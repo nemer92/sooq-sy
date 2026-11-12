@@ -15,10 +15,8 @@ import {
   Shirt,
   Wrench,
   PawPrint,
-  GraduationCap,
   ChevronLeft,
   Heart,
-  SlidersHorizontal,
 } from "lucide-react";
 
 type Category = {

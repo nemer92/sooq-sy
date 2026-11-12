@@ -1023,7 +1023,7 @@ const matchesCategory =
       ad.description.toLowerCase().includes(query);
 
 return matchesCategory && matchesSearch && matchesCity;  })
-  .map((ad, index) => (
+  .map((ad) => (
 <article
   key={ad.id}
   onClick={() => navigate(`/ad/${ad.id}`)}

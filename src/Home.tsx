@@ -115,7 +115,7 @@ async function toggleFavorite(adId: string) {
   }
 }
 const [adsLoading, setAdsLoading] = useState(true);
-const [categoriesLoading, setCategoriesLoading] = useState(true);
+const [, setCategoriesLoading] = useState(true);
 const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
 const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(null);
 const [searchQuery, setSearchQuery] = useState("");

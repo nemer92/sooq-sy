@@ -74,7 +74,7 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
 }
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename="/sooq-sy">
       <MaintenanceGuard>
   <Routes>
         <Route path="/" element={<Home />} />

@@ -21,7 +21,7 @@ export default function AddAd() {
   const searchParams = new URLSearchParams(window.location.search);
   const initialType = searchParams.get("type");
 
-  const [listingType, setListingType] = useState<"sale" | "donation">(
+  const [listingType] = useState<"sale" | "donation">(
     initialType === "donation" ? "donation" : "sale"
   );
 

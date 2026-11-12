@@ -76,7 +76,7 @@ export default function Home() {
     const [cities, setCities] = useState<City[]>([]);
     const [governorates, setGovernorates] = useState<Governorate[]>([]);
 const [selectedGovernorate, setSelectedGovernorate] = useState("");
-const [citiesLoading, setCitiesLoading] = useState(true);
+const [, setCitiesLoading] = useState(true);
     const [ads, setAds] = useState<Ad[]>([]);
     const [donations, setDonations] = useState<Ad[]>([]);
 const [donationsLoading, setDonationsLoading] = useState(true);

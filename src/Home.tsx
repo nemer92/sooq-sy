@@ -68,6 +68,7 @@ type Ad = {
   category_name: string;
   created_at: string;
   images: string[];
+  is_featured?: boolean;
 };
 
 export default function Home() {
@@ -78,6 +79,7 @@ export default function Home() {
 const [selectedGovernorate, setSelectedGovernorate] = useState("");
 const [, setCitiesLoading] = useState(true);
     const [ads, setAds] = useState<Ad[]>([]);
+    const [featuredAds, setFeaturedAds] = useState<Ad[]>([]);
     const [donations, setDonations] = useState<Ad[]>([]);
 const [donationsLoading, setDonationsLoading] = useState(true);
 const [favoriteAdIds, setFavoriteAdIds] = useState<string[]>([]);
@@ -122,6 +124,7 @@ const [searchQuery, setSearchQuery] = useState("");
 const [selectedCity, setSelectedCity] = useState("");
 const [siteName, setSiteName] = useState("Sooq.Sy");
 const [logoUrl, setLogoUrl] = useState("");
+const [heroImageUrl, setHeroImageUrl] = useState("");
 const [contactEmail, setContactEmail] = useState("");
 const [contactPhone, setContactPhone] = useState("");
 const [allowNewAds, setAllowNewAds] = useState(true);
@@ -157,7 +160,7 @@ useEffect(() => {
   async function loadSiteSettings() {
     const { data, error } = await supabase
       .from("site_settings")
-      .select("site_name, logo_url, contact_email, contact_phone, allow_new_ads")
+      .select("site_name, logo_url, hero_image_url, contact_email, contact_phone, allow_new_ads")
       .eq("id", 1)
       .single();
 
@@ -168,6 +171,7 @@ useEffect(() => {
 
     setSiteName(data.site_name || "Sooq.Sy");
     setLogoUrl(data.logo_url || "");
+    setHeroImageUrl(data.hero_image_url || "");
     setContactEmail(data.contact_email || "");
     setContactPhone(data.contact_phone || "");
     setAllowNewAds(data.allow_new_ads ?? true);
@@ -318,6 +322,7 @@ useEffect(() => {
         city_id,
         condition,
         created_at,
+        is_featured,
         categories(name_ar),
         cities(name_ar),
         ad_images(image_path, sort_order)
@@ -362,6 +367,7 @@ useEffect(() => {
             listing_type: ad.listing_type,
             condition: ad.condition,
             created_at: ad.created_at,
+            is_featured: ad.is_featured ?? false,
             category_name: ad.categories?.name_ar ?? "",
             city_name: ad.cities?.name_ar ?? "",
             images: signedImages.filter(Boolean),
@@ -849,7 +855,18 @@ useEffect(() => {
 
 
       <main className="mx-auto max-w-7xl px-5 pb-16">
-        <section className="relative mt-7 overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-950 via-emerald-800 to-emerald-600 px-7 py-12 text-white md:px-14 md:py-16">
+        <section
+  className="relative mt-7 overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-950 via-emerald-800 to-emerald-600 px-7 py-12 text-white md:px-14 md:py-16"
+  style={
+    heroImageUrl
+      ? {
+          backgroundImage: `linear-gradient(rgba(2, 44, 34, 0.72), rgba(2, 44, 34, 0.72)), url("${heroImageUrl}")`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }
+      : undefined
+  }
+>
           <div className="relative z-10 max-w-2xl">
             <span className="mb-5 inline-block rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold">
               سوق واحد... كل ما تبحث عنه

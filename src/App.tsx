@@ -154,6 +154,9 @@ function App() {
   const [allowNewAds, setAllowNewAds] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
+  const [heroImageUrl, setHeroImageUrl] = useState("");
+  const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
+const [heroImageUploading, setHeroImageUploading] = useState(false);
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
 
@@ -918,7 +921,7 @@ const loadSettings = useCallback(async () => {
   try {
     const { data, error } = await supabase
       .from("site_settings")
-      .select("site_name, logo_url, contact_email, contact_phone, allow_new_ads, maintenance_mode")
+      .select("site_name, logo_url, hero_image_url, contact_email, contact_phone, allow_new_ads, maintenance_mode")
       .eq("id", 1)
       .single();
 
@@ -926,6 +929,7 @@ const loadSettings = useCallback(async () => {
 
     setSiteName(data.site_name ?? "Sooq.Sy");
     setLogoUrl(data.logo_url ?? "");
+    setHeroImageUrl(data.hero_image_url || "");
     setContactEmail(data.contact_email ?? "");
     setContactPhone(data.contact_phone ?? "");
     setAllowNewAds(data.allow_new_ads ?? true);
@@ -941,7 +945,44 @@ const loadSettings = useCallback(async () => {
     setSettingsLoading(false);
   }
 }, []);
+const uploadHeroImage = async () => {
+  if (!heroImageFile) {
+    setSettingsError("يرجى اختيار صورة أولاً.");
+    return;
+  }
 
+  setHeroImageUploading(true);
+  setSettingsError("");
+  setSettingsSuccess("");
+
+  try {
+    const fileExt = heroImageFile.name.split(".").pop() || "jpg";
+    const filePath = `hero-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("site-images")
+      .upload(filePath, heroImageFile, {
+        upsert: true,
+        contentType: heroImageFile.type,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from("site-images")
+      .getPublicUrl(filePath);
+
+    setHeroImageUrl(data.publicUrl);
+    setHeroImageFile(null);
+    setSettingsSuccess("تم رفع صورة الواجهة بنجاح. اضغط حفظ الإعدادات لتثبيت الرابط.");
+  } catch (err) {
+    setSettingsError(
+      err instanceof Error ? err.message : "تعذر رفع الصورة."
+    );
+  } finally {
+    setHeroImageUploading(false);
+  }
+};
 const saveSettings = useCallback(async () => {
   setSettingsSaving(true);
   setSettingsError("");
@@ -953,6 +994,7 @@ const saveSettings = useCallback(async () => {
       .update({
         site_name: siteName,
         logo_url: logoUrl || null,
+        hero_image_url: heroImageUrl || null,
         contact_email: contactEmail || null,
         contact_phone: contactPhone || null,
         allow_new_ads: allowNewAds,
@@ -971,7 +1013,7 @@ const saveSettings = useCallback(async () => {
   } finally {
     setSettingsSaving(false);
   }
-}, [siteName, logoUrl, contactEmail, contactPhone, allowNewAds, maintenanceMode]);
+}, [siteName, logoUrl, heroImageUrl, contactEmail, contactPhone, allowNewAds, maintenanceMode]);
 const loadGovernorates = useCallback(async () => {
   const { data, error } = await supabase
     .from("governorates")
@@ -2743,7 +2785,37 @@ function getSubCategories(categoryId: number) {
           placeholder="رابط صورة الشعار"
         />
       </div>
+<div className="border rounded-xl p-4">
+  <label className="block font-semibold mb-2">
+    صورة الواجهة الرئيسية
+  </label>
 
+  {heroImageUrl && (
+    <img
+      src={heroImageUrl}
+      alt="معاينة صورة الواجهة"
+      className="w-full max-h-64 object-cover rounded-lg mb-3"
+    />
+  )}
+
+  <input
+    type="file"
+    accept="image/jpeg,image/png,image/webp"
+    onChange={(e) =>
+      setHeroImageFile(e.target.files?.[0] || null)
+    }
+    className="w-full border rounded-lg p-3"
+  />
+
+  <button
+    type="button"
+    onClick={uploadHeroImage}
+    disabled={!heroImageFile || heroImageUploading}
+    className="mt-3 bg-blue-600 text-white px-5 py-2 rounded-lg disabled:opacity-50"
+  >
+    {heroImageUploading ? "جارٍ رفع الصورة..." : "رفع صورة الواجهة"}
+  </button>
+</div>
       <div>
         <label>البريد الإلكتروني للتواصل</label>
         <input

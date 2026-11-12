@@ -1,4 +1,5 @@
 import { StrictMode, useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "./lib/supabase";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
@@ -74,7 +75,7 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
 }
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <BrowserRouter basename="/sooq-sy">
+   <BrowserRouter basename={Capacitor.isNativePlatform() ? "/" : "/sooq-sy"}>
       <MaintenanceGuard>
   <Routes>
         <Route path="/" element={<Home />} />

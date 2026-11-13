@@ -1,5 +1,5 @@
 
-name: Deploy Sooq.Sy to GitHub Pages
+name: Deploy Sooq.Sy and Android Updates
 
 on:
   push:
@@ -22,10 +22,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
@@ -33,14 +33,42 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      - name: Build Website
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Build Android Update
+        run: CAPACITOR_BUILD=true npx vite build --outDir dist-native
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Package Android Update
+        run: |
+          mkdir -p dist/updates
+
+          BUNDLE_ID="${GITHUB_SHA}"
+          ZIP_NAME="bundle-${GITHUB_SHA}.zip"
+          ZIP_PATH="dist/updates/${ZIP_NAME}"
+
+          cd dist-native
+          zip -r "../${ZIP_PATH}" .
+          cd ..
+
+          CHECKSUM=$(sha256sum "${ZIP_PATH}" | cut -d ' ' -f 1)
+
+          cat > dist/updates/latest.json <<EOF
+          {
+            "bundleId": "${BUNDLE_ID}",
+            "downloadUrl": "https://nemer92.github.io/sooq-sy/updates/${ZIP_NAME}",
+            "checksum": "${CHECKSUM}"
+          }
+          EOF
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
@@ -54,4 +82,4 @@ jobs:
     steps:
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v4

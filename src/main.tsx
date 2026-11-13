@@ -15,8 +15,7 @@ import Messages from "./Messages.tsx";
 import Favorites from "./Favorites.tsx";
 import Profile from "./Profile";
 import AdminConversation from "./AdminConversation";
-import PushNotificationsSetup from "./PushNotificationsSetup";
-import { LiveUpdate } from "@capawesome/capacitor-live-update";
+import PushNotificationsSetup from "./PushNotificationsSetup";import LiveUpdateReady from "./LiveUpdateReady";
 
 function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -78,23 +77,7 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
-let liveUpdateReadyCalled = false;
 
-function LiveUpdateReady() {
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform() || liveUpdateReadyCalled) {
-      return;
-    }
-
-    liveUpdateReadyCalled = true;
-
-    LiveUpdate.ready().catch((error) => {
-      console.error("Live Update Ready Error:", error);
-    });
-  }, []);
-
-  return null;
-}
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
 <BrowserRouter basename={Capacitor.isNativePlatform() ? "/" : "/sooq-sy"}>

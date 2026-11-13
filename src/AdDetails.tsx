@@ -197,13 +197,13 @@ if (sellerError) {
         error: userError,
       } = await supabase.auth.getUser();
 
-      if (userError) throw userError;
+if (!user) {
+  alert("يرجى تسجيل الدخول أولاً لمراسلة البائع.");
+  navigate("/auth");
+  return;
+}
 
-      if (!user) {
-        alert("يرجى تسجيل الدخول أولاً لمراسلة البائع.");
-        navigate("/auth");
-        return;
-      }
+if (userError) throw userError;
 
       if (user.id === ad.user_id) {
         alert("لا يمكنك مراسلة نفسك على إعلانك الشخصي.");

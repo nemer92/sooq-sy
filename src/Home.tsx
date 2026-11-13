@@ -15,8 +15,9 @@ import {
   Shirt,
   Wrench,
   PawPrint,
-  ChevronLeft,
-  Heart,
+  LogOut,
+    Heart,
+  Bell,
 } from "lucide-react";
 
 type Category = {
@@ -76,13 +77,66 @@ export default function Home() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [cities, setCities] = useState<City[]>([]);
     const [governorates, setGovernorates] = useState<Governorate[]>([]);
-const [selectedGovernorate, setSelectedGovernorate] = useState("");
-const [, setCitiesLoading] = useState(true);
+    const [selectedGovernorate, setSelectedGovernorate] = useState("");
+    const [, setCitiesLoading] = useState(true);
     const [ads, setAds] = useState<Ad[]>([]);
     const [featuredAds, setFeaturedAds] = useState<Ad[]>([]);
+    const [featuredAdsLoading, setFeaturedAdsLoading] = useState(true);
     const [donations, setDonations] = useState<Ad[]>([]);
-const [donationsLoading, setDonationsLoading] = useState(true);
-const [favoriteAdIds, setFavoriteAdIds] = useState<string[]>([]);
+    const [donationsLoading, setDonationsLoading] = useState(true);
+    const [favoriteAdIds, setFavoriteAdIds] = useState<string[]>([]);
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+    const [showNotifications, setShowNotifications] = useState(false);
+const loadNotifications = async (userId: string) => {
+  const { data, error } = await supabase
+    .from("user_notifications")
+    .select(`
+      id,
+      notification_id,
+      read_at,
+      created_at,
+      notifications (
+        title,
+        body,
+        link
+      )
+    `)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error loading notifications:", error);
+    return;
+  }
+
+  setNotifications(data || []);
+  setUnreadNotificationsCount(
+    (data || []).filter((item: any) => !item.read_at).length
+  );
+};
+
+const markNotificationAsRead = async (notificationId: string) => {
+  const { error } = await supabase
+    .from("user_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", notificationId);
+
+  if (error) {
+    console.error("Error marking notification as read:", error);
+    return;
+  }
+
+  setNotifications((prev) =>
+    prev.map((item) =>
+      item.id === notificationId && !item.read_at
+        ? { ...item, read_at: new Date().toISOString() }
+        : item
+    )
+  );
+
+  setUnreadNotificationsCount((prev) => Math.max(0, prev - 1));
+};
 async function toggleFavorite(adId: string) {
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -135,7 +189,6 @@ const [messageNotification, setMessageNotification] = useState<{
   senderName: string;
   message: string;
 } | null>(null);
-
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
 
@@ -149,13 +202,21 @@ useEffect(() => {
 
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => {
-    setIsLoggedIn(!!session);
-  });
+} = supabase.auth.onAuthStateChange((_event, session) => {
+  setIsLoggedIn(!!session);
 
-  return () => subscription.unsubscribe();
+  if (session?.user) {
+    setTimeout(() => {
+  loadNotifications(session.user.id);
+}, 0);
+  } else {
+    setNotifications([]);
+    setUnreadNotificationsCount(0);
+  }
+});
+
+return () => subscription.unsubscribe();
 }, []);
-
 useEffect(() => {
   async function loadSiteSettings() {
     const { data, error } = await supabase
@@ -209,18 +270,36 @@ useEffect(() => {
       return;
     }
 
-    const { count, error } = await supabase
-      .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("is_read", false)
-      .neq("sender_id", user.id);
+const { data: conversations, error: conversationsError } = await supabase
+  .from("conversations")
+  .select("id")
+  .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`);
 
-    if (error) {
-      console.error("خطأ تحميل عدد الرسائل غير المقروءة:", error);
-      return;
-    }
+if (conversationsError) {
+  console.error("خطأ تحميل المحادثات:", conversationsError);
+  return;
+}
 
-    setUnreadMessagesCount(count ?? 0);
+const conversationIds = (conversations ?? []).map((item) => item.id);
+
+if (conversationIds.length === 0) {
+  setUnreadMessagesCount(0);
+  return;
+}
+
+const { count, error } = await supabase
+  .from("messages")
+  .select("id", { count: "exact", head: true })
+  .in("conversation_id", conversationIds)
+  .eq("is_read", false)
+  .neq("sender_id", user.id);
+
+if (error) {
+  console.error("خطأ تحميل عدد الرسائل غير المقروءة:", error);
+  return;
+}
+
+setUnreadMessagesCount(count ?? 0);
   }
 
   loadUnreadMessagesCount();
@@ -400,7 +479,85 @@ if (user) {
 
   loadAds();
 }, []);
+useEffect(() => {
+  async function loadFeaturedAds() {
+    const { data, error } = await supabase
+      .from("ads")
+      .select(`
+        id,
+        title,
+        description,
+        price,
+        currency,
+        listing_type,
+        category_id,
+        city_id,
+        condition,
+        created_at,
+        is_featured,
+        categories(name_ar),
+        cities(name_ar),
+        ad_images(image_path, sort_order)
+      `)
+      .eq("status", "approved")
+      .eq("listing_type", "sale")
+      .eq("is_featured", true)
+      .order("created_at", { ascending: false })
+      .limit(6);
 
+if (error) {
+  console.error("خطأ تحميل الإعلانات المميزة:", error);
+  setFeaturedAdsLoading(false);
+  return;
+}
+
+    const formattedAds: Ad[] = await Promise.all(
+      (data ?? []).map(async (ad: any) => {
+        const sortedImages = (ad.ad_images ?? []).sort(
+          (a: any, b: any) => a.sort_order - b.sort_order
+        );
+
+        const signedImages = await Promise.all(
+          sortedImages.map(async (image: any) => {
+            const { data: imageData, error: imageError } =
+              await supabase.storage
+                .from("ad-images")
+                .createSignedUrl(image.image_path, 3600);
+
+            if (imageError) {
+              console.error("خطأ تحميل صورة الإعلان المميز:", imageError);
+              return "";
+            }
+
+            return imageData.signedUrl;
+          })
+        );
+
+        return {
+          id: ad.id,
+          city_id: ad.city_id,
+          title: ad.title,
+          category_id: ad.category_id,
+          description: ad.description,
+          price: ad.price,
+          currency: ad.currency,
+          listing_type: ad.listing_type,
+          condition: ad.condition,
+          created_at: ad.created_at,
+          is_featured: true,
+          category_name: ad.categories?.name_ar ?? "",
+          city_name: ad.cities?.name_ar ?? "",
+          images: signedImages.filter(Boolean),
+        };
+      })
+    );
+
+    setFeaturedAds(formattedAds);
+    setFeaturedAdsLoading(false);
+  }
+
+  loadFeaturedAds();
+}, []);
 useEffect(() => {
   async function loadDonations() {
     const { data, error } = await supabase
@@ -535,6 +692,39 @@ useEffect(() => {
 
   loadCities();
 }, []);
+
+const filteredLatestAds = ads.filter((ad) => {
+  const matchesCategory =
+    selectedSubCategory !== null
+      ? Number(ad.category_id) === selectedSubCategory
+      : selectedCategory === null ||
+        Number(ad.category_id) === selectedCategory ||
+        categories.some(
+          (sub) =>
+            sub.parent_id === selectedCategory &&
+            sub.id === Number(ad.category_id)
+        );
+
+  const matchesCity =
+    selectedCity !== ""
+      ? String(ad.city_id) === selectedCity
+      : selectedGovernorate === "" ||
+        cities.some(
+          (city) =>
+            String(city.governorate_id) === selectedGovernorate &&
+            city.id === ad.city_id
+        );
+
+  const query = searchQuery.trim().toLowerCase();
+
+  const matchesSearch =
+    query === "" ||
+    ad.title.toLowerCase().includes(query) ||
+    ad.description.toLowerCase().includes(query);
+
+  return !ad.is_featured && matchesCategory && matchesSearch && matchesCity;
+});
+
   return (
     <div dir="rtl" className="min-h-screen bg-[#f7f8fa] text-slate-800">
       
@@ -663,18 +853,152 @@ useEffect(() => {
 </button>
           </div>
 
-          <div className="hidden items-center gap-4 md:flex">
+
+<div className="hidden items-center gap-4 md:flex">
   {isLoggedIn ? (
-    <button
-      onClick={() => navigate("/my-ads")}
-      className="flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-    >
-      <UserRound size={18} />
-      إعلاناتي
-    </button>
-    
+    <>
+      <button
+        onClick={() => navigate("/my-ads")}
+        className="flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+      >
+        <UserRound size={18} />
+        إعلاناتي
+      </button>
+
+      <button
+        onClick={() => navigate("/profile")}
+        className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-emerald-700"
+      >
+        <UserRound size={18} />
+        الملف الشخصي
+      </button>
+
+<button
+  onClick={() => navigate("/messages")}
+  className="flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+>
+  <span>رسائلي</span>
+  {unreadMessagesCount > 0 && (
+    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+      {unreadMessagesCount}
+    </span>
+  )}
+</button>
+
+<div className="relative">
+  <button
+    onClick={() => setShowNotifications(!showNotifications)}
+    className="relative flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+  >
+    <Bell size={20} />
+    <span>الإشعارات</span>
+    {unreadNotificationsCount > 0 && (
+      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+        {unreadNotificationsCount}
+      </span>
+    )}
+  </button>
+
+  {showNotifications && (
+    <div className="absolute left-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+      <div className="border-b border-slate-100 px-4 py-3">
+        <h3 className="font-bold text-slate-800">الإشعارات</h3>
+      </div>
+
+      <div className="max-h-96 overflow-y-auto">
+        {notifications.length === 0 ? (
+          <p className="p-5 text-center text-sm text-slate-500">
+            لا توجد إشعارات حالياً
+          </p>
+        ) : (
+          notifications.map((item: any) => {
+            const notification = Array.isArray(item.notifications)
+              ? item.notifications[0]
+              : item.notifications;
+
+            return (
+<div
+  key={item.id}
+onClick={async () => {
+  if (!item.read_at) {
+    await markNotificationAsRead(item.id);
+  }
+
+  setShowNotifications(false);
+
+  if (notification?.link) {
+    if (/^https?:\/\//i.test(notification.link)) {
+      window.open(notification.link, "_blank", "noopener,noreferrer");
+    } else {
+      navigate(
+        notification.link.startsWith("/")
+          ? notification.link
+          : `/${notification.link}`
+      );
+    }
+  }
+}}
+  className={`cursor-pointer border-b border-slate-100 p-4 ${
+    !item.read_at ? "bg-emerald-50" : "bg-white"
+  }`}
+>
+                <p className="font-bold text-slate-800">
+                  {notification?.title}
+                </p>
+
+                <p className="mt-1 text-sm text-slate-600">
+                  {notification?.body}
+                </p>
+
+                <p className="mt-2 text-xs text-slate-400">
+                  {new Date(item.created_at).toLocaleString("ar")}
+                </p>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  )}
+</div>
+
+      <button
+        onClick={() => navigate("/favorites")}
+        className="flex items-center gap-2 text-sm font-semibold text-rose-600 hover:text-rose-700"
+      >
+        <Heart size={18} />
+        <span>مفضلتي</span>
+        {favoriteAdIds.length > 0 && (
+          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">
+            {favoriteAdIds.length}
+          </span>
+        )}
+      </button>
+
+      <button
+onClick={async () => {
+  const confirmed = window.confirm(
+    "هل أنت متأكد أنك تريد تسجيل الخروج؟"
+  );
+
+  if (!confirmed) return;
+
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    alert("تعذر تسجيل الخروج، حاول مرة أخرى.");
+    return;
+  }
+
+  navigate("/");
+}}
+        className="flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700"
+      >
+        <LogOut size={18} />
+        تسجيل الخروج
+      </button>
+    </>
   ) : (
-    
     <button
       onClick={() => navigate("/auth")}
       className="flex items-center gap-2 text-sm font-semibold text-slate-600"
@@ -683,50 +1007,34 @@ useEffect(() => {
       تسجيل الدخول
     </button>
   )}
-<button
-  onClick={() => navigate("/messages")}
-  className="flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
->
-  <span>رسائلي</span>
-{unreadMessagesCount > 0 && (
-  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-    {unreadMessagesCount}
-  </span>
-)}
-</button>
-<button
-  onClick={() => navigate("/favorites")}
-  className="flex items-center gap-2 text-sm font-semibold text-rose-600 hover:text-rose-700"
->
-  <Heart size={18} />
-  <span>مفضلتي</span>
 
-  {favoriteAdIds.length > 0 && (
-    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">
-      {favoriteAdIds.length}
-    </span>
+  {allowNewAds && (
+    <button
+      onClick={() => navigate("/add-ad")}
+      className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
+    >
+      <Plus size={19} />
+      أضف إعلانك
+    </button>
   )}
-</button>
-{allowNewAds && (
-  <button
-    onClick={() => navigate("/add-ad")}
-    className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
-  >
-    <Plus size={19} />
-    أضف إعلانك
-  </button>
-)}
 </div>
+
+
 
 
 <button
   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
   aria-label="فتح القائمة"
-  className="rounded-lg p-2 text-slate-600 md:hidden"
+  className="relative rounded-lg p-2 text-slate-600 md:hidden"
 >
   <Menu size={24} />
+
+{(unreadMessagesCount > 0 || unreadNotificationsCount > 0) && (
+  <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+)}
 </button>
 </div>
+
 
 {isMobileMenuOpen && (
   <div className="border-t border-slate-100 bg-white px-5 py-4 shadow-md md:hidden">
@@ -743,27 +1051,80 @@ useEffect(() => {
             <UserRound size={18} className="ml-2 inline" />
             إعلاناتي
           </button>
+
           <button
             onClick={() => {
               setIsMobileMenuOpen(false);
-              navigate("/messages");
+              navigate("/profile");
             }}
-            className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+            className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
           >
-                        <span>رسائلي</span>
-            {unreadMessagesCount > 0 && (
-              <span className="mr-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-                {unreadMessagesCount}
-              </span>
-            )}
+            <UserRound size={18} className="ml-2 inline" />
+            الملف الشخصي
           </button>
-          <button
 
-            onClick={async () => {
-              await supabase.auth.signOut();
+<button
+  onClick={() => {
+    setIsMobileMenuOpen(false);
+    navigate("/messages");
+  }}
+  className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+>
+  رسائلي
+  {unreadMessagesCount > 0 && (
+    <span className="mr-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+      {unreadMessagesCount}
+    </span>
+  )}
+</button>
+
+<button
+  onClick={() => {
+    setIsMobileMenuOpen(false);
+    setShowNotifications(true);
+  }}
+  className="flex items-center justify-between rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+>
+  <span className="flex items-center gap-2">
+    <Bell size={18} />
+    الإشعارات
+  </span>
+  {unreadNotificationsCount > 0 && (
+    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+      {unreadNotificationsCount}
+    </span>
+  )}
+</button>
+
+          <button
+            onClick={() => {
               setIsMobileMenuOpen(false);
-              navigate("/");
+              navigate("/favorites");
             }}
+            className="rounded-xl px-4 py-3 text-right text-sm font-bold text-rose-600 hover:bg-rose-50"
+          >
+            <Heart size={18} className="ml-2 inline" />
+            مفضلتي
+          </button>
+
+          <button
+onClick={async () => {
+  const confirmed = window.confirm(
+    "هل أنت متأكد أنك تريد تسجيل الخروج؟"
+  );
+
+  if (!confirmed) return;
+
+  const { error } = await supabase.auth.signOut();
+
+  if (error) {
+    alert("تعذر تسجيل الخروج، حاول مرة أخرى.");
+    return;
+  }
+
+  setIsMobileMenuOpen(false);
+  navigate("/");
+}}
             className="rounded-xl px-4 py-3 text-right text-sm font-semibold text-red-600 hover:bg-red-50"
           >
             تسجيل الخروج
@@ -777,22 +1138,102 @@ useEffect(() => {
           }}
           className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
         >
+          <UserRound size={18} className="ml-2 inline" />
           تسجيل الدخول
         </button>
       )}
 
-{allowNewAds && (
-  <button
-    onClick={() => {
-      setIsMobileMenuOpen(false);
-      navigate("/add-ad");
-    }}
-    className="rounded-xl bg-emerald-600 px-4 py-3 text-right text-sm font-bold text-white hover:bg-emerald-700"
-  >
-    <Plus size={18} className="ml-2 inline" />
-    أضف إعلانك
-  </button>
+      {allowNewAds && (
+        <button
+          onClick={() => {
+            setIsMobileMenuOpen(false);
+            navigate("/add-ad");
+          }}
+          className="rounded-xl bg-emerald-600 px-4 py-3 text-right text-sm font-bold text-white hover:bg-emerald-700"
+        >
+          <Plus size={18} className="ml-2 inline" />
+          أضف إعلانك
+        </button>
+      )}
+    </div>
+  </div>
 )}
+
+{showNotifications && (
+  <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 px-4 pt-20 md:hidden">
+    <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+
+      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
+        <h3 className="font-bold text-slate-800">
+          الإشعارات
+        </h3>
+
+        <button
+          onClick={() => setShowNotifications(false)}
+          className="rounded-lg px-3 py-1 text-sm font-bold text-red-600 hover:bg-red-50"
+        >
+          إغلاق
+        </button>
+      </div>
+
+      <div className="max-h-[70vh] overflow-y-auto">
+        {notifications.length === 0 ? (
+          <p className="p-6 text-center text-sm text-slate-500">
+            لا توجد إشعارات حالياً
+          </p>
+        ) : (
+          notifications.map((item: any) => {
+            const notification = Array.isArray(item.notifications)
+              ? item.notifications[0]
+              : item.notifications;
+
+            return (
+              <div
+                key={item.id}
+                onClick={async () => {
+                  if (!item.read_at) {
+                    await markNotificationAsRead(item.id);
+                  }
+
+                  setShowNotifications(false);
+
+                  if (notification?.link) {
+                    if (/^https?:\/\//i.test(notification.link)) {
+                      window.open(
+                        notification.link,
+                        "_blank",
+                        "noopener,noreferrer"
+                      );
+                    } else {
+                      navigate(
+                        notification.link.startsWith("/")
+                          ? notification.link
+                          : `/${notification.link}`
+                      );
+                    }
+                  }
+                }}
+                className={`cursor-pointer border-b border-slate-100 p-4 ${
+                  !item.read_at ? "bg-emerald-50" : "bg-white"
+                }`}
+              >
+                <p className="font-bold text-slate-800">
+                  {notification?.title}
+                </p>
+
+                <p className="mt-1 text-sm text-slate-600">
+                  {notification?.body}
+                </p>
+
+                <p className="mt-2 text-xs text-slate-400">
+                  {new Date(item.created_at).toLocaleString("ar")}
+                </p>
+              </div>
+            );
+          })
+        )}
+      </div>
+
     </div>
   </div>
 )}
@@ -984,126 +1425,139 @@ onClick={() => {
           </div>
         </section>
 
-        <section className="mt-14">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-black text-slate-900">إعلانات مميزة</h2>
-                <span className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">مختارة</span>
-              </div>
-              <p className="mt-1 text-sm text-slate-500">مجموعة من الإعلانات التي تستحق المشاهدة</p>
-            </div>
-            <button className="flex items-center gap-1 text-sm font-bold text-emerald-700">
-              عرض الكل <ChevronLeft size={17} />
-            </button>
-          </div>
-            {adsLoading && (
-            <p className="py-8 text-center text-sm text-slate-500">
-                جارٍ تحميل الإعلانات...
-            </p>
-            )}
-<div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
-  {!adsLoading && ads.length === 0 && (
-    <p className="col-span-full py-10 text-center text-sm text-slate-500">
-      لا توجد إعلانات متاحة حالياً، كن أول من ينشر إعلاناً!
+<section className="mt-14">
+  <div className="mb-6 flex items-center justify-between">
+    <div>
+      <div className="flex items-center gap-2">
+        <h2 className="text-xl font-black text-slate-900">إعلانات مميزة</h2>
+        <span className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">
+          مختارة
+        </span>
+      </div>
+      <p className="mt-1 text-sm text-slate-500">
+        مجموعة من الإعلانات التي تستحق المشاهدة
+      </p>
+    </div>
+  </div>
+
+  {featuredAdsLoading && (
+    <p className="py-8 text-center text-sm text-slate-500">
+      جارٍ تحميل الإعلانات...
     </p>
   )}
 
-{ads
-  .filter((ad) => {
-const matchesCategory =
-  selectedSubCategory !== null
-    ? Number(ad.category_id) === selectedSubCategory
-    : selectedCategory === null ||
-      Number(ad.category_id) === selectedCategory ||
-      categories.some(
-        (sub) =>
-          sub.parent_id === selectedCategory &&
-          sub.id === Number(ad.category_id)
-      );
-    const matchesCity =
-  selectedCity !== ""
-    ? String(ad.city_id) === selectedCity
-    : selectedGovernorate === "" ||
-      cities.some(
-        (city) =>
-          String(city.governorate_id) === selectedGovernorate &&
-          city.id === ad.city_id
-      );
+ {!featuredAdsLoading && featuredAds.length === 0 && (
+    <p className="py-10 text-center text-sm text-slate-500">
+      لا توجد إعلانات مميزة حالياً.
+    </p>
+  )}
 
-    const query = searchQuery.trim().toLowerCase();
+  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    {featuredAds
+      .filter((ad) => {
+        const matchesCategory =
+          selectedSubCategory !== null
+            ? Number(ad.category_id) === selectedSubCategory
+            : selectedCategory === null ||
+              Number(ad.category_id) === selectedCategory ||
+              categories.some(
+                (sub) =>
+                  sub.parent_id === selectedCategory &&
+                  sub.id === Number(ad.category_id)
+              );
 
-    const matchesSearch =
-      query === "" ||
-      ad.title.toLowerCase().includes(query) ||
-      ad.description.toLowerCase().includes(query);
+        const matchesCity =
+          selectedCity !== ""
+            ? String(ad.city_id) === selectedCity
+            : selectedGovernorate === "" ||
+              cities.some(
+                (city) =>
+                  String(city.governorate_id) === selectedGovernorate &&
+                  city.id === ad.city_id
+              );
 
-return matchesCategory && matchesSearch && matchesCity;  })
-  .map((ad) => (
-<article
-  key={ad.id}
-  onClick={() => navigate(`/ad/${ad.id}`)}
-  className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-100 bg-white transition hover:-translate-y-1 hover:shadow-lg"
->                <div className="relative h-52 overflow-hidden bg-slate-100">
-{ad.images.length > 0 ? (
-  <img
-    src={ad.images[0]}
-    alt={ad.title}
-    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-  />
-) : (
-  <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
-    <Car size={48} />
-  </div>
-)}
-                  <span className="absolute right-3 top-3 rounded-lg bg-white/95 px-3 py-1.5 text-xs font-bold text-slate-700">
-                    {ad.condition === "used"
-  ? "مستعمل"
-  : ad.condition === "new"
-    ? "جديد"
-    : ad.condition}
-                  </span>
-<button
-  type="button"
-  aria-label="إضافة للمفضلة"
-onClick={(e) => {
-  e.stopPropagation();
-  toggleFavorite(ad.id);
-}}
-  className="absolute left-3 top-3 rounded-full bg-white/90 p-2 text-slate-500 hover:text-red-500"
->
-  <Heart
-  size={18}
-  fill={favoriteAdIds.includes(ad.id) ? "currentColor" : "none"}
-  className={favoriteAdIds.includes(ad.id) ? "text-red-500" : ""}
- />
-</button>
-                </div>
-                <div className="p-4">
-                  <h3 className="line-clamp-2 min-h-12 font-bold leading-6 text-slate-800">
-                    {ad.title}
-                  </h3>
-                  <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-xl font-black text-emerald-700">{ad.price?.toLocaleString("en-US") ?? "السعر عند التواصل"}</span>
-<span className="text-xs font-semibold text-slate-500">
-  {ad.currency === "USD"
-    ? "دولار"
-    : ad.currency === "SYP"
-      ? "ليرة سورية"
-      : ad.currency}
-</span>                  </div>
-                  <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-400">
-                    <span className="flex items-center gap-1">
-                      <MapPin size={14} /> {ad.city_name}
-                    </span>
-                    <span>{new Date(ad.created_at).toLocaleDateString("ar-SY")}</span>
-                  </div>
-                </div>
-              </article>
-            ))}
+        const query = searchQuery.trim().toLowerCase();
+
+        const matchesSearch =
+          query === "" ||
+          ad.title.toLowerCase().includes(query) ||
+          ad.description.toLowerCase().includes(query);
+
+        return matchesCategory && matchesSearch && matchesCity;
+      })
+      .map((ad) => (
+        <article
+          key={ad.id}
+          onClick={() => navigate(`/ad/${ad.id}`)}
+          className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-100 bg-white transition hover:-translate-y-1 hover:shadow-lg"
+        >
+          <div className="relative h-52 overflow-hidden bg-slate-100">
+            {ad.images.length > 0 ? (
+              <img
+                src={ad.images[0]}
+                alt={ad.title}
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
+                <Car size={48} />
+              </div>
+            )}
+
+            <span className="absolute right-3 top-3 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700">
+              إعلان مميز
+            </span>
+
+            <button
+              type="button"
+              aria-label="إضافة للمفضلة"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFavorite(ad.id);
+              }}
+              className="absolute left-3 top-3 rounded-full bg-white/90 p-2 text-slate-500 hover:text-red-500"
+            >
+              <Heart
+                size={18}
+                fill={favoriteAdIds.includes(ad.id) ? "currentColor" : "none"}
+                className={favoriteAdIds.includes(ad.id) ? "text-red-500" : ""}
+              />
+            </button>
           </div>
-        </section>
+
+          <div className="p-4">
+            <h3 className="line-clamp-2 min-h-12 font-bold leading-6 text-slate-800">
+              {ad.title}
+            </h3>
+
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="text-xl font-black text-emerald-700">
+                {ad.price?.toLocaleString("en-US") ?? "السعر عند التواصل"}
+              </span>
+              <span className="text-xs font-semibold text-slate-500">
+                {ad.currency === "USD"
+                  ? "دولار"
+                  : ad.currency === "SYP"
+                    ? "ليرة سورية"
+                    : ad.currency}
+              </span>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-400">
+              <span className="flex items-center gap-1">
+                <MapPin size={14} /> {ad.city_name}
+              </span>
+              <span>
+                {new Date(ad.created_at).toLocaleDateString("ar-SY")}
+              </span>
+            </div>
+          </div>
+        </article>
+      ))}
+  </div>
+</section>
+
 
 
 <section className="mt-14">
@@ -1188,6 +1642,101 @@ onClick={(e) => {
   </div>
 </section>
 
+
+<section className="mt-14" id="ads-section">
+  <div className="mb-6 flex items-center justify-between">
+    <div>
+      <h2 className="text-xl font-black text-slate-900">
+        أحدث الإعلانات
+      </h2>
+      <p className="mt-1 text-sm text-slate-500">
+        تصفح أحدث ما أُضيف إلى السوق
+      </p>
+    </div>
+  </div>
+
+  {adsLoading && (
+    <p className="py-8 text-center text-sm text-slate-500">
+      جارٍ تحميل الإعلانات...
+    </p>
+  )}
+
+  {!adsLoading && filteredLatestAds.length === 0 && (
+    <p className="py-10 text-center text-sm text-slate-500">
+      لا توجد إعلانات جديدة حالياً.
+    </p>
+  )}
+
+  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+{filteredLatestAds
+  .slice(0, 8)
+  .map((ad) => (
+        <article
+          key={ad.id}
+          onClick={() => navigate(`/ad/${ad.id}`)}
+          className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-100 bg-white transition hover:-translate-y-1 hover:shadow-lg"
+        >
+          <div className="relative h-52 overflow-hidden bg-slate-100">
+            {ad.images.length > 0 ? (
+              <img
+                src={ad.images[0]}
+                alt={ad.title}
+                className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-slate-400">
+                <Car size={45} />
+              </div>
+            )}
+
+            <button
+              type="button"
+              aria-label="إضافة للمفضلة"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFavorite(ad.id);
+              }}
+              className="absolute left-3 top-3 rounded-full bg-white/90 p-2 text-slate-500 hover:text-red-500"
+            >
+              <Heart
+                size={18}
+                fill={favoriteAdIds.includes(ad.id) ? "currentColor" : "none"}
+                className={favoriteAdIds.includes(ad.id) ? "text-red-500" : ""}
+              />
+            </button>
+          </div>
+
+          <div className="p-4">
+            <h3 className="line-clamp-2 min-h-12 font-bold leading-6 text-slate-800">
+              {ad.title}
+            </h3>
+
+            <div className="mt-3 flex items-baseline gap-1">
+              <span className="text-xl font-black text-emerald-700">
+                {ad.price?.toLocaleString("en-US") ?? "السعر عند التواصل"}
+              </span>
+              <span className="text-xs font-semibold text-slate-500">
+                {ad.currency === "USD"
+                  ? "دولار"
+                  : ad.currency === "SYP"
+                    ? "ليرة سورية"
+                    : ad.currency}
+              </span>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-400">
+              <span className="flex items-center gap-1">
+                <MapPin size={14} /> {ad.city_name}
+              </span>
+              <span>
+                {new Date(ad.created_at).toLocaleDateString("ar-SY")}
+              </span>
+            </div>
+          </div>
+        </article>
+      ))}
+  </div>
+</section>
 
 <section className="mt-8 overflow-hidden rounded-3xl border border-rose-100 bg-gradient-to-l from-rose-50 to-white p-7 md:flex md:items-center md:justify-between md:p-10">
   <div>

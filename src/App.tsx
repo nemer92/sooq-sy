@@ -49,6 +49,18 @@ type Profile = {
     count: number;
   }[];
 };
+type Notification = {
+  id: string;
+  title: string;
+  body: string;
+  link: string | null;
+  target_type: "all" | "governorate" | "city" | "category" | "favorites";
+  target_id: number | null;
+  scheduled_at: string | null;
+  sent_at: string | null;
+  status: "draft" | "scheduled" | "sent" | "failed";
+  created_at: string;
+};
 type Category = {
   id: number;
   parent_id: number | null;
@@ -88,17 +100,16 @@ type UserBan = {
 type Report = {
   id: string;
   reporter_id: string;
-  ad_id: string | null;
-  reported_user_id: string | null;
+  reported_user_id: string;
+  conversation_id: string;
   reason: string;
   details: string | null;
-  status: "pending" | "reviewed" | "resolved" | "dismissed";
+  status: "pending" | "reviewed" | "rejected" | "actioned";
   created_at: string;
   reporter_name?: string;
   reported_user_name?: string;
-  ad_title?: string;
+  active_ban?: boolean;
 };
-
 type NamedItem = {
   name_ar: string;
 };
@@ -123,7 +134,7 @@ type Ad = {
   created_at: string;
   category_id: number;
   city_id: number;
-
+  is_featured: boolean;
   profiles: Related<Profile>;
   categories: Related<NamedItem>;
   cities: Related<NamedItem>;
@@ -140,14 +151,26 @@ function getOne<T>(value: Related<T>): T | null {
 
 function App() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+const [phone, setPhone] = useState("");
+const [password, setPassword] = useState("");
 
   const [admin, setAdmin] = useState<AdminSession | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
+  const [notificationTitle, setNotificationTitle] = useState("");
+  const [notificationBody, setNotificationBody] = useState("");
+  const [notificationLink, setNotificationLink] = useState("");
+  const [notificationTarget, setNotificationTarget] = useState("all");
+  const [notificationTargetId, setNotificationTargetId] = useState("");
+  const [notificationScheduledAt, setNotificationScheduledAt] = useState("");
+  const [notificationSaving, setNotificationSaving] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [editingNotificationId, setEditingNotificationId] = useState<string | null>(null);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationsError, setNotificationsError] = useState("");
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationError, setNotificationError] = useState("");
   const [error, setError] = useState("");
   const [dataError, setDataError] = useState("");
   const [siteName, setSiteName] = useState("Sooq.Sy");
@@ -164,6 +187,9 @@ const [heroImageUploading, setHeroImageUploading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [settingsSuccess, setSettingsSuccess] = useState("");
+  const [adminLoginUpdating, setAdminLoginUpdating] = useState(false);
+const [adminLoginMessage, setAdminLoginMessage] = useState("");
+const [adminLoginError, setAdminLoginError] = useState("");
   const [activeMenu, setActiveMenu] = useState("الرئيسية");
 
   const [stats, setStats] = useState({
@@ -187,9 +213,9 @@ const [heroImageUploading, setHeroImageUploading] = useState(false);
   const reportStats = {
   all: reports.length,
   pending: reports.filter((r) => r.status === "pending").length,
-  reviewed: reports.filter((r) => r.status === "reviewed").length,
-  resolved: reports.filter((r) => r.status === "resolved").length,
-  dismissed: reports.filter((r) => r.status === "dismissed").length,
+reviewed: reports.filter((r) => r.status === "reviewed").length,
+actioned: reports.filter((r) => r.status === "actioned").length,
+rejected: reports.filter((r) => r.status === "rejected").length,
 };
   const [adsLoading, setAdsLoading] = useState(false);
 
@@ -286,42 +312,53 @@ const [heroImageUploading, setHeroImageUploading] = useState(false);
     };
   }, []);
 
-  // تسجيل الدخول
-  async function handleLogin(
-    event: FormEvent<HTMLFormElement>
-  ) {
-    event.preventDefault();
+// تسجيل الدخول برقم الموبايل
+async function handleLogin(
+  event: FormEvent<HTMLFormElement>
+) {
+  event.preventDefault();
 
-    setError("");
-    setSubmitting(true);
+  setError("");
+  setSubmitting(true);
 
-    try {
-      const { data, error } =
-        await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
+  try {
+    const cleanPhone = phone.trim();
 
-      if (error) throw error;
-
-      if (!data.user) {
-        throw new Error("تعذر الحصول على بيانات الحساب.");
-      }
-
-      await verifyAdmin(
-        data.user.id,
-        data.user.email
+    if (!/^09[0-9]{8}$/.test(cleanPhone)) {
+      throw new Error(
+        "يرجى إدخال رقم موبايل سوري صحيح يبدأ بـ 09."
       );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "تعذر تسجيل الدخول."
-      );
-    } finally {
-      setSubmitting(false);
     }
+
+    const internalEmail =
+      `phone.${cleanPhone}@login.sooq.sy`;
+
+    const { data, error } =
+      await supabase.auth.signInWithPassword({
+        email: internalEmail,
+        password,
+      });
+
+    if (error) throw error;
+
+    if (!data.user) {
+      throw new Error("تعذر الحصول على بيانات الحساب.");
+    }
+
+    await verifyAdmin(
+      data.user.id,
+      data.user.email
+    );
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "تعذر تسجيل الدخول."
+    );
+  } finally {
+    setSubmitting(false);
   }
+}
 
   // تسجيل الخروج
   async function handleLogout() {
@@ -511,6 +548,7 @@ const loadApprovedAds = useCallback(async () => {
         currency,
         condition,
         created_at,
+        is_featured,
         category_id,
         city_id,
 
@@ -591,6 +629,42 @@ const loadApprovedAds = useCallback(async () => {
   }
 }, []);
 
+const toggleFeaturedAd = async (ad: Ad) => {
+  setActionLoading(ad.id);
+
+  try {
+    const newValue = !ad.is_featured;
+
+    const { data, error } = await supabase
+      .from("ads")
+      .update({
+        is_featured: newValue,
+      })
+      .eq("id", ad.id)
+      .select("id, is_featured");
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      throw new Error("لم يتم تحديث الإعلان. تحقق من صلاحيات التعديل في Supabase.");
+    }
+
+    console.log("نتيجة تحديث الإعلان:", data);
+
+    await loadApprovedAds();
+
+  } catch (err) {
+    console.error("خطأ التمييز:", err);
+
+    setDataError(
+      err instanceof Error
+        ? err.message
+        : "تعذر تحديث حالة الإعلان المميز."
+    );
+  } finally {
+    setActionLoading(null);
+  }
+};
 
 const loadArchivedAds = useCallback(async () => {
   setArchivedAdsLoading(true);
@@ -744,17 +818,17 @@ const loadReports = useCallback(async () => {
   try {
     // تحميل البلاغات
     const { data, error } = await supabase
-      .from("reports")
-      .select(`
-        id,
-        reporter_id,
-        ad_id,
-        reported_user_id,
-        reason,
-        details,
-        status,
-        created_at
-      `)
+.from("user_reports")
+.select(`
+  id,
+  reporter_id,
+  reported_user_id,
+  conversation_id,
+  reason,
+  details,
+  status,
+  created_at
+`)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -772,16 +846,10 @@ const loadReports = useCallback(async () => {
       ),
     ];
 
-    const adIds = [
-      ...new Set(
-        reportsData
-          .map((report) => report.ad_id)
-          .filter((id): id is string => Boolean(id))
-      ),
-    ];
+
 
     const userNames = new Map<string, string>();
-    const adTitles = new Map<string, string>();
+
 
     // تحميل أسماء المستخدمين
     if (userIds.length > 0) {
@@ -800,32 +868,46 @@ const loadReports = useCallback(async () => {
       });
     }
 
-    // تحميل عناوين الإعلانات
-    if (adIds.length > 0) {
-      const { data: ads, error: adsError } = await supabase
-        .from("ads")
-        .select("id, title")
-        .in("id", adIds);
 
-      if (adsError) throw adsError;
+// استخراج معرفات المستخدمين المبلّغ عنهم
+const reportedUserIds = [
+  ...new Set(reportsData.map((report) => report.reported_user_id)),
+];
 
-      ads?.forEach((ad) => {
-        adTitles.set(ad.id, ad.title);
-      });
+// تحميل سجلات الحظر
+const activeBanUsers = new Set<string>();
+
+if (reportedUserIds.length > 0) {
+  const { data: bans, error: bansError } = await supabase
+    .from("user_bans")
+    .select("user_id, ban_type, banned_until, lifted_at")
+    .in("user_id", reportedUserIds);
+
+  if (bansError) throw bansError;
+
+  (bans || []).forEach((ban) => {
+    if (ban.lifted_at !== null) return;
+
+    if (
+      ban.ban_type === "permanent" ||
+      (ban.banned_until !== null &&
+        new Date(ban.banned_until).getTime() > Date.now())
+    ) {
+      activeBanUsers.add(ban.user_id);
     }
+  });
+}
 
-    // ربط الأسماء والعناوين بالبلاغات
-    const enrichedReports = reportsData.map((report) => ({
-      ...report,
-      reporter_name:
-        userNames.get(report.reporter_id) || "مستخدم غير معروف",
-      reported_user_name: report.reported_user_id
-        ? userNames.get(report.reported_user_id) || "مستخدم غير معروف"
-        : undefined,
-      ad_title: report.ad_id
-        ? adTitles.get(report.ad_id) || "الإعلان غير موجود"
-        : undefined,
-    }));
+
+// ربط أسماء المستخدمين بالبلاغات
+const enrichedReports = reportsData.map((report) => ({
+  ...report,
+  reporter_name:
+    userNames.get(report.reporter_id) || "مستخدم غير معروف",
+  reported_user_name:
+    userNames.get(report.reported_user_id) || "مستخدم غير معروف",
+  active_ban: activeBanUsers.has(report.reported_user_id),
+}));
 
     setReports(enrichedReports);
 
@@ -839,6 +921,164 @@ const loadReports = useCallback(async () => {
     setReportsLoading(false);
   }
 }, []);
+
+
+const handleAdminBan = async (
+  report: Report,
+  banType: "temporary" | "permanent"
+) => {
+  const reason = window.prompt(
+    "اكتب سبب حظر المستخدم:",
+    report.reason
+  );
+
+  if (!reason?.trim()) return;
+
+  let bannedUntil: string | null = null;
+
+  if (banType === "temporary") {
+    const daysInput = window.prompt(
+      "مدة الحظر بالأيام:",
+      "7"
+    );
+
+    if (daysInput === null) return;
+
+    const days = Number(daysInput);
+
+    if (!Number.isInteger(days) || days <= 0) {
+      alert("يرجى إدخال عدد أيام صحيح.");
+      return;
+    }
+
+    bannedUntil = new Date(
+      Date.now() + days * 24 * 60 * 60 * 1000
+    ).toISOString();
+  }
+
+  try {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) throw userError;
+    if (!user) throw new Error("لم يتم العثور على حساب المدير.");
+
+    const { data: history, error: historyError } = await supabase
+      .from("user_bans")
+      .select("id, ban_type, reason, banned_until, created_at, lifted_at")
+      .eq("user_id", report.reported_user_id);
+
+    if (historyError) throw historyError;
+
+const activeBan = (history || []).find((ban) => {
+  if (ban.lifted_at !== null) return false;
+
+  if (ban.ban_type === "permanent") return true;
+
+  return (
+    ban.banned_until !== null &&
+    new Date(ban.banned_until).getTime() > Date.now()
+  );
+});
+
+if (activeBan) {
+  alert("هذا المستخدم لديه حظر فعّال بالفعل.");
+  return;
+}
+
+    const { error: insertError } = await supabase
+      .from("user_bans")
+      .insert({
+        user_id: report.reported_user_id,
+        ban_type: banType,
+        reason: reason.trim(),
+        banned_until: bannedUntil,
+        banned_by: user.id,
+      });
+
+    if (insertError) throw insertError;
+
+    setReports((prev) =>
+  prev.map((item) =>
+    item.reported_user_id === report.reported_user_id
+      ? { ...item, active_ban: true }
+      : item
+  )
+);
+
+alert("تم حظر المستخدم بنجاح.");
+  } catch (err) {
+    console.error("خطأ في حظر المستخدم:", err);
+    alert("تعذر تنفيذ الحظر.");
+  }
+};
+
+
+const handleAdminUnban = async (report: Report) => {
+  if (!window.confirm("هل أنت متأكد من فك الحظر عن هذا المستخدم؟")) {
+    return;
+  }
+
+  try {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError) throw userError;
+    if (!user) throw new Error("لم يتم العثور على حساب المدير.");
+
+    const { data: history, error: historyError } = await supabase
+      .from("user_bans")
+      .select("id, ban_type, banned_until, lifted_at")
+      .eq("user_id", report.reported_user_id);
+
+    if (historyError) throw historyError;
+
+    const activeBan = (history || []).find((ban) => {
+      if (ban.lifted_at !== null) return false;
+
+      if (ban.ban_type === "permanent") return true;
+
+      return (
+        ban.banned_until !== null &&
+        new Date(ban.banned_until).getTime() > Date.now()
+      );
+    });
+
+    if (!activeBan) {
+      alert("لا يوجد حظر فعّال على هذا المستخدم.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("user_bans")
+      .update({
+        lifted_at: new Date().toISOString(),
+        lifted_by: user.id,
+      })
+      .eq("id", activeBan.id);
+
+    if (error) throw error;
+
+    setReports((prev) =>
+  prev.map((item) =>
+    item.reported_user_id === report.reported_user_id
+      ? { ...item, active_ban: false }
+      : item
+  )
+);
+
+alert("تم فك الحظر بنجاح.");
+  } catch (err) {
+    console.error("خطأ في فك الحظر:", err);
+    alert("تعذر فك الحظر.");
+  }
+};
+
+
 async function updateReportStatus(
   reportId: string,
   status: Report["status"]
@@ -1466,6 +1706,220 @@ useEffect(() => {
   loadGovernorates,
   loadSettings,
 ]);
+// تحميل بيانات الاستهداف عند فتح قسم الإشعارات
+useEffect(() => {
+  if (admin && activeMenu === "الإشعارات") {
+    loadCategories();
+    loadCities();
+    loadNotifications();
+    loadGovernorates();
+  }
+}, [
+  admin,
+  activeMenu,
+  loadCategories,
+  loadCities,
+  loadGovernorates,
+]);
+
+
+async function saveNotification() {
+  setNotificationError("");
+  setNotificationMessage("");
+
+  if (!notificationTitle.trim() || !notificationBody.trim()) {
+    setNotificationError("يرجى إدخال عنوان الإشعار ونصه.");
+    return;
+  }
+
+  if (
+    ["governorate", "city", "category"].includes(notificationTarget) &&
+    !notificationTargetId
+  ) {
+    setNotificationError("يرجى اختيار الجمهور المستهدف.");
+    return;
+  }
+
+  if (
+    notificationScheduledAt &&
+    new Date(notificationScheduledAt).getTime() <= Date.now()
+  ) {
+    setNotificationError("موعد الإرسال يجب أن يكون في المستقبل.");
+    return;
+  }
+
+  setNotificationSaving(true);
+
+  try {
+    const { data: { user }, error: userError } =
+      await supabase.auth.getUser();
+
+    if (userError) throw userError;
+
+    if (!user) {
+      throw new Error("تعذر تحديد حساب المدير.");
+    }
+
+const notificationData = {
+  title: notificationTitle.trim(),
+  body: notificationBody.trim(),
+  link: notificationLink.trim() || null,
+  target_type: notificationTarget,
+  target_id: notificationTargetId
+    ? Number(notificationTargetId)
+    : null,
+  scheduled_at: notificationScheduledAt
+    ? new Date(notificationScheduledAt).toISOString()
+    : null,
+  status: notificationScheduledAt ? "scheduled" : "draft",
+};
+
+const { error } = editingNotificationId
+  ? await supabase
+      .from("notifications")
+      .update(notificationData)
+      .eq("id", editingNotificationId)
+  : await supabase
+      .from("notifications")
+      .insert({
+        ...notificationData,
+        created_by: user.id,
+      });
+
+    if (error) throw error;
+
+    setNotificationMessage("تم حفظ الإشعار بنجاح.");
+    await loadNotifications();
+    setEditingNotificationId(null);
+    setNotificationTitle("");
+    setNotificationBody("");
+    setNotificationLink("");
+    setNotificationTarget("all");
+    setNotificationTargetId("");
+    setNotificationScheduledAt("");
+  } catch (error) {
+    console.error("Save notification error:", error);
+    setNotificationError(
+      error instanceof Error
+        ? error.message
+        : "حدث خطأ أثناء حفظ الإشعار."
+    );
+  } finally {
+    setNotificationSaving(false);
+  }
+}
+
+async function loadNotifications() {
+  setNotificationsLoading(true);
+  setNotificationsError("");
+
+  try {
+    const { data, error } = await supabase
+      .from("notifications")
+      .select(`
+        id,
+        title,
+        body,
+        link,
+        target_type,
+        target_id,
+        scheduled_at,
+        sent_at,
+        status,
+        created_at
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    setNotifications((data || []) as Notification[]);
+  } catch (error) {
+    console.error("Load notifications error:", error);
+    setNotificationsError(
+      error instanceof Error
+        ? error.message
+        : "حدث خطأ أثناء تحميل الإشعارات."
+    );
+  } finally {
+    setNotificationsLoading(false);
+  }
+}
+
+async function deleteNotification(id: string) {
+  const confirmed = window.confirm(
+    "هل أنت متأكد من حذف هذا الإشعار؟"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const { error } = await supabase
+      .from("notifications")
+      .delete()
+      .eq("id", id);
+
+    if (error) throw error;
+
+    await loadNotifications();
+
+    alert("تم حذف الإشعار بنجاح.");
+  } catch (error) {
+    console.error("Delete notification error:", error);
+    alert("حدث خطأ أثناء حذف الإشعار.");
+  }
+}
+
+async function sendNotificationNow(notification: Notification) {
+  const confirmed = window.confirm(
+    `هل أنت متأكد من إرسال الإشعار "${notification.title}" الآن؟`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const { data, error } = await supabase.rpc(
+      "send_notification_now",
+      {
+        p_notification_id: notification.id,
+      }
+    );
+
+    if (error) throw error;
+
+    await loadNotifications();
+
+    alert(`تم إرسال الإشعار بنجاح إلى ${data} مستخدم.`);
+  } catch (error) {
+    console.error("Send notification error:", error);
+    alert("تعذر إرسال الإشعار. تأكد من حالة الإشعار وصلاحياتك.");
+  }
+}
+
+function editNotification(notification: Notification) {
+  setEditingNotificationId(notification.id);
+  setNotificationTitle(notification.title);
+  setNotificationBody(notification.body);
+  setNotificationLink(notification.link || "");
+  setNotificationTarget(notification.target_type);
+  setNotificationTargetId(
+    notification.target_id !== null
+      ? String(notification.target_id)
+      : ""
+  );
+  setNotificationScheduledAt(
+    notification.scheduled_at
+      ? new Date(notification.scheduled_at).toISOString().slice(0, 16)
+      : ""
+  );
+
+  setNotificationError("");
+  setNotificationMessage("");
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
+}
   // قبول إعلان
   async function approveAd(adId: string) {
     if (
@@ -1668,8 +2122,8 @@ const filteredReports = reports.filter((report) => {
     report.details?.toLowerCase().includes(search) ||
     report.id.toLowerCase().includes(search) ||
     report.reporter_id.toLowerCase().includes(search) ||
-    report.reported_user_id?.toLowerCase().includes(search) ||
-    report.ad_id?.toLowerCase().includes(search);
+report.reported_user_id?.toLowerCase().includes(search) ||
+report.conversation_id?.toLowerCase().includes(search);
 
   const matchesStatus =
     reportStatusFilter === "all" ||
@@ -1685,6 +2139,44 @@ function getSubCategories(categoryId: number) {
   return categories.filter(
     (category) => category.parent_id === categoryId
   );
+}
+// تحديث تسجيل دخول المدير إلى رقم الموبايل
+async function updateAdminLogin() {
+  const confirmed = window.confirm(
+    "سيتم تحويل تسجيل دخول حساب المدير الحالي إلى رقم الموبايل المحفوظ. ستبقى كلمة المرور والصلاحيات والبيانات كما هي. هل تريد المتابعة؟"
+  );
+
+  if (!confirmed) return;
+
+  setAdminLoginUpdating(true);
+  setAdminLoginMessage("");
+  setAdminLoginError("");
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      "update-admin-login"
+    );
+
+    if (error) throw error;
+
+    if (!data?.success) {
+      throw new Error(
+        data?.error || "تعذر تحديث تسجيل الدخول."
+      );
+    }
+
+    setAdminLoginMessage(
+      data.message || "تم تحديث تسجيل الدخول بنجاح."
+    );
+  } catch (err) {
+    setAdminLoginError(
+      err instanceof Error
+        ? err.message
+        : "حدث خطأ أثناء تحديث تسجيل الدخول."
+    );
+  } finally {
+    setAdminLoginUpdating(false);
+  }
 }
   // شاشة التحميل
   if (loading) {
@@ -1713,40 +2205,38 @@ function getSubCategories(categoryId: number) {
             تسجيل دخول لوحة الإدارة
           </p>
 
-          <form onSubmit={handleLogin}>
-            <label>البريد الإلكتروني</label>
+<form onSubmit={handleLogin}>
+  <label>رقم الموبايل</label>
 
-            <div className="login-input">
-              <Mail size={19} />
+  <div className="login-input">
+    <Mail size={19} />
 
-              <input
-                type="email"
-                placeholder="admin@example.com"
-                value={email}
-                onChange={(e) =>
-                  setEmail(e.target.value)
-                }
-                required
-                autoComplete="username"
-              />
-            </div>
+    <input
+      type="tel"
+      placeholder="09XXXXXXXX"
+      value={phone}
+      onChange={(event) => setPhone(event.target.value)}
+      required
+      autoComplete="username"
+      maxLength={10}
+      dir="ltr"
+    />
+  </div>
 
-            <label>كلمة المرور</label>
+  <label>كلمة المرور</label>
 
-            <div className="login-input">
-              <LockKeyhole size={19} />
+  <div className="login-input">
+    <LockKeyhole size={19} />
 
-              <input
-                type="password"
-                placeholder="أدخل كلمة المرور"
-                value={password}
-                onChange={(e) =>
-                  setPassword(e.target.value)
-                }
-                required
-                autoComplete="current-password"
-              />
-            </div>
+    <input
+      type="password"
+      placeholder="أدخل كلمة المرور"
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+      required
+      autoComplete="current-password"
+    />
+  </div>
 
             {error && (
               <div className="login-error">
@@ -1813,6 +2303,10 @@ function getSubCategories(categoryId: number) {
       label: "البلاغات",
       icon: Flag,
     },
+    {
+  label: "الإشعارات",
+  icon: Bell,
+},
     {
       label: "الإعدادات",
       icon: Settings,
@@ -2086,6 +2580,11 @@ function getSubCategories(categoryId: number) {
     className="admin-ad-image"
   />
 )}
+{ad.is_featured && (
+  <span className="featured-badge">
+    ★ إعلان مميز
+  </span>
+)}
             <h3>{ad.title}</h3>
             {ad.price !== null && (
   <p className="admin-ad-price">
@@ -2114,7 +2613,21 @@ function getSubCategories(categoryId: number) {
             >
               عرض التفاصيل
             </button>
-
+<button
+  className="refresh-button"
+  onClick={() => toggleFeaturedAd(ad)}
+  disabled={actionLoading === ad.id}
+  style={{
+    background: ad.is_featured ? "#d97706" : "#64748b",
+    color: "#fff",
+  }}
+>
+  {actionLoading === ad.id
+    ? "جاري التحديث..."
+    : ad.is_featured
+      ? "★ إلغاء التمييز"
+      : "☆ تمييز الإعلان"}
+</button>
 <button
   className="refresh-button"
   onClick={() => archiveAd(ad.id)}
@@ -2606,8 +3119,8 @@ function getSubCategories(categoryId: number) {
     className="report-stat-card resolved"
     onClick={() => setReportStatusFilter("resolved")}
   >
-    <span>تم الحل</span>
-    <strong>{reportStats.resolved}</strong>
+    <span>تم اتخاذ إجراء</span>
+    <strong>{reportStats.actioned}</strong>
   </button>
 
   <button
@@ -2616,7 +3129,7 @@ function getSubCategories(categoryId: number) {
     onClick={() => setReportStatusFilter("dismissed")}
   >
     <span>مرفوضة</span>
-    <strong>{reportStats.dismissed}</strong>
+    <strong>{reportStats.rejected}</strong>
   </button>
 </div>
     <div className="users-search">
@@ -2702,23 +3215,7 @@ function getSubCategories(categoryId: number) {
   </p>
 )}
 
-        {report.ad_id && (
-  <p>
-    <strong>الإعلان:</strong>{" "}
-    <a
-      href={`/ad/${report.ad_id}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{
-        color: "#059669",
-        fontWeight: "bold",
-        textDecoration: "underline",
-      }}
-    >
-      {report.ad_title || "فتح الإعلان"}
-    </a>
-  </p>
-)}
+
 
         {report.details && (
           <p className="report-details">
@@ -2731,23 +3228,64 @@ function getSubCategories(categoryId: number) {
         <small>رقم البلاغ: {report.id}</small>
       </div>
 
-      <div className="category-card-actions">
-        <select
-          value={report.status}
-          disabled={reportSaving}
-          onChange={(e) =>
-            updateReportStatus(
-              report.id,
-              e.target.value as Report["status"]
-            )
-          }
-        >
-          <option value="pending">قيد المراجعة</option>
-          <option value="reviewed">تمت المراجعة</option>
-          <option value="resolved">تم الحل</option>
-          <option value="dismissed">مرفوض</option>
-        </select>
-      </div>
+<div className="category-card-actions">
+  <select
+    value={report.status}
+    disabled={reportSaving}
+    onChange={(e) =>
+      updateReportStatus(
+        report.id,
+        e.target.value as Report["status"]
+      )
+    }
+  >
+    <option value="pending">قيد المراجعة</option>
+    <option value="reviewed">تمت المراجعة</option>
+    <option value="actioned">تم اتخاذ إجراء</option>
+    <option value="rejected">مرفوض</option>
+  </select>
+
+  <button
+    type="button"
+    className="category-edit-button"
+    onClick={() => {
+window.open(
+  `${import.meta.env.BASE_URL}admin/conversation/${report.conversation_id}`,
+  "_blank"
+);
+    }}
+  >
+    <Eye size={15} />
+    عرض المحادثة
+  </button>
+{report.active_ban ? (
+  <button
+    type="button"
+    className="category-edit-button"
+    onClick={() => handleAdminUnban(report)}
+  >
+    فك الحظر
+  </button>
+) : (
+  <>
+    <button
+      type="button"
+      className="category-edit-button"
+      onClick={() => handleAdminBan(report, "temporary")}
+    >
+      حظر مؤقت
+    </button>
+
+    <button
+      type="button"
+      className="category-edit-button"
+      onClick={() => handleAdminBan(report, "permanent")}
+    >
+      حظر نهائي
+    </button>
+  </>
+)}
+</div>
     </article>
   ))}
 </div>
@@ -2819,7 +3357,7 @@ function getSubCategories(categoryId: number) {
       <div>
         <label>البريد الإلكتروني للتواصل</label>
         <input
-          type="email"
+          type="tel"
           value={contactEmail}
           onChange={(e) => setContactEmail(e.target.value)}
           className="w-full border rounded-lg p-3 mt-1"
@@ -2857,24 +3395,27 @@ function getSubCategories(categoryId: number) {
 </div>
 
 <div className="category-card">
-  <h3>إعدادات الإعلانات</h3>
 
-  <label className="mt-4 flex items-center gap-3 cursor-pointer">
-    <input
-      type="checkbox"
-      checked={allowNewAds}
-      onChange={(e) => setAllowNewAds(e.target.checked)}
-      className="h-5 w-5 accent-emerald-600"
-    />
+<h3>إعدادات الإعلانات</h3>
 
-    <span className="font-medium text-slate-700">
-      السماح للمستخدمين بنشر إعلانات جديدة
-    </span>
-  </label>
+<label className="mt-4 flex items-center gap-3 cursor-pointer">
+  <input
+    type="checkbox"
+    checked={allowNewAds}
+    onChange={(e) => setAllowNewAds(e.target.checked)}
+    className="h-5 w-5 accent-emerald-600"
+  />
 
-  <p className="mt-2 text-sm text-slate-500">
-    عند إيقاف هذا الخيار، لن يتمكن المستخدمون من إضافة إعلانات جديدة.
-    <div className="mt-6 border-t border-slate-200 pt-5">
+  <span className="font-medium text-slate-700">
+    السماح للمستخدمين بنشر إعلانات جديدة
+  </span>
+</label>
+
+<p className="mt-2 text-sm text-slate-500">
+  عند إيقاف هذا الخيار، لن يتمكن المستخدمون من إضافة إعلانات جديدة.
+</p>
+
+<div className="mt-6 border-t border-slate-200 pt-5">
   <label className="flex cursor-pointer items-center gap-3">
     <input
       type="checkbox"
@@ -2892,12 +3433,309 @@ function getSubCategories(categoryId: number) {
     عند التفعيل، سيتم إيقاف تصفح الموقع مؤقتاً أمام الزوار.
   </p>
 </div>
-  </p>
+
 </div>
 
+<div className="category-card mt-6">
+  <h3>تحديث تسجيل دخول المدير</h3>
+
+  <p className="mt-2 text-sm text-slate-500">
+    تحويل طريقة دخول حساب المدير الحالي من البريد الإلكتروني
+    إلى رقم الموبايل، مع الحفاظ على كلمة المرور والصلاحيات.
+  </p>
+
+  {adminLoginMessage && (
+    <p className="mt-3 text-green-600">
+      {adminLoginMessage}
+    </p>
+  )}
+
+  {adminLoginError && (
+    <p className="mt-3 text-red-600">
+      {adminLoginError}
+    </p>
+  )}
+
+  <button
+    type="button"
+    onClick={updateAdminLogin}
+    disabled={adminLoginUpdating}
+    className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-lg disabled:opacity-50"
+  >
+    {adminLoginUpdating
+      ? "جارٍ تحديث تسجيل الدخول..."
+      : "تحديث تسجيل دخول المدير"}
+  </button>
+</div>
+
+</div>
+)}
+{activeMenu === "الإشعارات" && (
+  <div className="admin-section">
+    <h2>إدارة الإشعارات</h2>
+
+    <div className="category-card">
+      <h3>إنشاء إشعار جديد</h3>
+
+      <p className="mt-2 text-sm text-slate-500">
+        إنشاء إشعارات عامة أو موجهة لمستخدمين حسب المحافظة أو المدينة أو التصنيف أو المفضلة.
+      </p>
+      <div className="mt-5 space-y-4">
+
+  <div>
+    <label className="block font-medium mb-2">عنوان الإشعار</label>
+    <input
+      type="text"
+      value={notificationTitle}
+      onChange={(e) => setNotificationTitle(e.target.value)}
+      className="w-full border rounded-lg p-3"
+      placeholder="مثلاً: عروض جديدة على Sooq.Sy"
+    />
+  </div>
+
+  <div>
+    <label className="block font-medium mb-2">نص الإشعار</label>
+    <textarea
+      value={notificationBody}
+      onChange={(e) => setNotificationBody(e.target.value)}
+      className="w-full border rounded-lg p-3"
+      rows={4}
+      placeholder="اكتب نص الإشعار هنا..."
+    />
+  </div>
+
+  <div>
+    <label className="block font-medium mb-2">رابط عند الضغط على الإشعار (اختياري)</label>
+    <input
+      type="text"
+      value={notificationLink}
+      onChange={(e) => setNotificationLink(e.target.value)}
+      className="w-full border rounded-lg p-3"
+      placeholder="رابط الإعلان أو الصفحة"
+    />
+  </div>
+
+  <div>
+    <label className="block font-medium mb-2">الجمهور المستهدف</label>
+    <select
+      value={notificationTarget}
+      onChange={(e) => {
+        setNotificationTarget(e.target.value);
+        setNotificationTargetId("");
+      }}
+      className="w-full border rounded-lg p-3"
+    >
+      <option value="all">جميع المستخدمين</option>
+      <option value="governorate">حسب المحافظة</option>
+      <option value="city">حسب المدينة</option>
+      <option value="category">المهتمون بتصنيف معين</option>
+      <option value="favorites">حسب المفضلة</option>
+    </select>
+  </div>
+
+  {notificationTarget === "governorate" && (
+    <div>
+      <label className="block font-medium mb-2">اختر المحافظة</label>
+      <select
+        value={notificationTargetId}
+        onChange={(e) => setNotificationTargetId(e.target.value)}
+        className="w-full border rounded-lg p-3"
+      >
+        <option value="">اختر المحافظة</option>
+        {governorates.filter((g) => g.is_active).map((g) => (
+          <option key={g.id} value={g.id}>{g.name_ar}</option>
+        ))}
+      </select>
+    </div>
+  )}
+
+  {notificationTarget === "city" && (
+    <div>
+      <label className="block font-medium mb-2">اختر المدينة</label>
+      <select
+        value={notificationTargetId}
+        onChange={(e) => setNotificationTargetId(e.target.value)}
+        className="w-full border rounded-lg p-3"
+      >
+        <option value="">اختر المدينة</option>
+        {cities.filter((c) => c.is_active).map((c) => (
+          <option key={c.id} value={c.id}>{c.name_ar}</option>
+        ))}
+      </select>
+    </div>
+  )}
+
+  {notificationTarget === "category" && (
+    <div>
+      <label className="block font-medium mb-2">اختر التصنيف</label>
+      <select
+        value={notificationTargetId}
+        onChange={(e) => setNotificationTargetId(e.target.value)}
+        className="w-full border rounded-lg p-3"
+      >
+        <option value="">اختر التصنيف</option>
+        {categories.filter((c) => c.is_active).map((c) => (
+          <option key={c.id} value={c.id}>{c.name_ar}</option>
+        ))}
+      </select>
+    </div>
+  )}
+
+  <div>
+    <label className="block font-medium mb-2">موعد الإرسال</label>
+    <input
+      type="datetime-local"
+      value={notificationScheduledAt}
+      onChange={(e) => setNotificationScheduledAt(e.target.value)}
+      className="w-full border rounded-lg p-3"
+    />
+    <p className="text-sm text-slate-500 mt-1">
+      اتركه فارغاً لحفظ الإشعار كمسودة. أما تحديد موعد فيحفظه كإشعار مجدول.
+    </p>
 
   </div>
+
+  {/* زر حفظ الإشعار */}
+  <div className="mt-5">
+    {notificationError && (
+      <p className="text-red-600 mb-3">
+        {notificationError}
+      </p>
+    )}
+
+    {notificationMessage && (
+      <p className="text-green-600 mb-3">
+        {notificationMessage}
+      </p>
+    )}
+
+    <button
+      type="button"
+      onClick={saveNotification}
+      disabled={notificationSaving}
+      className="bg-emerald-600 text-white px-6 py-3 rounded-lg disabled:opacity-50"
+    >
+      {notificationSaving
+  ? "جارٍ الحفظ..."
+  : editingNotificationId
+    ? "حفظ التعديلات"
+    : "حفظ الإشعار"}
+    </button>
+  </div>
+    </div>
+
+  </div>
+
+    {/* سجل الإشعارات */}
+    <div className="category-card mt-6">
+      <h3>سجل الإشعارات</h3>
+
+      {notificationsLoading && (
+        <p className="mt-4 text-slate-500">
+          جارٍ تحميل الإشعارات...
+        </p>
+      )}
+
+      {notificationsError && (
+        <p className="mt-4 text-red-600">
+          {notificationsError}
+        </p>
+      )}
+
+      {!notificationsLoading && notifications.length === 0 && (
+        <p className="mt-4 text-slate-500">
+          لا توجد إشعارات محفوظة حالياً.
+        </p>
+      )}
+
+      <div className="mt-4 space-y-3">
+        {notifications.map((notification) => (
+          <div
+            key={notification.id}
+            className="border rounded-lg p-4"
+          >
+            <div className="flex justify-between items-start gap-3 flex-wrap">
+              <div>
+                <h4 className="font-bold">
+                  {notification.title}
+                </h4>
+
+                <p className="text-sm text-slate-600 mt-1">
+                  {notification.body}
+                </p>
+              </div>
+
+              <span className="text-sm font-medium">
+                {notification.status === "draft" && "مسودة"}
+                {notification.status === "scheduled" && "مجدول"}
+                {notification.status === "sent" && "تم الإرسال"}
+                {notification.status === "failed" && "فشل الإرسال"}
+              </span>
+            </div>
+
+            <div className="text-sm text-slate-500 mt-3 space-y-1">
+              <p>
+                الجمهور المستهدف: {
+                  {
+                    all: "جميع المستخدمين",
+                    governorate: "محافظة",
+                    city: "مدينة",
+                    category: "تصنيف",
+                    favorites: "المفضلة",
+                  }[notification.target_type]
+                }
+              </p>
+
+              {notification.scheduled_at && (
+                <p>
+                  موعد الإرسال:{" "}
+                  {new Date(notification.scheduled_at).toLocaleString("ar")}
+                </p>
+              )}
+
+              <p>
+                تاريخ الإنشاء:{" "}
+                {new Date(notification.created_at).toLocaleString("ar")}
+              </p>
+            </div>
+
+            {/* زر حذف الإشعار */}
+<div className="mt-4 flex justify-end gap-2 flex-wrap">
+
+  {notification.status !== "sent" && (
+    <button
+      type="button"
+      onClick={() => sendNotificationNow(notification)}
+      className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700"
+    >
+      إرسال الآن
+    </button>
+  )}
+
+  <button
+    type="button"
+    onClick={() => editNotification(notification)}
+    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+  >
+    تعديل الإشعار
+  </button>
+
+  <button
+    type="button"
+    onClick={() => deleteNotification(notification.id)}
+    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+  >
+    حذف الإشعار
+  </button>
+
+</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
 )}
+
           {/* الأقسام التي لم يتم تجهيزها بعد */}
             {![
               "الرئيسية",

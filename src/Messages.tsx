@@ -19,6 +19,14 @@ export default function Messages() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [messageText, setMessageText] = useState("");
   const [conversation, setConversation] = useState<any>(null);
+  const [otherUser, setOtherUser] = useState<any>(null);
+  const [blockedByMe, setBlockedByMe] = useState(false);
+  const [blockedMe, setBlockedMe] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+const [reportDetails, setReportDetails] = useState("");
+const [reporting, setReporting] = useState(false);
+const [blocking, setBlocking] = useState(false);
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -146,7 +154,42 @@ setConversations(enrichedConversations);
         }
 
         setConversation(conversationData);
+const otherUserId =
+  conversationData.buyer_id === user.id
+    ? conversationData.seller_id
+    : conversationData.buyer_id;
 
+// جلب بيانات الطرف الآخر وحالة الحظر
+const [profileResult, myBlockResult, theirBlockResult] =
+  await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, display_name, avatar_url")
+      .eq("id", otherUserId)
+      .single(),
+
+    supabase
+      .from("user_blocks")
+      .select("id")
+      .eq("blocker_id", user.id)
+      .eq("blocked_id", otherUserId)
+      .maybeSingle(),
+
+    supabase
+      .from("user_blocks")
+      .select("id")
+      .eq("blocker_id", otherUserId)
+      .eq("blocked_id", user.id)
+      .maybeSingle(),
+  ]);
+
+if (profileResult.error) throw profileResult.error;
+if (myBlockResult.error) throw myBlockResult.error;
+if (theirBlockResult.error) throw theirBlockResult.error;
+
+setOtherUser(profileResult.data);
+setBlockedByMe(!!myBlockResult.data);
+setBlockedMe(!!theirBlockResult.data);
         const { data: messagesData, error: messagesError } =
           await supabase
             .from("messages")
@@ -221,13 +264,100 @@ useEffect(() => {
   };
 }, [id]);
 
+// حظر أو إلغاء حظر المستخدم
+async function toggleBlock() {
+  if (!otherUser || !userId || blocking) return;
 
-  async function sendMessage(e: React.FormEvent) {
-    e.preventDefault();
+  const action = blockedByMe ? "إلغاء الحظر" : "حظر هذا المستخدم";
 
-    const body = messageText.trim();
+  if (!window.confirm(`هل أنت متأكد من ${action}؟`)) return;
 
-    if (!body || !conversation || sending) return;
+  setBlocking(true);
+
+  try {
+    if (blockedByMe) {
+      const { error } = await supabase
+        .from("user_blocks")
+        .delete()
+        .eq("blocker_id", userId)
+        .eq("blocked_id", otherUser.id);
+
+      if (error) throw error;
+
+      setBlockedByMe(false);
+      alert("تم إلغاء الحظر بنجاح.");
+    } else {
+      const { error } = await supabase
+        .from("user_blocks")
+        .insert({
+          blocker_id: userId,
+          blocked_id: otherUser.id,
+        });
+
+      if (error) throw error;
+
+      setBlockedByMe(true);
+      alert("تم حظر المستخدم بنجاح.");
+    }
+  } catch (err) {
+    console.error("خطأ في الحظر:", err);
+    alert("تعذر تنفيذ العملية. حاول مرة أخرى.");
+  } finally {
+    setBlocking(false);
+  }
+}
+
+
+// إرسال بلاغ عن المستخدم
+async function submitReport(e: React.FormEvent) {
+  e.preventDefault();
+
+  if (!conversation || !otherUser || !userId || !reportReason || reporting) {
+    return;
+  }
+
+  setReporting(true);
+
+  try {
+    const { error } = await supabase
+      .from("user_reports")
+      .insert({
+        reporter_id: userId,
+        reported_user_id: otherUser.id,
+        conversation_id: conversation.id,
+        reason: reportReason,
+        details: reportDetails.trim() || null,
+      });
+
+    if (error) throw error;
+
+    setShowReport(false);
+    setReportReason("");
+    setReportDetails("");
+
+    alert("تم إرسال البلاغ إلى الإدارة بنجاح. شكراً لمساعدتنا في حماية المستخدمين.");
+  } catch (err) {
+    console.error("خطأ إرسال البلاغ:", err);
+    alert("تعذر إرسال البلاغ. حاول مرة أخرى.");
+  } finally {
+    setReporting(false);
+  }
+}
+async function sendMessage(e: React.FormEvent) {
+  e.preventDefault();
+
+  const body = messageText.trim();
+
+  if (!body || !conversation || sending) return;
+
+  if (blockedByMe || blockedMe) {
+    alert(
+      blockedMe
+        ? "قام هذا المستخدم بحظرك، لا يمكنك مراسلته."
+        : "لقد حظرت هذا المستخدم، لا يمكنك مراسلته."
+    );
+    return;
+  }
 
     setSending(true);
 
@@ -353,8 +483,8 @@ useEffect(() => {
     );
   }
   return (
-    <main dir="rtl" className="flex min-h-screen flex-col bg-slate-50">
-      <header className="border-b bg-white px-4 py-4">
+    <main dir="rtl" className="flex h-dvh flex-col overflow-hidden bg-slate-50">
+      <header className="shrink-0 border-b bg-white px-4 py-4">
         <div className="mx-auto flex max-w-4xl items-center gap-3">
           <Link
             to="/"
@@ -370,17 +500,42 @@ useEffect(() => {
         </div>
       </header>
 
-      <section className="mx-auto flex w-full max-w-4xl flex-1 flex-col p-4">
-        <div className="mb-4 rounded-xl bg-white p-4 shadow-sm">
-          <h1 className="text-xl font-black text-slate-800">
-            المحادثة
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            تواصل مع الطرف الآخر بشأن الإعلان
-          </p>
-        </div>
+      <section className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col overflow-hidden p-4">
+<div className="mb-4 shrink-0 rounded-xl bg-white p-4 shadow-sm">
+  <div className="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 className="text-xl font-black text-slate-800">
+        {otherUser?.display_name || "المستخدم"}
+      </h1>
+      <p className="mt-1 text-sm text-slate-500">
+        تواصل مع الطرف الآخر بشأن الإعلان
+      </p>
+    </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto rounded-xl bg-white p-4 shadow-sm">
+    <div className="flex flex-wrap gap-2">
+      <button
+        onClick={() => setShowReport(true)}
+        className="rounded-lg border border-amber-300 px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-50"
+      >
+        الإبلاغ عن المستخدم
+      </button>
+
+      <button
+        onClick={toggleBlock}
+        disabled={blocking}
+        className="rounded-lg border border-red-300 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
+      >
+        {blocking
+          ? "جارٍ التنفيذ..."
+          : blockedByMe
+            ? "إلغاء الحظر"
+            : "حظر المستخدم"}
+      </button>
+    </div>
+  </div>
+</div>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain rounded-xl bg-white p-4 shadow-sm">
           {messages.length === 0 ? (
             <p className="py-10 text-center text-slate-400">
               لا توجد رسائل بعد. ابدأ المحادثة الآن.
@@ -419,28 +574,104 @@ useEffect(() => {
           )}
         </div>
 
-        <form
-          onSubmit={sendMessage}
-          className="mt-4 flex gap-2 rounded-xl bg-white p-3 shadow-sm"
-        >
-          <textarea
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            placeholder="اكتب رسالتك هنا..."
-            rows={2}
-            maxLength={5000}
-            className="min-w-0 flex-1 resize-none rounded-lg border border-slate-200 p-3 outline-none focus:border-emerald-500"
-          />
+{blockedByMe || blockedMe ? (
+  <div className="mt-4 shrink-0 rounded-xl border border-red-200 bg-red-50 p-5 text-center">
+    <p className="font-bold text-red-700">
+      {blockedMe
+        ? "قام هذا المستخدم بحظرك، لذلك لا يمكنك إرسال رسائل إليه."
+        : "لقد حظرت هذا المستخدم، ولن تتمكنوا من تبادل الرسائل."}
+    </p>
+  </div>
+) : (
+  <form
+    onSubmit={sendMessage}
+    className="mt-4 flex shrink-0 gap-2 rounded-xl bg-white p-3 shadow-sm"
+  >
+    <textarea
+      value={messageText}
+      onChange={(e) => setMessageText(e.target.value)}
+      placeholder="اكتب رسالتك هنا..."
+      rows={2}
+      maxLength={5000}
+      className="min-w-0 flex-1 resize-none rounded-lg border border-slate-200 p-3 outline-none focus:border-emerald-500"
+    />
 
+    <button
+      type="submit"
+      disabled={sending || !messageText.trim()}
+      className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+    >
+      <Send size={18} />
+      إرسال
+    </button>
+  </form>
+)}
+        {showReport && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+      <h2 className="mb-2 text-xl font-black text-slate-800">
+        الإبلاغ عن المستخدم
+      </h2>
+
+      <p className="mb-4 text-sm text-slate-500">
+        يرجى تحديد سبب الإبلاغ، وسيتم إرسال البلاغ إلى الإدارة لمراجعته.
+      </p>
+
+      <form onSubmit={submitReport}>
+        <label className="mb-2 block text-sm font-bold text-slate-700">
+          سبب الإبلاغ
+        </label>
+
+        <select
+          value={reportReason}
+          onChange={(e) => setReportReason(e.target.value)}
+          required
+          className="mb-4 w-full rounded-lg border border-slate-200 p-3 outline-none focus:border-emerald-500"
+        >
+          <option value="">اختر سبب الإبلاغ</option>
+          <option value="رسائل مزعجة أو متكررة">رسائل مزعجة أو متكررة</option>
+          <option value="إساءة أو ألفاظ غير لائقة">إساءة أو ألفاظ غير لائقة</option>
+          <option value="احتيال أو محاولة نصب">احتيال أو محاولة نصب</option>
+          <option value="تهديد أو ابتزاز">تهديد أو ابتزاز</option>
+          <option value="محتوى غير مناسب">محتوى غير مناسب</option>
+          <option value="سبب آخر">سبب آخر</option>
+        </select>
+
+        <label className="mb-2 block text-sm font-bold text-slate-700">
+          تفاصيل إضافية (اختياري)
+        </label>
+
+        <textarea
+          value={reportDetails}
+          onChange={(e) => setReportDetails(e.target.value)}
+          rows={4}
+          maxLength={1000}
+          placeholder="اشرح لنا المشكلة إن أردت..."
+          className="mb-5 w-full resize-none rounded-lg border border-slate-200 p-3 outline-none focus:border-emerald-500"
+        />
+
+        <div className="flex gap-2">
           <button
             type="submit"
-            disabled={sending || !messageText.trim()}
-            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+            disabled={!reportReason || reporting}
+            className="flex-1 rounded-lg bg-emerald-600 px-4 py-3 font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
           >
-            <Send size={18} />
-            إرسال
+            {reporting ? "جارٍ إرسال البلاغ..." : "إرسال البلاغ"}
           </button>
-        </form>
+
+          <button
+            type="button"
+            onClick={() => setShowReport(false)}
+            disabled={reporting}
+            className="rounded-lg border border-slate-200 px-4 py-3 font-bold text-slate-600"
+          >
+            إلغاء
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
       </section>
     </main>
   );

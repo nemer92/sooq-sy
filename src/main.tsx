@@ -13,6 +13,11 @@ import MyAds from "./MyAds.tsx";
 import EditAd from "./EditAd.tsx";
 import Messages from "./Messages.tsx";
 import Favorites from "./Favorites.tsx";
+import Profile from "./Profile";
+import AdminConversation from "./AdminConversation";
+import PushNotificationsSetup from "./PushNotificationsSetup";
+import { LiveUpdate } from "@capawesome/capacitor-live-update";
+
 function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -73,14 +78,38 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+let liveUpdateReadyCalled = false;
+
+function LiveUpdateReady() {
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || liveUpdateReadyCalled) {
+      return;
+    }
+
+    liveUpdateReadyCalled = true;
+
+    LiveUpdate.ready().catch((error) => {
+      console.error("Live Update Ready Error:", error);
+    });
+  }, []);
+
+  return null;
+}
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-   <BrowserRouter basename={Capacitor.isNativePlatform() ? "/" : "/sooq-sy"}>
-      <MaintenanceGuard>
+<BrowserRouter basename={Capacitor.isNativePlatform() ? "/" : "/sooq-sy"}>
+<LiveUpdateReady />
+  <PushNotificationsSetup />
+
+  <MaintenanceGuard>
   <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/ad/:id" element={<AdDetails />} />
         <Route path="/admin" element={<App />} />
+        <Route
+  path="/admin/conversation/:id"
+  element={<AdminConversation />}
+/>
         <Route path="/auth" element={<Auth />} />
         <Route path="/add-ad" element={<AddAd />} />
         <Route path="/edit-ad/:id" element={<EditAd />} />
@@ -88,6 +117,7 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/messages/:id" element={<Messages />} />
         <Route path="/my-ads" element={<MyAds />} />
         <Route path="/favorites" element={<Favorites />} />
+        <Route path="/profile" element={<Profile />} />
         
         </Routes>
 </MaintenanceGuard>

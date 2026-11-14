@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import { useNavigate } from "react-router-dom";
+import siteIcon from "../assets/icon.png";
 import {
   Search,
   MapPin,
@@ -177,7 +178,7 @@ const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(nu
 const [searchQuery, setSearchQuery] = useState("");
 const [selectedCity, setSelectedCity] = useState("");
 const [siteName, setSiteName] = useState("Sooq.Sy");
-const [logoUrl, setLogoUrl] = useState("");
+const [, setLogoUrl] = useState("");
 const [heroImageUrl, setHeroImageUrl] = useState("");
 const [contactEmail, setContactEmail] = useState("");
 const [contactPhone, setContactPhone] = useState("");
@@ -763,17 +764,11 @@ const filteredLatestAds = ads.filter((ad) => {
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-4">
 <a href="/" className="flex items-center gap-2">
-  {logoUrl ? (
-    <img
-      src={logoUrl}
-      alt={siteName}
-      className="h-11 w-11 rounded-xl object-contain"
-    />
-  ) : (
-    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-xl font-black text-white">
-      {siteName.charAt(0)}
-    </div>
-  )}
+  <img
+    src={siteIcon}
+    alt="Sooq.Sy"
+    className="h-11 w-11 rounded-xl object-contain"
+  />
 
   <div>
     <h1 className="text-2xl font-black tracking-tight text-slate-900">

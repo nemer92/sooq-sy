@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 
 export default function PushNotificationsSetup() {
   const userIdRef = useRef<string | null>(null);
+  const deviceTokenRef = useRef<string | null>(null);
   const registeredForUserRef = useRef<string | null>(null);
   const registeringRef = useRef(false);
   const navigate = useNavigate();
@@ -53,24 +54,17 @@ export default function PushNotificationsSetup() {
       try {
         const registrationListener = await PushNotifications.addListener(
           "registration",
-          async (token) => {
-            const userId = userIdRef.current;
+async (token) => {
+  deviceTokenRef.current = token.value;
 
-            if (!active || !userId) return;
+  const userId = userIdRef.current;
 
-            const { error } = await supabase
-              .from("push_tokens")
-              .upsert(
-                {
-                  user_id: userId,
-                  token: token.value,
-                  platform: "android",
-                  updated_at: new Date().toISOString(),
-                },
-                {
-                  onConflict: "user_id,token",
-                }
-              );
+  if (!active || !userId) return;
+
+const { error } = await supabase.rpc("register_push_token", {
+  p_token: token.value,
+  p_platform: "android",
+});
 
             if (error) {
               console.error("Saving push token failed:", error);

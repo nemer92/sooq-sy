@@ -3,11 +3,13 @@ import { useEffect, useRef } from "react";
 import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { PushNotifications } from "@capacitor/push-notifications";
 import { supabase } from "./lib/supabase";
+import { useNavigate } from "react-router-dom";
 
 export default function PushNotificationsSetup() {
   const userIdRef = useRef<string | null>(null);
   const registeredForUserRef = useRef<string | null>(null);
   const registeringRef = useRef(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // الإشعارات مخصصة لتطبيق Android فقط
@@ -98,12 +100,34 @@ export default function PushNotificationsSetup() {
 
         listenerHandles.push(receivedListener);
 
-        const actionListener = await PushNotifications.addListener(
-          "pushNotificationActionPerformed",
-          (action) => {
-            console.log("Push notification opened:", action);
-          }
-        );
+const actionListener = await PushNotifications.addListener(
+  "pushNotificationActionPerformed",
+  (action) => {
+    console.log("Push notification opened:", action);
+
+    const link = action.notification.data?.link;
+
+    if (!link) return;
+
+    try {
+      const url = new URL(link);
+
+      if (url.hostname !== "nemer92.github.io") return;
+
+      const match = url.pathname.match(
+        /^\/sooq-sy\/ad\/([^/]+)\/?$/
+      );
+
+      if (!match) return;
+
+      const adId = match[1];
+
+      navigate(`/ad/${encodeURIComponent(adId)}`);
+    } catch (error) {
+      console.error("Invalid notification link:", error);
+    }
+  }
+);
 
         listenerHandles.push(actionListener);
 

@@ -84,7 +84,7 @@ export default function LiveUpdateReady() {
     });
   }, []);
 
-  if (!Capacitor.isNativePlatform()) return null;
+
 
   return (
     <div

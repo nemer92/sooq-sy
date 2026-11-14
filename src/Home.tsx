@@ -1297,7 +1297,7 @@ onClick={async () => {
 
       <main className="mx-auto max-w-7xl px-5 pb-16">
         <div className="mt-4 rounded-xl bg-amber-100 p-4 text-center font-black text-amber-900">
-  🚀 تم اختبار التحديث التلقائي بنجاح - النسخة الجديدة
+  ✅ وصل التحديث الجديد عبر الإنترنت بنجاح
 </div>
         <section
   className="relative mt-7 overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-950 via-emerald-800 to-emerald-600 px-7 py-12 text-white md:px-14 md:py-16"

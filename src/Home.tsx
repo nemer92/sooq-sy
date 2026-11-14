@@ -926,7 +926,23 @@ onClick={async () => {
 
   setShowNotifications(false);
 
-  if (notification?.link) {
+
+
+if (notification?.link) {
+  try {
+    const url = new URL(notification.link);
+
+    if (url.hostname === "nemer92.github.io") {
+      const match = url.pathname.match(
+        /^\/sooq-sy\/ad\/([^/]+)\/?$/
+      );
+
+      if (match) {
+        navigate(`/ad/${encodeURIComponent(match[1])}`);
+        return;
+      }
+    }
+
     if (/^https?:\/\//i.test(notification.link)) {
       window.open(notification.link, "_blank", "noopener,noreferrer");
     } else {
@@ -936,7 +952,12 @@ onClick={async () => {
           : `/${notification.link}`
       );
     }
+  } catch (error) {
+    console.error("Invalid notification link:", error);
   }
+}
+
+
 }}
   className={`cursor-pointer border-b border-slate-100 p-4 ${
     !item.read_at ? "bg-emerald-50" : "bg-white"
@@ -1199,7 +1220,34 @@ onClick={async () => {
 
                   if (notification?.link) {
                     if (/^https?:\/\//i.test(notification.link)) {
-                      window.open(
+                      
+if (notification?.link) {
+  try {
+    const url = new URL(notification.link);
+
+    if (
+      url.hostname === "nemer92.github.io" &&
+      url.pathname.startsWith("/sooq-sy/ad/")
+    ) {
+      const adId = url.pathname
+        .replace("/sooq-sy/ad/", "")
+        .replace(/\/$/, "");
+
+      navigate(`/ad/${encodeURIComponent(adId)}`);
+    } else if (/^https?:\/\//i.test(notification.link)) {
+      window.open(notification.link, "_blank", "noopener,noreferrer");
+    } else {
+      navigate(
+        notification.link.startsWith("/")
+          ? notification.link
+          : `/${notification.link}`
+      );
+    }
+  } catch (error) {
+    console.error("Invalid notification link:", error);
+  }
+}
+(
                         notification.link,
                         "_blank",
                         "noopener,noreferrer"

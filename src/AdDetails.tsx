@@ -215,10 +215,6 @@ if (sellerError) {
 }
 
 async function getShareUrl() {
-  if (!ad?.id) {
-    throw new Error("بيانات الإعلان غير جاهزة.");
-  }
-
   const { data: token, error } = await supabase.rpc(
     "get_or_create_ad_share_link",
     {
@@ -229,10 +225,7 @@ async function getShareUrl() {
   if (error) throw error;
   if (!token) throw new Error("تعذر إنشاء رابط المشاركة.");
 
-  const url = new URL(window.location.href);
-  url.searchParams.set("share", token);
-
-  return url.toString();
+  return `https://nemer92.github.io/sooq-sy/ad/${ad.id}?share=${token}`;
 }
 
 async function copyAdLink() {

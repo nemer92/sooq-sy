@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import { Device } from "@capacitor/device";
+import { Capacitor } from "@capacitor/core";
 import {
   MapPin,
   ArrowRight,
@@ -62,6 +64,46 @@ const { data, error } = await supabase
 
       if (data) {
         setAd(data);
+
+// تسجيل الزيارة القادمة من رابط مشاركة
+const shareToken = new URLSearchParams(window.location.search).get("share");
+
+if (shareToken) {
+  try {
+    let visitorId: string;
+
+if (Capacitor.isNativePlatform()) {
+  const deviceInfo = await Device.getId();
+  visitorId = `android:${deviceInfo.identifier}`;
+} else {
+  visitorId = localStorage.getItem("sooqsy_visitor_id") || "";
+
+  if (!visitorId) {
+    visitorId = crypto.randomUUID();
+    localStorage.setItem("sooqsy_visitor_id", visitorId);
+  }
+}
+
+    if (!visitorId) {
+      visitorId = crypto.randomUUID();
+      localStorage.setItem("sooqsy_visitor_id", visitorId);
+    }
+
+    const { data: visitRecorded, error: visitError } =
+      await supabase.rpc("record_ad_share_visit", {
+        p_token: shareToken,
+        p_visitor_id: visitorId,
+      });
+
+    if (visitError) {
+      console.error("خطأ تسجيل زيارة المشاركة:", visitError);
+    } else if (visitRecorded) {
+      console.log("تم تسجيل زيارة المشاركة ومنح النقطة.");
+    }
+  } catch (error) {
+    console.error("تعذر تسجيل زيارة المشاركة:", error);
+  }
+}
         const { data: { user } } = await supabase.auth.getUser();
 
 if (user) {
@@ -171,25 +213,54 @@ if (sellerError) {
   }
 }
 
-  async function copyAdLink() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      alert("تم نسخ رابط الإعلان بنجاح.");
-    } catch (error) {
-      console.error("خطأ نسخ الرابط:", error);
-      alert("تعذر نسخ الرابط.");
-    }
+async function getShareUrl() {
+  if (!ad?.id) {
+    throw new Error("بيانات الإعلان غير جاهزة.");
   }
 
-  function shareAdOnWhatsApp() {
-    const message = `شاهد هذا الإعلان على Sooq.sy:\n${ad.title}\n${window.location.href}`;
+  const { data: token, error } = await supabase.rpc(
+    "get_or_create_ad_share_link",
+    {
+      p_ad_id: ad.id,
+    }
+  );
+
+  if (error) throw error;
+  if (!token) throw new Error("تعذر إنشاء رابط المشاركة.");
+
+  const url = new URL(window.location.href);
+  url.searchParams.set("share", token);
+
+  return url.toString();
+}
+
+async function copyAdLink() {
+  try {
+    const link = await getShareUrl();
+    await navigator.clipboard.writeText(link);
+    alert("تم نسخ رابط المشاركة بنجاح.");
+  } catch (error) {
+    console.error("خطأ نسخ رابط المشاركة:", error);
+    alert("تعذر إنشاء أو نسخ رابط المشاركة. تأكد من تسجيل الدخول.");
+  }
+}
+
+async function shareAdOnWhatsApp() {
+  try {
+    const link = await getShareUrl();
+
+    const message = `شاهد هذا الإعلان على Sooq.sy:\n${ad.title}\n${link}`;
 
     window.open(
       `https://wa.me/?text=${encodeURIComponent(message)}`,
       "_blank",
       "noopener,noreferrer"
     );
+  } catch (error) {
+    console.error("خطأ مشاركة الإعلان:", error);
+    alert("تعذرت المشاركة. تأكد من تسجيل الدخول.");
   }
+}
     async function startConversation() {
     try {
       const {

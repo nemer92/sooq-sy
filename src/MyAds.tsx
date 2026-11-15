@@ -11,6 +11,7 @@ type Ad = {
   currency: string;
   status: string;
   created_at: string;
+  published_at: string | null;
   rejection_reason: string | null;
   categories: { name_ar: string } | null;
   cities: { name_ar: string } | null;
@@ -53,6 +54,7 @@ export default function MyAds() {
           currency,
           status,
           created_at,
+          published_at,
           rejection_reason,
           categories(name_ar),
           cities(name_ar)
@@ -290,15 +292,15 @@ export default function MyAds() {
                       )}
                     </div>
 
-                    {ad.status === "approved" && (
-                      <Link
-                      
-                        to={`/ad/${ad.id}`}
-                        className="shrink-0 rounded-xl border border-emerald-200 px-4 py-2.5 text-center text-sm font-bold text-emerald-700 hover:bg-emerald-50"
-                      >
-                        عرض الإعلان
-                        {ad.status === "approved" && (
-  <>
+                {ad.status === "approved" && (
+  <div className="flex flex-wrap gap-2">
+    <Link
+      to={`/ad/${ad.id}`}
+      className="shrink-0 rounded-xl border border-emerald-200 px-4 py-2.5 text-center text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+    >
+      عرض الإعلان
+    </Link>
+
     <button
       type="button"
       onClick={() => {
@@ -322,11 +324,17 @@ export default function MyAds() {
     >
       إغلاق الإعلان
     </button>
-  </>
+
+    {ad.published_at && (
+      <Link
+        to={`/featured-campaign/${ad.id}`}
+        className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-amber-600"
+      >
+        تمييز الإعلان
+      </Link>
+    )}
+  </div>
 )}
-                      </Link>
-                      
-                    )}
                     
                     {(ad.status === "sold" || ad.status === "archived") && (
   <button

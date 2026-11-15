@@ -23,6 +23,7 @@ import {
   Pencil,
   Eye,
   X,
+  Copy,
   CalendarDays,
   UserRound,
   MapPin,
@@ -110,6 +111,24 @@ type Report = {
   reported_user_name?: string;
   active_ban?: boolean;
 };
+type SubscriptionPaymentRequest = {
+  id: string;
+  user_id: string;
+  phone: string;
+  package_number: number;
+  amount_usd: number;
+  exchange_rate: number;
+  amount_syp: number;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  admin_note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  request_type: "subscription" | "featured_campaign";
+  plan_name?: string;
+  duration_months?: number;
+  user_name?: string;
+};
 type NamedItem = {
   name_ar: string;
 };
@@ -180,6 +199,9 @@ const [password, setPassword] = useState("");
   const [heroImageUrl, setHeroImageUrl] = useState("");
   const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
 const [heroImageUploading, setHeroImageUploading] = useState(false);
+const [shamCashQrUrl, setShamCashQrUrl] = useState("");
+const [shamCashQrFile, setShamCashQrFile] = useState<File | null>(null);
+const [shamCashQrUploading, setShamCashQrUploading] = useState(false);
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
 
@@ -200,6 +222,9 @@ const [adminLoginError, setAdminLoginError] = useState("");
     total: 0,
   });
   const [reports, setReports] = useState<Report[]>([]);
+  const [subscriptionRequests, setSubscriptionRequests] = useState<SubscriptionPaymentRequest[]>([]);
+const [subscriptionRequestsLoading, setSubscriptionRequestsLoading] = useState(false);
+const [subscriptionRequestsError, setSubscriptionRequestsError] = useState("");
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportsError, setReportsError] = useState("");
   const [reportSearch, setReportSearch] = useState("");
@@ -922,6 +947,156 @@ const enrichedReports = reportsData.map((report) => ({
   }
 }, []);
 
+const loadSubscriptionRequests = useCallback(async () => {
+  setSubscriptionRequestsLoading(true);
+  setSubscriptionRequestsError("");
+
+  try {
+    const { data, error } = await supabase
+      .from("subscription_payment_requests")
+      .select("*")
+      .eq("request_type", "subscription")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const requests = (data ?? []) as SubscriptionPaymentRequest[];
+
+    const packageNumbers = [
+      ...new Set(requests.map((request) => request.package_number)),
+    ];
+
+    const userIds = [
+      ...new Set(requests.map((request) => request.user_id)),
+    ];
+
+    let plans: {
+      id: number;
+      name: string;
+      duration_months: number;
+    }[] = [];
+
+    let profiles: {
+      id: string;
+      display_name: string | null;
+    }[] = [];
+
+    if (packageNumbers.length > 0) {
+      const { data: plansData, error: plansError } = await supabase
+        .from("subscription_plans")
+        .select("id, name, duration_months")
+        .in("id", packageNumbers);
+
+      if (plansError) throw plansError;
+      plans = plansData ?? [];
+    }
+
+    if (userIds.length > 0) {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", userIds);
+
+      if (profilesError) throw profilesError;
+      profiles = profilesData ?? [];
+    }
+
+    const enrichedRequests = requests.map((request) => {
+      const plan = plans.find(
+        (item) => item.id === request.package_number
+      );
+
+      const profile = profiles.find(
+        (item) => item.id === request.user_id
+      );
+
+      return {
+        ...request,
+        plan_name: plan?.name ?? `الباقة ${request.package_number}`,
+        duration_months: plan?.duration_months ?? 0,
+        user_name: profile?.display_name ?? "مستخدم غير معروف",
+      };
+    });
+
+    setSubscriptionRequests(enrichedRequests);
+  } catch (err) {
+    console.error("Error loading subscription requests:", err);
+    setSubscriptionRequestsError("تعذر تحميل طلبات الاشتراك.");
+  } finally {
+    setSubscriptionRequestsLoading(false);
+  }
+}, []);
+
+const approveSubscriptionRequest = async (requestId: string) => {
+  const confirmed = window.confirm(
+    "هل تأكدت من وصول الحوالة وصحة المبلغ ورقم الهاتف؟ سيتم تفعيل الاشتراك أو جدولته."
+  );
+
+  if (!confirmed) return;
+
+  setSubscriptionRequestsLoading(true);
+  setSubscriptionRequestsError("");
+
+  try {
+    const { error } = await supabase.rpc(
+      "approve_subscription_payment_request",
+      { p_request_id: requestId }
+    );
+
+    if (error) throw error;
+
+    alert("تمت الموافقة على طلب الاشتراك بنجاح.");
+    await loadSubscriptionRequests();
+  } catch (err) {
+    console.error("Error approving subscription:", err);
+    alert(
+      err instanceof Error
+        ? err.message
+        : "تعذرت الموافقة على طلب الاشتراك."
+    );
+  } finally {
+    setSubscriptionRequestsLoading(false);
+  }
+};
+
+const rejectSubscriptionRequest = async (requestId: string) => {
+  const adminNote = window.prompt("اكتب سبب رفض طلب الاشتراك:");
+
+  if (!adminNote || !adminNote.trim()) return;
+
+  setSubscriptionRequestsLoading(true);
+  setSubscriptionRequestsError("");
+
+  try {
+    const { error } = await supabase.rpc(
+      "reject_subscription_payment_request",
+      {
+        p_request_id: requestId,
+        p_admin_note: adminNote.trim(),
+      }
+    );
+
+    if (error) throw error;
+
+    alert("تم رفض طلب الاشتراك.");
+    await loadSubscriptionRequests();
+  } catch (err) {
+    console.error("Error rejecting subscription:", err);
+    alert(
+      err instanceof Error
+        ? err.message
+        : "تعذر رفض طلب الاشتراك."
+    );
+  } finally {
+    setSubscriptionRequestsLoading(false);
+  }
+};
+
+useEffect(() => {
+  if (activeMenu === "طلبات الاشتراك") {
+    loadSubscriptionRequests();
+  }
+}, [activeMenu, loadSubscriptionRequests]);
 
 const handleAdminBan = async (
   report: Report,
@@ -1161,7 +1336,7 @@ const loadSettings = useCallback(async () => {
   try {
     const { data, error } = await supabase
       .from("site_settings")
-      .select("site_name, logo_url, hero_image_url, contact_email, contact_phone, allow_new_ads, maintenance_mode")
+      .select("site_name, logo_url, hero_image_url, sham_cash_qr_url, contact_email, contact_phone, allow_new_ads, maintenance_mode")
       .eq("id", 1)
       .single();
 
@@ -1174,6 +1349,7 @@ const loadSettings = useCallback(async () => {
     setContactPhone(data.contact_phone ?? "");
     setAllowNewAds(data.allow_new_ads ?? true);
     setMaintenanceMode(data.maintenance_mode ?? false);
+    setShamCashQrUrl(data.sham_cash_qr_url ?? "");
   } catch (err) {
     setSettingsError(
       err instanceof Error
@@ -1223,6 +1399,46 @@ const uploadHeroImage = async () => {
     setHeroImageUploading(false);
   }
 };
+const uploadShamCashQr = async () => {
+  if (!shamCashQrFile) {
+    setSettingsError("يرجى اختيار صورة QR أولاً.");
+    return;
+  }
+
+  setShamCashQrUploading(true);
+  setSettingsError("");
+  setSettingsSuccess("");
+
+  try {
+    const fileExt = shamCashQrFile.name.split(".").pop() || "png";
+    const filePath = `sham-cash-qr-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("site-images")
+      .upload(filePath, shamCashQrFile, {
+        upsert: true,
+        contentType: shamCashQrFile.type,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from("site-images")
+      .getPublicUrl(filePath);
+
+    setShamCashQrUrl(data.publicUrl);
+    setShamCashQrFile(null);
+    setSettingsSuccess(
+      "تم رفع صورة QR بنجاح. اضغط حفظ الإعدادات لتثبيت الرابط."
+    );
+  } catch (err) {
+    setSettingsError(
+      err instanceof Error ? err.message : "تعذر رفع صورة QR."
+    );
+  } finally {
+    setShamCashQrUploading(false);
+  }
+};
 const saveSettings = useCallback(async () => {
   setSettingsSaving(true);
   setSettingsError("");
@@ -1235,6 +1451,7 @@ const saveSettings = useCallback(async () => {
         site_name: siteName,
         logo_url: logoUrl || null,
         hero_image_url: heroImageUrl || null,
+        sham_cash_qr_url: shamCashQrUrl || null,
         contact_email: contactEmail || null,
         contact_phone: contactPhone || null,
         allow_new_ads: allowNewAds,
@@ -1253,7 +1470,7 @@ const saveSettings = useCallback(async () => {
   } finally {
     setSettingsSaving(false);
   }
-}, [siteName, logoUrl, heroImageUrl, contactEmail, contactPhone, allowNewAds, maintenanceMode]);
+}, [siteName, logoUrl, heroImageUrl, shamCashQrUrl, contactEmail, contactPhone, allowNewAds, maintenanceMode]);
 const loadGovernorates = useCallback(async () => {
   const { data, error } = await supabase
     .from("governorates")
@@ -2279,6 +2496,10 @@ async function updateAdminLogin() {
   label: "إدارة الإعلانات",
   icon: Megaphone,
 },
+{
+  label: "طلبات الاشتراك",
+  icon: Megaphone,
+},
     {
   label: "الإعلانات المؤرشفة",
   icon: Megaphone,
@@ -2537,6 +2758,155 @@ async function updateAdminLogin() {
               />
             </>
           )}
+
+{/* طلبات الاشتراك */}
+{activeMenu === "طلبات الاشتراك" && (
+  <>
+    <div className="section-heading">
+      <div>
+        <h2>طلبات الاشتراك</h2>
+        <p>مراجعة طلبات الدفع والتحقق من الحوالات يدوياً</p>
+      </div>
+
+      <button
+        className="refresh-button"
+        onClick={loadSubscriptionRequests}
+        disabled={subscriptionRequestsLoading}
+      >
+        <RefreshCw size={17} />
+        تحديث
+      </button>
+    </div>
+
+    {subscriptionRequestsLoading ? (
+      <p>جارٍ تحميل طلبات الاشتراك...</p>
+    ) : subscriptionRequestsError ? (
+      <p className="error-message">{subscriptionRequestsError}</p>
+    ) : subscriptionRequests.length === 0 ? (
+      <p>لا توجد طلبات اشتراك حالياً.</p>
+    ) : (
+      <div className="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>رقم الطلب</th>
+              <th>المستخدم / الهاتف</th>
+              <th>الباقة</th>
+              <th>المبلغ بالدولار</th>
+              <th>سعر الصرف</th>
+              <th>المبلغ بالليرة</th>
+              <th>الحالة</th>
+              <th>تاريخ الطلب</th>
+              <th>الإجراءات</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {subscriptionRequests.map((request) => (
+              <tr key={request.id}>
+<td>
+  <div className="flex items-center gap-2">
+    <span
+      className="text-xs break-all"
+      dir="ltr"
+      title={request.id}
+    >
+      {request.id}
+    </span>
+
+    <button
+      type="button"
+      onClick={() => {
+        navigator.clipboard.writeText(request.id);
+        alert("تم نسخ رقم الطلب");
+      }}
+      className="text-emerald-600 hover:text-emerald-800 shrink-0"
+      title="نسخ رقم الطلب"
+    >
+      <Copy size={16} />
+    </button>
+  </div>
+</td>
+
+                <td>
+  <div className="font-medium">
+    {request.user_name || "مستخدم غير معروف"}
+  </div>
+  <div className="text-xs text-gray-500" dir="ltr">
+    {request.phone}
+  </div>
+</td>
+
+                <td>
+  <div className="font-medium">
+    {request.plan_name || `الباقة ${request.package_number}`}
+  </div>
+  <div className="text-xs text-gray-500">
+    {request.duration_months
+      ? `${request.duration_months} شهر`
+      : "المدة غير محددة"}
+  </div>
+</td>
+
+                <td>
+                  ${Number(request.amount_usd).toFixed(2)}
+                </td>
+
+                <td>
+                  {Number(request.exchange_rate).toLocaleString("en-US")}
+                </td>
+
+                <td>
+                  {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+                </td>
+
+                <td>
+                  {request.status === "pending"
+                    ? "بانتظار المراجعة"
+                    : request.status === "approved"
+                    ? "مقبول"
+                    : request.status === "rejected"
+                    ? "مرفوض"
+                    : "ملغي"}
+                </td>
+
+                <td>{formatDate(request.created_at)}</td>
+
+                <td>
+                  {request.status === "pending" ? (
+                    <div className="flex gap-2">
+                      <button
+                        className="refresh-button"
+                        disabled={subscriptionRequestsLoading}
+                        onClick={() =>
+                          approveSubscriptionRequest(request.id)
+                        }
+                      >
+                        موافقة
+                      </button>
+
+                      <button
+                        className="refresh-button"
+                        disabled={subscriptionRequestsLoading}
+                        onClick={() =>
+                          rejectSubscriptionRequest(request.id)
+                        }
+                      >
+                        رفض
+                      </button>
+                    </div>
+                  ) : (
+                    <span>تمت المراجعة</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </>
+)}
 
 {activeMenu === "إدارة الإعلانات" && (
   <>
@@ -3352,6 +3722,43 @@ window.open(
     className="mt-3 bg-blue-600 text-white px-5 py-2 rounded-lg disabled:opacity-50"
   >
     {heroImageUploading ? "جارٍ رفع الصورة..." : "رفع صورة الواجهة"}
+  </button>
+</div>
+<div className="border rounded-xl p-4">
+  <label className="block font-semibold mb-2">
+    رمز الدفع عبر شام كاش (QR)
+  </label>
+
+  <p className="text-sm text-slate-500 mb-3">
+    الصورة التي ستظهر للمستخدمين عند طلب تمييز إعلاناتهم.
+  </p>
+
+  {shamCashQrUrl && (
+    <img
+      src={shamCashQrUrl}
+      alt="رمز شام كاش"
+      className="w-64 max-w-full object-contain rounded-lg border p-2 mb-3"
+    />
+  )}
+
+  <input
+    type="file"
+    accept="image/jpeg,image/png,image/webp"
+    onChange={(e) =>
+      setShamCashQrFile(e.target.files?.[0] || null)
+    }
+    className="w-full border rounded-lg p-3"
+  />
+
+  <button
+    type="button"
+    onClick={uploadShamCashQr}
+    disabled={!shamCashQrFile || shamCashQrUploading}
+    className="mt-3 bg-blue-600 text-white px-5 py-2 rounded-lg disabled:opacity-50"
+  >
+    {shamCashQrUploading
+      ? "جارٍ رفع رمز QR..."
+      : "رفع رمز QR"}
   </button>
 </div>
       <div>

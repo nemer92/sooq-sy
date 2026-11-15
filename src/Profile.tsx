@@ -18,6 +18,8 @@ export default function Profile() {
   const [savingPassword, setSavingPassword] = useState(false);
 
   const [userId, setUserId] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const [pointsBalance, setPointsBalance] = useState(0);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -101,6 +103,26 @@ export default function Profile() {
           .single();
 
       if (phoneError) throw phoneError;
+      const { data: referralData, error: referralError } =
+  await supabase
+    .from("referral_codes")
+    .select("code")
+    .eq("user_id", id)
+    .single();
+
+if (referralError) throw referralError;
+
+const { data: pointsData, error: pointsError } =
+  await supabase
+    .from("user_points")
+    .select("balance")
+    .eq("user_id", id)
+    .single();
+
+if (pointsError) throw pointsError;
+
+setReferralCode(referralData.code);
+setPointsBalance(pointsData.balance);
 
       setName(profile.display_name || "");
       setPhone(privateProfile.phone || "");
@@ -328,6 +350,58 @@ export default function Profile() {
               {savingName ? "جارٍ الحفظ..." : "حفظ الاسم"}
             </button>
           </section>
+          <section className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm">
+  <h2 className="mb-4 text-xl font-bold text-slate-800">
+    نقاطي ودعوة الأصدقاء
+  </h2>
+
+  <div className="mb-5 rounded-xl bg-emerald-50 p-4">
+    <p className="text-sm font-semibold text-emerald-700">
+      رصيد نقاطك
+    </p>
+    <p className="mt-1 text-3xl font-black text-emerald-700">
+      {pointsBalance} نقطة
+    </p>
+    <p className="mt-2 text-xs text-slate-500">
+      يمكنك جمع النقاط من مشاركة الإعلانات ودعوة الأصدقاء.
+    </p>
+  </div>
+
+  <label className="mb-2 block text-sm font-semibold text-slate-600">
+    رمز الإحالة الخاص بك
+  </label>
+
+  <div className="flex gap-2">
+    <input
+      type="text"
+      readOnly
+      value={referralCode}
+      dir="ltr"
+      className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-center font-bold tracking-widest"
+    />
+
+    <button
+      type="button"
+      onClick={() => {
+        const basePath = window.location.pathname.startsWith("/sooq-sy")
+  ? "/sooq-sy"
+  : "";
+
+const link = `${window.location.origin}${basePath}/auth?ref=${referralCode}`;
+        navigator.clipboard.writeText(link)
+          .then(() => alert("تم نسخ رابط الدعوة بنجاح."))
+          .catch(() => alert("تعذر نسخ الرابط."));
+      }}
+      className="rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white hover:bg-emerald-700"
+    >
+      نسخ الرابط
+    </button>
+  </div>
+
+  <p className="mt-3 text-sm text-slate-500">
+    ادعُ أصدقاءك للتسجيل باستخدام رابطك، واحصل على 20 نقطة عند إنشاء كل صديق لحسابه بنجاح.
+  </p>
+</section>
           <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
             <div className="mb-5">
               <h2 className="text-xl font-bold text-slate-800">

@@ -374,7 +374,13 @@ async function sendMessage(e: React.FormEvent) {
 
       if (sendError) throw sendError;
 
-      setMessages((previous) => [...previous, data]);
+      setMessages((previous) => {
+  if (previous.some((message) => message.id === data.id)) {
+    return previous;
+  }
+
+  return [...previous, data];
+});
       setMessageText("");
     } catch (err) {
       console.error("خطأ إرسال الرسالة:", err);

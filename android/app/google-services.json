@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "171150571192",
+    "project_id": "sooq-sy-ca531",
+    "storage_bucket": "sooq-sy-ca531.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:171150571192:android:b6c7d164a5f945952be64d",
+        "android_client_info": {
+          "package_name": "com.sooqsy.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAF5ZBsUZAaamfTxo4lXlaEkZySR7lGRno"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

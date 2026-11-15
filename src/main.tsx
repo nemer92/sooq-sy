@@ -16,6 +16,8 @@ import Favorites from "./Favorites.tsx";
 import Profile from "./Profile";
 import AdminConversation from "./AdminConversation";
 import PushNotificationsSetup from "./PushNotificationsSetup";import LiveUpdateReady from "./LiveUpdateReady";
+import FeaturedCampaign from "./FeaturedCampaign.tsx";
+import Subscriptions from "./Subscriptions.tsx";
 
 function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   const location = useLocation();
@@ -101,7 +103,12 @@ createRoot(document.getElementById("root")!).render(
         <Route path="/my-ads" element={<MyAds />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/profile" element={<Profile />} />
-        
+        <Route path="/subscriptions" element={<Subscriptions />} />
+        <Route
+  path="/featured-campaign/:adId"
+  element={<FeaturedCampaign />}
+/>
+
         </Routes>
 </MaintenanceGuard>
     </BrowserRouter>

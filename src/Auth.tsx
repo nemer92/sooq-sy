@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { Eye, EyeOff } from "lucide-react";
@@ -19,6 +19,61 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [governorates, setGovernorates] = useState<any[]>([]);
+const [cities, setCities] = useState<any[]>([]);
+const [selectedGovernorate, setSelectedGovernorate] = useState("");
+const [selectedCity, setSelectedCity] = useState("");
+const [locationsLoading, setLocationsLoading] = useState(false);
+const [referralCode, setReferralCode] = useState("");
+
+useEffect(() => {
+  const params = new URLSearchParams(location.search);
+  const ref = params.get("ref");
+
+  if (ref) {
+    setReferralCode(ref.toUpperCase().trim());
+    setIsRegister(true);
+  }
+}, [location.search]);
+
+useEffect(() => {
+  if (!isRegister) return;
+
+  async function loadLocations() {
+    setLocationsLoading(true);
+
+    try {
+      const { data: governoratesData, error: governoratesError } =
+        await supabase
+          .from("governorates")
+          .select("id, name_ar")
+          .eq("is_active", true)
+          .order("name_ar");
+
+      if (governoratesError) throw governoratesError;
+
+      const { data: citiesData, error: citiesError } =
+        await supabase
+          .from("cities")
+          .select("id, governorate_id, name_ar")
+          .eq("is_active", true)
+          .order("name_ar");
+
+      if (citiesError) throw citiesError;
+
+      setGovernorates(governoratesData || []);
+      setCities(citiesData || []);
+    } catch (err) {
+      setError("تعذر تحميل المحافظات والمدن. حاول مرة أخرى.");
+    } finally {
+      setLocationsLoading(false);
+    }
+  }
+
+
+
+  loadLocations();
+}, [isRegister]);
 
   // تحويل رقم الموبايل إلى بريد داخلي ثابت لا يظهر للمستخدم
   function getInternalEmail(cleanPhone: string) {
@@ -36,7 +91,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     try {
       const cleanPhone = phone.trim();
-
+      const internalEmail = getInternalEmail(cleanPhone);
       if (!/^09\d{8}$/.test(cleanPhone)) {
         throw new Error(
           "رقم الموبايل يجب أن يبدأ بـ 09 ويتكون من 10 أرقام."
@@ -47,25 +102,56 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
         throw new Error("كلمة المرور يجب أن تتكون من 6 أحرف على الأقل.");
       }
 
-      const internalEmail = getInternalEmail(cleanPhone);
+if (isRegister) {
+  if (!name.trim()) {
+    throw new Error("يرجى إدخال الاسم.");
+  }
 
-      if (isRegister) {
-        if (!name.trim()) {
-          throw new Error("يرجى إدخال الاسم.");
-        }
+  if (!selectedGovernorate || !selectedCity) {
+    throw new Error("يرجى اختيار المحافظة والمدينة.");
+  }
 
-        if (password !== confirmPassword) {
-          throw new Error("كلمتا المرور غير متطابقتين.");
-        }
+  const cityExists = cities.some(
+    (city) =>
+      String(city.id) === selectedCity &&
+      String(city.governorate_id) === selectedGovernorate
+  );
+
+  if (!cityExists) {
+    throw new Error("المدينة المختارة غير صحيحة.");
+  }
+
+  if (password !== confirmPassword) {
+    throw new Error("كلمتا المرور غير متطابقتين.");
+  }
+
+  const cleanReferralCode = referralCode.trim().toUpperCase();
+
+if (cleanReferralCode) {
+  const { data: isReferralValid, error: referralError } =
+    await supabase.rpc("validate_referral_code", {
+      p_code: cleanReferralCode,
+    });
+
+  if (referralError) {
+    throw new Error("تعذر التحقق من رمز الإحالة. حاول مرة أخرى.");
+  }
+
+  if (!isReferralValid) {
+    throw new Error("رمز الإحالة غير صحيح، يرجى التأكد منه.");
+  }
+}
 
         const { data, error } = await supabase.auth.signUp({
           email: internalEmail,
           password,
           options: {
-            data: {
-              display_name: name.trim(),
-              phone: cleanPhone,
-            },
+data: {
+  display_name: name.trim(),
+  phone: cleanPhone,
+  city_id: selectedCity,
+  referral_code: referralCode.trim().toUpperCase(),
+},
           },
         });
 
@@ -183,6 +269,87 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
                 className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
               />
             </div>
+          )}
+          {isRegister && (
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-slate-700">
+                رمز الإحالة (اختياري)
+              </label>
+              <input
+                type="text"
+                value={referralCode}
+                onChange={(e) =>
+                  setReferralCode(e.target.value.toUpperCase().replace(/\s/g, ""))
+                }
+                placeholder="أدخل رمز الدعوة"
+                maxLength={8}
+                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left uppercase outline-none focus:border-emerald-500"
+                dir="ltr"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                إذا دعـاك أحد أصدقائك، أدخل رمز الإحالة الخاص به.
+              </p>
+            </div>
+          )}
+                    {isRegister && (
+            <>
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  المحافظة
+                </label>
+
+                <select
+                  required
+                  value={selectedGovernorate}
+                  onChange={(e) => {
+                    setSelectedGovernorate(e.target.value);
+                    setSelectedCity("");
+                  }}
+                  disabled={locationsLoading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {locationsLoading ? "جارٍ تحميل المحافظات..." : "اختر المحافظة"}
+                  </option>
+
+                  {governorates.map((governorate) => (
+                    <option
+                      key={governorate.id}
+                      value={String(governorate.id)}
+                    >
+                      {governorate.name_ar}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  المدينة
+                </label>
+
+                <select
+                  required
+                  value={selectedCity}
+                  onChange={(e) => setSelectedCity(e.target.value)}
+                  disabled={!selectedGovernorate || locationsLoading}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500 disabled:bg-slate-100"
+                >
+                  <option value="">اختر المدينة</option>
+
+                  {cities
+                    .filter(
+                      (city) =>
+                        String(city.governorate_id) === selectedGovernorate
+                    )
+                    .map((city) => (
+                      <option key={city.id} value={String(city.id)}>
+                        {city.name_ar}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </>
           )}
 
           <div>

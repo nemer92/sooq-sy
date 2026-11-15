@@ -47,9 +47,14 @@ async function getFirebaseAccessToken(serviceAccount: {
 
   const unsignedToken = `${header}.${claims}`;
 
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8",
-    decodePrivateKey(serviceAccount.private_key),
+const privateKeyData = decodePrivateKey(serviceAccount.private_key);
+
+const privateKeyBuffer = new ArrayBuffer(privateKeyData.byteLength);
+new Uint8Array(privateKeyBuffer).set(privateKeyData);
+
+const privateKey = await crypto.subtle.importKey(
+  "pkcs8",
+  privateKeyBuffer,
     {
       name: "RSASSA-PKCS1-v1_5",
       hash: "SHA-256",
@@ -104,17 +109,27 @@ async function getRows(
     {
       headers: {
         apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
       },
     },
   );
 
   if (!response.ok) {
+    console.error("Supabase read failed:", {
+      table,
+      status: response.status,
+    });
+
     throw new Error(`Could not read ${table} from Supabase.`);
   }
 
-  return await response.json();
+  const rows = await response.json();
+
+
+
+  return rows;
 }
+
+
 
 async function sendToDevice(
   token: string,
@@ -123,6 +138,7 @@ async function sendToDevice(
   body: string,
   data: Record<string, string>,
 ) {
+
   const response = await fetch(
     `https://fcm.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/messages:send`,
     {
@@ -160,23 +176,60 @@ Deno.serve(async (request) => {
   }
 
   try {
-    const webhookSecret = Deno.env.get("PUSH_WEBHOOK_SECRET");
-    const suppliedSecret = request.headers.get("x-webhook-secret");
+const suppliedSecret = request.headers.get("x-webhook-secret");
 
-    if (!webhookSecret || suppliedSecret !== webhookSecret) {
-      return new Response("Unauthorized", { status: 401 });
-    }
+const serviceAccountEncoded = Deno.env.get(
+  "FIREBASE_SERVICE_ACCOUNT_B64",
+);
 
-    const serviceAccountEncoded = Deno.env.get(
-      "FIREBASE_SERVICE_ACCOUNT_B64",
-    );
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+const secretKeysRaw = Deno.env.get("SUPABASE_SECRET_KEYS");
 
-    if (!serviceAccountEncoded || !serviceKey || !supabaseUrl) {
-      throw new Error("Required server configuration is missing.");
-    }
+if (!secretKeysRaw) {
+  throw new Error("Supabase secret keys are missing.");
+}
 
+const secretKeys = JSON.parse(secretKeysRaw);
+const serviceKey = secretKeys.default;
+const supabaseUrl = Deno.env.get("SUPABASE_URL");
+
+if (!serviceAccountEncoded || !serviceKey || !supabaseUrl) {
+  throw new Error("Required server configuration is missing.");
+}
+
+if (!suppliedSecret) {
+  return new Response("Unauthorized", { status: 401 });
+}
+
+const verifyResponse = await fetch(
+  `${supabaseUrl}/rest/v1/rpc/verify_push_webhook_secret`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": serviceKey,
+      "Authorization": `Bearer ${serviceKey}`,
+    },
+    body: JSON.stringify({
+      p_supplied_secret: suppliedSecret,
+    }),
+  },
+);
+
+if (!verifyResponse.ok) {
+  console.error(
+    "Push secret verification failed:",
+    verifyResponse.status,
+    await verifyResponse.text(),
+  );
+
+  throw new Error("Push authentication verification failed.");
+}
+
+const secretsMatch = await verifyResponse.json();
+
+if (secretsMatch !== true) {
+  return new Response("Unauthorized", { status: 401 });
+}
     const serviceAccountJson = new TextDecoder().decode(
       Uint8Array.from(atob(serviceAccountEncoded), (char) =>
         char.charCodeAt(0)
@@ -214,6 +267,7 @@ Deno.serve(async (request) => {
           status: 400,
         });
       }
+
 
       const conversations = await getRows(
         "conversations",

@@ -1,5 +1,5 @@
-
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { Device } from "@capacitor/device";
@@ -16,6 +16,7 @@ import {
   Heart,
 } from "lucide-react";
 export default function AdDetails() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
   const [ad, setAd] = useState<any>(null);
@@ -161,7 +162,7 @@ if (sellerError) {
     }
 
     loadAd();
-  }, [id]);
+  }, [id, location.search]);
 
   async function submitReport() {
   if (!reportReason) {

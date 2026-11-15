@@ -562,9 +562,41 @@ async function sendMessage(e: React.FormEvent) {
                         : "bg-slate-100 text-slate-800"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap break-words">
-                      {message.body}
-                    </p>
+<p className="whitespace-pre-wrap break-words">
+  {message.body
+    .split(/(\[[^\]]+\]\(https?:\/\/[^)\s]+\)|https?:\/\/[^\s]+)/g)
+    .map((part, index) => {
+      const markdownMatch = part.match(
+        /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/
+      );
+
+      const plainMatch = part.match(/^https?:\/\/[^\s]+$/);
+
+      const rawUrl = markdownMatch?.[2] || plainMatch?.[0];
+
+      if (!rawUrl) {
+        return <span key={index}>{part}</span>;
+      }
+
+      return (
+        <a
+          key={index}
+          href={rawUrl}
+          onClick={(event) => {
+            const url = new URL(rawUrl);
+
+            if (url.hostname === "nemer92.github.io") {
+              event.preventDefault();
+              navigate(url.pathname.replace("/sooq-sy", "") + url.search);
+            }
+          }}
+          className="underline font-semibold break-all"
+        >
+          {markdownMatch?.[1] || rawUrl}
+        </a>
+      );
+    })}
+</p>
 
                     <p
                       className={`mt-2 text-left text-xs ${

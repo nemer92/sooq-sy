@@ -183,6 +183,7 @@ const [heroImageUrl, setHeroImageUrl] = useState("");
 const [contactEmail, setContactEmail] = useState("");
 const [contactPhone, setContactPhone] = useState("");
 const [allowNewAds, setAllowNewAds] = useState(true);
+const [, setSubscriptionsEnabled] = useState(false);
 const [isLoggedIn, setIsLoggedIn] = useState(false);
 const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
 const [messageNotification, setMessageNotification] = useState<{
@@ -222,7 +223,7 @@ useEffect(() => {
   async function loadSiteSettings() {
     const { data, error } = await supabase
       .from("site_settings")
-      .select("site_name, logo_url, hero_image_url, contact_email, contact_phone, allow_new_ads")
+      .select("site_name, logo_url, hero_image_url, contact_email, contact_phone, allow_new_ads, subscriptions_enabled")
       .eq("id", 1)
       .single();
 
@@ -237,6 +238,7 @@ useEffect(() => {
     setContactEmail(data.contact_email || "");
     setContactPhone(data.contact_phone || "");
     setAllowNewAds(data.allow_new_ads ?? true);
+    setSubscriptionsEnabled(data.subscriptions_enabled ?? false);
   }
 
   loadSiteSettings();
@@ -1380,7 +1382,30 @@ if (notification?.link) {
           <div className="pointer-events-none absolute -left-20 -top-28 h-80 w-80 rounded-full border-[45px] border-white/5" />
           <div className="pointer-events-none absolute -bottom-40 left-1/3 h-96 w-96 rounded-full bg-emerald-400/10 blur-3xl" />
         </section>
+{true && (
+  <section className="mt-8 overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-amber-50 p-6 shadow-sm md:flex md:items-center md:justify-between md:p-9">
+    <div>
+      <span className="mb-2 inline-block rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
+        باقات Sooq.Sy
+      </span>
 
+      <h2 className="text-2xl font-extrabold text-gray-900">
+        ارتقِ بإعلاناتك مع باقات الاشتراك
+      </h2>
+
+      <p className="mt-2 text-gray-600">
+        احصل على حصة أكبر من الإعلانات العادية والمميزة، واختر الباقة المناسبة لك.
+      </p>
+    </div>
+
+    <button
+      onClick={() => navigate("/subscriptions")}
+      className="mt-5 shrink-0 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white transition hover:bg-emerald-700 md:mt-0"
+    >
+      استكشف باقات الاشتراك
+    </button>
+  </section>
+)}
         <section className="mt-12">
           <div className="mb-6 flex items-center justify-between">
             <div>

@@ -2,15 +2,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 type Package = {
   number: number;
   name: string;
   price: number;
   duration_months: number;
+  ordinary_ads_limit: number;
+  featured_ads_limit: number;
 };
-
 
 
 export default function Subscriptions() {
@@ -55,9 +56,7 @@ useEffect(() => {
 
       setSubscriptionsEnabled(enabled);
 
-      if (!enabled) {
-        return;
-      }
+
 
       const [
         { data: profileData, error: profileError },
@@ -71,8 +70,8 @@ useEffect(() => {
 
         supabase
           .from("subscription_plans")
-          .select("id, name, price_usd, duration_months")
-          .eq("is_active", true)
+          .select("id, name, price_usd, duration_months, ordinary_ads_limit, featured_ads_limit")
+
           .order("id"),
       ]);
 
@@ -93,6 +92,8 @@ useEffect(() => {
           name: plan.name,
           price: Number(plan.price_usd),
           duration_months: plan.duration_months,
+          ordinary_ads_limit: plan.ordinary_ads_limit,
+featured_ads_limit: plan.featured_ads_limit,
         }))
       );
     } catch (err) {
@@ -190,15 +191,20 @@ const submitSubscriptionRequest = async () => {
       </header>
 
 <div className="mx-auto max-w-3xl space-y-5 px-4 py-7">
-  {!subscriptionsEnabled ? (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-center text-amber-800">
-      <h2 className="font-bold">الاشتراكات غير متاحة حالياً</h2>
-      <p className="mt-2 text-sm leading-7">
-        سيتم فتح الاشتراكات بعد تفعيلها من الإدارة.
-      </p>
-    </div>
-  ) : (
-    <>
+{!subscriptionsEnabled && (
+  <div className="rounded-2xl border border-emerald-200 bg-gradient-to-l from-emerald-50 to-white p-5 text-center">
+    <h2 className="text-lg font-black text-emerald-800">
+      أهلاً وسهلاً بكم في Sooq.Sy 🌿
+    </h2>
+    <p className="mt-3 text-sm leading-8 text-slate-700">
+      جميع خدمات الموقع متاحة حالياً بشكل مجاني، ويمكنكم نشر إعلاناتكم والاستفادة من خدماتنا دون الحاجة إلى الاشتراك.
+      نعمل على تجهيز باقات الاشتراك بمزايا إضافية، وسيتم تفعيلها قريباً بإذن الله.
+      شكراً لثقتكم، ونتمنى لكم تجربة ممتعة ومفيدة معنا.
+    </p>
+  </div>
+)}
+
+<>
       <section className="rounded-2xl border bg-white p-5">
         <h2 className="font-bold text-slate-800">
           اختر الباقة المناسبة
@@ -215,17 +221,41 @@ const submitSubscriptionRequest = async () => {
                 key={item.number}
                 type="button"
                 onClick={() => setSelectedPackage(item)}
-                className="rounded-xl border p-4 text-right"
-              >
-                <span className="font-bold">{item.name}</span>
+className={`rounded-2xl border-2 p-4 text-right transition-all ${
+  selectedPackage?.number === item.number
+    ? "border-emerald-600 bg-emerald-50 shadow-md"
+    : "border-slate-200 bg-white hover:border-emerald-300"
+}`}
+>
+  <span className="font-black text-slate-800">{item.name}</span>
 
-                <p className="mt-2 text-sm text-slate-500">
-                  مدة الاشتراك: {item.duration_months} شهر
-                </p>
+  <p className="mt-2 text-sm text-slate-500">
+    مدة الاشتراك: {item.duration_months} شهر
+  </p>
 
-                <p className="mt-3 text-2xl font-black text-emerald-700">
-                  ${item.price}
-                </p>
+  <div className="mt-4 space-y-2 text-sm">
+    <p className="flex justify-between">
+      <span>الإعلانات العادية</span>
+      <strong>{item.ordinary_ads_limit} إعلان</strong>
+    </p>
+
+    <p className="flex justify-between">
+      <span>الإعلانات المميزة</span>
+      <strong className="text-amber-600">
+        {item.featured_ads_limit} إعلان
+      </strong>
+    </p>
+  </div>
+
+  <p className="mt-4 text-2xl font-black text-emerald-700">
+    ${item.price}
+  </p>
+
+  {selectedPackage?.number === item.number && (
+    <p className="mt-2 text-center text-sm font-bold text-emerald-700">
+      <CheckCircle2 size={16} className="inline ml-1" /> تم اختيار هذه الباقة
+    </p>
+  )}
               </button>
             ))}
           </div>
@@ -240,6 +270,16 @@ const submitSubscriptionRequest = async () => {
           <p className="mt-2 text-sm text-slate-500">
             مدة الاشتراك: {selectedPackage.duration_months} شهر
           </p>
+          <div className="mt-3 space-y-2 text-sm">
+  <p>
+    الإعلانات العادية:{" "}
+    <strong>{selectedPackage.ordinary_ads_limit} إعلان</strong>
+  </p>
+  <p>
+    الإعلانات المميزة:{" "}
+    <strong>{selectedPackage.featured_ads_limit} إعلان</strong>
+  </p>
+</div>
 
           <p className="mt-3">${selectedPackage.price}</p>
 
@@ -281,7 +321,7 @@ const submitSubscriptionRequest = async () => {
             <button
               type="button"
               onClick={submitSubscriptionRequest}
-              disabled={!selectedPackage || submitting}
+              disabled={!selectedPackage || submitting || !subscriptionsEnabled}
               className="mt-5 w-full rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting
@@ -292,7 +332,7 @@ const submitSubscriptionRequest = async () => {
         )}
       </section>
     </>
-  )}
+
 </div>
     </main>
   );

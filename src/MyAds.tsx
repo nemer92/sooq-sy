@@ -15,6 +15,8 @@ type Ad = {
   rejection_reason: string | null;
   categories: { name_ar: string } | null;
   cities: { name_ar: string } | null;
+  listing_type: string;
+is_featured: boolean;
 };
 
 const statusInfo: Record<string, { label: string; color: string }> = {
@@ -31,6 +33,38 @@ export default function MyAds() {
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [featuringAdId, setFeaturingAdId] = useState<string | null>(null);
+
+async function featureAdWithSubscription(adId: string) {
+  if (!window.confirm("هل تريد استخدام إعلان مميز من رصيد اشتراكك؟")) {
+    return;
+  }
+
+  setFeaturingAdId(adId);
+
+  try {
+    const { error } = await supabase.rpc(
+      "feature_ad_with_subscription",
+      { p_ad_id: adId }
+    );
+
+    if (error) throw error;
+
+    setAds((currentAds) =>
+      currentAds.map((ad) =>
+        ad.id === adId ? { ...ad, is_featured: true } : ad
+      )
+    );
+
+    window.alert("تم تمييز إعلانك بنجاح من رصيد اشتراكك.");
+  } catch (err) {
+    window.alert(
+      err instanceof Error ? err.message : "تعذر تمييز الإعلان."
+    );
+  } finally {
+    setFeaturingAdId(null);
+  }
+}
 
   useEffect(() => {
     async function loadMyAds() {
@@ -57,7 +91,9 @@ export default function MyAds() {
           published_at,
           rejection_reason,
           categories(name_ar),
-          cities(name_ar)
+          cities(name_ar),
+          listing_type,
+is_featured
         `)
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
@@ -325,6 +361,18 @@ export default function MyAds() {
       إغلاق الإعلان
     </button>
 
+{ad.listing_type === "sale" && !ad.is_featured && (
+  <button
+    type="button"
+    onClick={() => featureAdWithSubscription(ad.id)}
+    disabled={featuringAdId === ad.id}
+    className="shrink-0 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-50"
+  >
+    {featuringAdId === ad.id
+      ? "جارٍ التمييز..."
+      : "تمييز من رصيد اشتراكي"}
+  </button>
+)}
     {ad.published_at && (
       <Link
         to={`/featured-campaign/${ad.id}`}

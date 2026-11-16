@@ -194,6 +194,7 @@ const [password, setPassword] = useState("");
   const [dataError, setDataError] = useState("");
   const [siteName, setSiteName] = useState("Sooq.Sy");
   const [allowNewAds, setAllowNewAds] = useState(true);
+  const [subscriptionsEnabled, setSubscriptionsEnabled] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
   const [heroImageUrl, setHeroImageUrl] = useState("");
@@ -225,6 +226,9 @@ const [adminLoginError, setAdminLoginError] = useState("");
   const [subscriptionRequests, setSubscriptionRequests] = useState<SubscriptionPaymentRequest[]>([]);
 const [subscriptionRequestsLoading, setSubscriptionRequestsLoading] = useState(false);
 const [subscriptionRequestsError, setSubscriptionRequestsError] = useState("");
+const [campaignRequests, setCampaignRequests] = useState<SubscriptionPaymentRequest[]>([]);
+const [campaignRequestsLoading, setCampaignRequestsLoading] = useState(false);
+const [campaignRequestsError, setCampaignRequestsError] = useState("");
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportsError, setReportsError] = useState("");
   const [reportSearch, setReportSearch] = useState("");
@@ -1026,8 +1030,61 @@ const loadSubscriptionRequests = useCallback(async () => {
     setSubscriptionRequestsLoading(false);
   }
 }, []);
+const loadCampaignRequests = useCallback(async () => {
+  setCampaignRequestsLoading(true);
+  setCampaignRequestsError("");
 
+  try {
+    const { data, error } = await supabase
+      .from("subscription_payment_requests")
+      .select("*")
+      .eq("request_type", "featured_campaign")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const requests = (data ?? []) as SubscriptionPaymentRequest[];
+
+    const userIds = [
+      ...new Set(requests.map((request) => request.user_id)),
+    ];
+
+    let profiles: {
+      id: string;
+      display_name: string | null;
+    }[] = [];
+
+    if (userIds.length > 0) {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", userIds);
+
+      if (profilesError) throw profilesError;
+      profiles = profilesData ?? [];
+    }
+
+    const enrichedRequests = requests.map((request) => {
+      const profile = profiles.find(
+        (item) => item.id === request.user_id
+      );
+
+      return {
+        ...request,
+        user_name: profile?.display_name ?? "مستخدم غير معروف",
+      };
+    });
+
+    setCampaignRequests(enrichedRequests);
+  } catch (err) {
+    console.error("Error loading campaign requests:", err);
+    setCampaignRequestsError("تعذر تحميل طلبات حملات التمييز.");
+  } finally {
+    setCampaignRequestsLoading(false);
+  }
+}, []);
 const approveSubscriptionRequest = async (requestId: string) => {
+
   const confirmed = window.confirm(
     "هل تأكدت من وصول الحوالة وصحة المبلغ ورقم الهاتف؟ سيتم تفعيل الاشتراك أو جدولته."
   );
@@ -1056,6 +1113,71 @@ const approveSubscriptionRequest = async (requestId: string) => {
     );
   } finally {
     setSubscriptionRequestsLoading(false);
+  }
+};
+
+const approveCampaignRequest = async (requestId: string) => {
+  const confirmed = window.confirm(
+    "هل تأكدت من وصول الحوالة وصحة المبلغ؟ سيتم تفعيل حملة التمييز لمدة 10 أيام."
+  );
+
+  if (!confirmed) return;
+
+  setCampaignRequestsLoading(true);
+  setCampaignRequestsError("");
+
+  try {
+    const { error } = await supabase.rpc(
+      "approve_featured_campaign_request",
+      { p_request_id: requestId }
+    );
+
+    if (error) throw error;
+
+    alert("تم اعتماد حملة التمييز وتفعيلها بنجاح.");
+    await loadCampaignRequests();
+  } catch (err) {
+    console.error("Error approving campaign:", err);
+    alert(
+      err instanceof Error
+        ? err.message
+        : "تعذرت الموافقة على حملة التمييز."
+    );
+  } finally {
+    setCampaignRequestsLoading(false);
+  }
+};
+
+const rejectCampaignRequest = async (requestId: string) => {
+  const adminNote = window.prompt("اكتب سبب رفض طلب الحملة:");
+
+  if (!adminNote || !adminNote.trim()) return;
+
+  setCampaignRequestsLoading(true);
+  setCampaignRequestsError("");
+
+  try {
+    const { error } = await supabase.rpc(
+      "reject_featured_campaign_request",
+      {
+        p_request_id: requestId,
+        p_admin_note: adminNote.trim(),
+      }
+    );
+
+    if (error) throw error;
+
+    alert("تم رفض طلب حملة التمييز.");
+    await loadCampaignRequests();
+  } catch (err) {
+    console.error("Error rejecting campaign:", err);
+    alert(
+      err instanceof Error
+        ? err.message
+        : "تعذر رفض طلب الحملة."
+    );
+  } finally {
+    setCampaignRequestsLoading(false);
   }
 };
 
@@ -1091,13 +1213,16 @@ const rejectSubscriptionRequest = async (requestId: string) => {
     setSubscriptionRequestsLoading(false);
   }
 };
-
 useEffect(() => {
   if (activeMenu === "طلبات الاشتراك") {
     loadSubscriptionRequests();
+    loadCampaignRequests();
   }
-}, [activeMenu, loadSubscriptionRequests]);
-
+}, [
+  activeMenu,
+  loadSubscriptionRequests,
+  loadCampaignRequests,
+]);
 const handleAdminBan = async (
   report: Report,
   banType: "temporary" | "permanent"
@@ -1336,7 +1461,7 @@ const loadSettings = useCallback(async () => {
   try {
     const { data, error } = await supabase
       .from("site_settings")
-      .select("site_name, logo_url, hero_image_url, sham_cash_qr_url, contact_email, contact_phone, allow_new_ads, maintenance_mode")
+      .select("site_name, logo_url, hero_image_url, sham_cash_qr_url, contact_email, contact_phone, allow_new_ads, maintenance_mode, subscriptions_enabled")
       .eq("id", 1)
       .single();
 
@@ -1349,6 +1474,7 @@ const loadSettings = useCallback(async () => {
     setContactPhone(data.contact_phone ?? "");
     setAllowNewAds(data.allow_new_ads ?? true);
     setMaintenanceMode(data.maintenance_mode ?? false);
+    setSubscriptionsEnabled(data.subscriptions_enabled ?? false);
     setShamCashQrUrl(data.sham_cash_qr_url ?? "");
   } catch (err) {
     setSettingsError(
@@ -1445,6 +1571,13 @@ const saveSettings = useCallback(async () => {
   setSettingsSuccess("");
 
   try {
+    const { error: plansError } = await supabase
+      .from("subscription_plans")
+      .update({ is_active: subscriptionsEnabled })
+      .in("id", [1, 2, 3]);
+
+    if (plansError) throw plansError;
+
     const { error } = await supabase
       .from("site_settings")
       .update({
@@ -1456,6 +1589,7 @@ const saveSettings = useCallback(async () => {
         contact_phone: contactPhone || null,
         allow_new_ads: allowNewAds,
         maintenance_mode: maintenanceMode,
+        subscriptions_enabled: subscriptionsEnabled,
         updated_at: new Date().toISOString(),
       })
       .eq("id", 1);
@@ -1470,7 +1604,17 @@ const saveSettings = useCallback(async () => {
   } finally {
     setSettingsSaving(false);
   }
-}, [siteName, logoUrl, heroImageUrl, shamCashQrUrl, contactEmail, contactPhone, allowNewAds, maintenanceMode]);
+}, [
+  siteName,
+  logoUrl,
+  heroImageUrl,
+  shamCashQrUrl,
+  contactEmail,
+  contactPhone,
+  allowNewAds,
+  maintenanceMode,
+  subscriptionsEnabled,
+]);
 const loadGovernorates = useCallback(async () => {
   const { data, error } = await supabase
     .from("governorates")
@@ -2804,53 +2948,51 @@ async function updateAdminLogin() {
           <tbody>
             {subscriptionRequests.map((request) => (
               <tr key={request.id}>
-<td>
-  <div className="flex items-center gap-2">
-    <span
-      className="text-xs break-all"
-      dir="ltr"
-      title={request.id}
-    >
-      {request.id}
-    </span>
-
-    <button
-      type="button"
-      onClick={() => {
-        navigator.clipboard.writeText(request.id);
-        alert("تم نسخ رقم الطلب");
-      }}
-      className="text-emerald-600 hover:text-emerald-800 shrink-0"
-      title="نسخ رقم الطلب"
-    >
-      <Copy size={16} />
-    </button>
-  </div>
-</td>
-
                 <td>
-  <div className="font-medium">
-    {request.user_name || "مستخدم غير معروف"}
-  </div>
-  <div className="text-xs text-gray-500" dir="ltr">
-    {request.phone}
-  </div>
-</td>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-xs break-all"
+                      dir="ltr"
+                      title={request.id}
+                    >
+                      {request.id}
+                    </span>
 
-                <td>
-  <div className="font-medium">
-    {request.plan_name || `الباقة ${request.package_number}`}
-  </div>
-  <div className="text-xs text-gray-500">
-    {request.duration_months
-      ? `${request.duration_months} شهر`
-      : "المدة غير محددة"}
-  </div>
-</td>
-
-                <td>
-                  ${Number(request.amount_usd).toFixed(2)}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(request.id);
+                        alert("تم نسخ رقم الطلب");
+                      }}
+                      className="text-emerald-600 hover:text-emerald-800 shrink-0"
+                      title="نسخ رقم الطلب"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </div>
                 </td>
+
+                <td>
+                  <div className="font-medium">
+                    {request.user_name || "مستخدم غير معروف"}
+                  </div>
+                  <div className="text-xs text-gray-500" dir="ltr">
+                    {request.phone}
+                  </div>
+                </td>
+
+                <td>
+                  <div className="font-medium">
+                    {request.plan_name || `الباقة ${request.package_number}`}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {request.duration_months
+                      ? `${request.duration_months} شهر`
+                      : "المدة غير محددة"}
+                  </div>
+                </td>
+
+                <td>${Number(request.amount_usd).toFixed(2)}</td>
 
                 <td>
                   {Number(request.exchange_rate).toLocaleString("en-US")}
@@ -2905,9 +3047,116 @@ async function updateAdminLogin() {
         </table>
       </div>
     )}
+
+    {/* طلبات حملات التمييز المدفوعة */}
+    <div className="mt-10">
+      <div className="section-heading">
+        <div>
+          <h2>طلبات حملات التمييز المدفوعة</h2>
+          <p>مراجعة الحوالات وتفعيل الحملات لمدة 10 أيام</p>
+        </div>
+
+        <button
+          className="refresh-button"
+          onClick={loadCampaignRequests}
+          disabled={campaignRequestsLoading}
+        >
+          <RefreshCw size={17} />
+          تحديث
+        </button>
+      </div>
+
+      {campaignRequestsLoading ? (
+        <p>جارٍ تحميل طلبات الحملات...</p>
+      ) : campaignRequestsError ? (
+        <p className="error-message">{campaignRequestsError}</p>
+      ) : campaignRequests.length === 0 ? (
+        <p>لا توجد طلبات حملات تمييز حالياً.</p>
+      ) : (
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>رقم الطلب</th>
+                <th>المستخدم / الهاتف</th>
+                <th>المبلغ بالدولار</th>
+                <th>المبلغ بالليرة</th>
+                <th>الحالة</th>
+                <th>تاريخ الطلب</th>
+                <th>الإجراءات</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {campaignRequests.map((request) => (
+                <tr key={request.id}>
+                  <td>
+                    <span className="text-xs break-all" dir="ltr">
+                      {request.id}
+                    </span>
+                  </td>
+
+                  <td>
+                    <div className="font-medium">
+                      {request.user_name || "مستخدم غير معروف"}
+                    </div>
+                    <div className="text-xs text-gray-500" dir="ltr">
+                      {request.phone}
+                    </div>
+                  </td>
+
+                  <td>${Number(request.amount_usd).toFixed(2)}</td>
+
+                  <td>
+                    {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+                  </td>
+
+                  <td>
+                    {request.status === "pending"
+                      ? "بانتظار المراجعة"
+                      : request.status === "approved"
+                      ? "مقبول"
+                      : request.status === "rejected"
+                      ? "مرفوض"
+                      : "ملغي"}
+                  </td>
+
+                  <td>{formatDate(request.created_at)}</td>
+
+                  <td>
+                    {request.status === "pending" ? (
+                      <div className="flex gap-2">
+                        <button
+                          className="refresh-button"
+                          disabled={campaignRequestsLoading}
+                          onClick={() => approveCampaignRequest(request.id)}
+                        >
+                          موافقة وتفعيل
+                        </button>
+
+                        <button
+                          className="refresh-button"
+                          disabled={campaignRequestsLoading}
+                          onClick={() => rejectCampaignRequest(request.id)}
+                        >
+                          رفض
+                        </button>
+                      </div>
+                    ) : (
+                      <span>تمت المراجعة</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   </>
 )}
 
+{/* قسم إدارة الإعلانات */}
 {activeMenu === "إدارة الإعلانات" && (
   <>
     <div className="section-heading">
@@ -2944,31 +3193,35 @@ async function updateAdminLogin() {
             key={ad.id}
           >
             {ad.ad_images?.[0]?.signedUrl && (
-  <img
-    src={ad.ad_images[0].signedUrl}
-    alt={ad.title}
-    className="admin-ad-image"
-  />
-)}
-{ad.is_featured && (
-  <span className="featured-badge">
-    ★ إعلان مميز
-  </span>
-)}
+              <img
+                src={ad.ad_images[0].signedUrl}
+                alt={ad.title}
+                className="admin-ad-image"
+              />
+            )}
+
+            {ad.is_featured && (
+              <span className="featured-badge">
+                ★ إعلان مميز
+              </span>
+            )}
+
             <h3>{ad.title}</h3>
+
             {ad.price !== null && (
-  <p className="admin-ad-price">
-    {ad.price.toLocaleString("en-US")} {ad.currency || ""}
-  </p>
-)}
+              <p className="admin-ad-price">
+                {ad.price.toLocaleString("en-US")} {ad.currency || ""}
+              </p>
+            )}
 
-<p>
-  التصنيف: {getOne(ad.categories)?.name_ar || "غير محدد"}
-</p>
+            <p>
+              التصنيف: {getOne(ad.categories)?.name_ar || "غير محدد"}
+            </p>
 
-<p>
-  تاريخ النشر: {formatDate(ad.created_at)}
-</p>
+            <p>
+              تاريخ النشر: {formatDate(ad.created_at)}
+            </p>
+
             <p>
               {getOne(ad.profiles)?.display_name || "مستخدم"}
             </p>
@@ -2983,38 +3236,38 @@ async function updateAdminLogin() {
             >
               عرض التفاصيل
             </button>
-<button
-  className="refresh-button"
-  onClick={() => toggleFeaturedAd(ad)}
-  disabled={actionLoading === ad.id}
-  style={{
-    background: ad.is_featured ? "#d97706" : "#64748b",
-    color: "#fff",
-  }}
->
-  {actionLoading === ad.id
-    ? "جاري التحديث..."
-    : ad.is_featured
-      ? "★ إلغاء التمييز"
-      : "☆ تمييز الإعلان"}
-</button>
-<button
-  className="refresh-button"
-  onClick={() => archiveAd(ad.id)}
-  disabled={actionLoading === ad.id}
->
-  {actionLoading === ad.id
-    ? "جاري الأرشفة..."
-    : "أرشفة الإعلان"}
-</button>
 
+            <button
+              className="refresh-button"
+              onClick={() => toggleFeaturedAd(ad)}
+              disabled={actionLoading === ad.id}
+              style={{
+                background: ad.is_featured ? "#d97706" : "#64748b",
+                color: "#fff",
+              }}
+            >
+              {actionLoading === ad.id
+                ? "جاري التحديث..."
+                : ad.is_featured
+                  ? "★ إلغاء التمييز"
+                  : "☆ تمييز الإعلان"}
+            </button>
+
+            <button
+              className="refresh-button"
+              onClick={() => archiveAd(ad.id)}
+              disabled={actionLoading === ad.id}
+            >
+              {actionLoading === ad.id
+                ? "جاري الأرشفة..."
+                : "أرشفة الإعلان"}
+            </button>
           </div>
         ))}
       </div>
     )}
   </>
 )}
-
 
 {activeMenu === "الإعلانات المؤرشفة" && (
   <>
@@ -3840,40 +4093,28 @@ window.open(
     عند التفعيل، سيتم إيقاف تصفح الموقع مؤقتاً أمام الزوار.
   </p>
 </div>
+<div className="mt-6 border-t border-slate-200 pt-5">
+  <label className="flex cursor-pointer items-center gap-3">
+    <input
+      type="checkbox"
+      checked={subscriptionsEnabled}
+      onChange={(e) => setSubscriptionsEnabled(e.target.checked)}
+      className="h-5 w-5 accent-emerald-600"
+    />
 
-</div>
-
-<div className="category-card mt-6">
-  <h3>تحديث تسجيل دخول المدير</h3>
+    <span className="font-medium text-slate-700">
+      تفعيل باقات الاشتراك واستقبال الطلبات
+    </span>
+  </label>
 
   <p className="mt-2 text-sm text-slate-500">
-    تحويل طريقة دخول حساب المدير الحالي من البريد الإلكتروني
-    إلى رقم الموبايل، مع الحفاظ على كلمة المرور والصلاحيات.
+    عند التفعيل، ستصبح الباقات الثلاث متاحة لاستقبال طلبات الاشتراك.
+    وعند الإيقاف، يتوقف استقبال الطلبات وتبقى الباقات ظاهرة للزوار.
   </p>
-
-  {adminLoginMessage && (
-    <p className="mt-3 text-green-600">
-      {adminLoginMessage}
-    </p>
-  )}
-
-  {adminLoginError && (
-    <p className="mt-3 text-red-600">
-      {adminLoginError}
-    </p>
-  )}
-
-  <button
-    type="button"
-    onClick={updateAdminLogin}
-    disabled={adminLoginUpdating}
-    className="mt-4 bg-blue-600 text-white px-6 py-3 rounded-lg disabled:opacity-50"
-  >
-    {adminLoginUpdating
-      ? "جارٍ تحديث تسجيل الدخول..."
-      : "تحديث تسجيل دخول المدير"}
-  </button>
 </div>
+</div>
+
+
 
 </div>
 )}

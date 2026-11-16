@@ -1,8 +1,17 @@
+
 import { StrictMode, useEffect, useState } from "react";
 import { Capacitor } from "@capacitor/core";
+import { App as CapacitorApp } from "@capacitor/app";
 import { supabase } from "./lib/supabase";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+
 import Auth from "./Auth.tsx";
 import "./index.css";
 import App from "./App.tsx";
@@ -15,11 +24,85 @@ import Messages from "./Messages.tsx";
 import Favorites from "./Favorites.tsx";
 import Profile from "./Profile";
 import AdminConversation from "./AdminConversation";
-import PushNotificationsSetup from "./PushNotificationsSetup";import LiveUpdateReady from "./LiveUpdateReady";
+import PushNotificationsSetup from "./PushNotificationsSetup";
+import LiveUpdateReady from "./LiveUpdateReady";
 import FeaturedCampaign from "./FeaturedCampaign.tsx";
 import Subscriptions from "./Subscriptions.tsx";
 
-function MaintenanceGuard({ children }: { children: React.ReactNode }) {
+// معالجة زر الرجوع في تطبيق أندرويد فقط
+function MobileBackButtonHandler() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (
+      !Capacitor.isNativePlatform() ||
+      Capacitor.getPlatform() !== "android"
+    ) {
+      return;
+    }
+
+    let active = true;
+    let removeListener: (() => void) | undefined;
+
+    const setupBackButton = async () => {
+      const listener = await CapacitorApp.addListener(
+        "backButton",
+        () => {
+          const historyState = window.history.state as
+            | { idx?: number }
+            | null;
+
+          const historyIndex =
+            typeof historyState?.idx === "number"
+              ? historyState.idx
+              : 0;
+
+          // إذا توجد صفحة سابقة، ارجع إليها
+          if (historyIndex > 0) {
+            window.history.back();
+            return;
+          }
+
+          // إذا لا توجد صفحة سابقة، ارجع للرئيسية
+          if (location.pathname !== "/") {
+            navigate("/", { replace: true });
+            return;
+          }
+
+          // إذا كان المستخدم في الرئيسية، اخرج من التطبيق
+          void CapacitorApp.exitApp();
+        }
+      );
+
+      if (!active) {
+        await listener.remove();
+        return;
+      }
+
+      removeListener = () => {
+        void listener.remove();
+      };
+    };
+
+    void setupBackButton().catch((error) => {
+      console.error("Back button setup error:", error);
+    });
+
+    return () => {
+      active = false;
+      removeListener?.();
+    };
+  }, [location.pathname, navigate]);
+
+  return null;
+}
+
+function MaintenanceGuard({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const location = useLocation();
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -49,14 +132,19 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="font-bold text-slate-500">جاري تحميل الموقع...</p>
+        <p className="font-bold text-slate-500">
+          جاري تحميل الموقع...
+        </p>
       </div>
     );
   }
 
   if (maintenanceMode) {
     return (
-      <main dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <main
+        dir="rtl"
+        className="flex min-h-screen items-center justify-center bg-slate-50 px-4"
+      >
         <div className="w-full max-w-lg rounded-3xl border bg-white p-10 text-center shadow-sm">
           <div className="mb-5 text-5xl">🛠️</div>
 
@@ -82,35 +170,43 @@ function MaintenanceGuard({ children }: { children: React.ReactNode }) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-<BrowserRouter basename={Capacitor.isNativePlatform() ? "/" : "/sooq-sy"}>
-<LiveUpdateReady />
-  <PushNotificationsSetup />
+    <BrowserRouter
+      basename={Capacitor.isNativePlatform() ? "/" : "/sooq-sy"}
+    >
+      <MobileBackButtonHandler />
 
-  <MaintenanceGuard>
-  <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/ad/:id" element={<AdDetails />} />
-        <Route path="/admin" element={<App />} />
-        <Route
-  path="/admin/conversation/:id"
-  element={<AdminConversation />}
-/>
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/add-ad" element={<AddAd />} />
-        <Route path="/edit-ad/:id" element={<EditAd />} />
-        <Route path="/messages" element={<Messages />} />
-        <Route path="/messages/:id" element={<Messages />} />
-        <Route path="/my-ads" element={<MyAds />} />
-        <Route path="/favorites" element={<Favorites />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/subscriptions" element={<Subscriptions />} />
-        <Route
-  path="/featured-campaign/:adId"
-  element={<FeaturedCampaign />}
-/>
+      <LiveUpdateReady />
+      <PushNotificationsSetup />
 
+      <MaintenanceGuard>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/ad/:id" element={<AdDetails />} />
+          <Route path="/admin" element={<App />} />
+
+          <Route
+            path="/admin/conversation/:id"
+            element={<AdminConversation />}
+          />
+
+          <Route path="/auth" element={<Auth />} />
+          <Route path="/add-ad" element={<AddAd />} />
+          <Route path="/edit-ad/:id" element={<EditAd />} />
+
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/messages/:id" element={<Messages />} />
+
+          <Route path="/my-ads" element={<MyAds />} />
+          <Route path="/favorites" element={<Favorites />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/subscriptions" element={<Subscriptions />} />
+
+          <Route
+            path="/featured-campaign/:adId"
+            element={<FeaturedCampaign />}
+          />
         </Routes>
-</MaintenanceGuard>
+      </MaintenanceGuard>
     </BrowserRouter>
   </StrictMode>
 );

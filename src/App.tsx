@@ -1134,14 +1134,23 @@ const approveCampaignRequest = async (requestId: string) => {
 
     alert("تم اعتماد حملة التمييز وتفعيلها بنجاح.");
     await loadCampaignRequests();
-  } catch (err) {
-    console.error("Error approving campaign:", err);
-    alert(
-      err instanceof Error
-        ? err.message
-        : "تعذرت الموافقة على حملة التمييز."
-    );
-  } finally {
+} catch (err: any) {
+  console.error("Error approving campaign:", err);
+
+  alert(
+    JSON.stringify(
+      {
+        message: err?.message,
+        details: err?.details,
+        hint: err?.hint,
+        code: err?.code,
+      },
+      null,
+      2
+    )
+  );
+}
+ finally {
     setCampaignRequestsLoading(false);
   }
 };

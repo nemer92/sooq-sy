@@ -19,6 +19,7 @@ import {
   LogOut,
     Heart,
   Bell,
+  MessageCircle
 } from "lucide-react";
 
 type Category = {
@@ -243,26 +244,6 @@ useEffect(() => {
 
   loadSiteSettings();
 }, []);useEffect(() => {
-  async function loadSiteSettings() {
-    const { data, error } = await supabase
-      .from("site_settings")
-      .select("site_name, logo_url")
-      .eq("id", 1)
-      .single();
-
-    if (error) {
-      console.error("خطأ تحميل إعدادات الموقع:", error);
-      return;
-    }
-
-    setSiteName(data.site_name || "Sooq.Sy");
-    setLogoUrl(data.logo_url || "");
-  }
-
-  loadSiteSettings();
-}, []);
-
-useEffect(() => {
   let channel: ReturnType<typeof supabase.channel> | null = null;
 
   async function loadUnreadMessagesCount() {
@@ -864,19 +845,23 @@ const filteredLatestAds = ads.filter((ad) => {
 
       <button
         onClick={() => navigate("/profile")}
-        className="flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-emerald-700"
+        className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-emerald-800"
       >
         <UserRound size={18} />
         الملف الشخصي
       </button>
 
 <button
-  onClick={() => navigate("/messages")}
-  className="flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+  onClick={() => {
+    setIsMobileMenuOpen(false);
+    navigate("/messages");
+  }}
+  className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
 >
-  <span>رسائلي</span>
+  <MessageCircle size={18} className="ml-2 inline" />
+  رسائلي
   {unreadMessagesCount > 0 && (
-    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+    <span className="mr-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
       {unreadMessagesCount}
     </span>
   )}
@@ -913,66 +898,62 @@ const filteredLatestAds = ads.filter((ad) => {
               ? item.notifications[0]
               : item.notifications;
 
-            return (
-<div
-  key={item.id}
-onClick={async () => {
-  if (!item.read_at) {
-    await markNotificationAsRead(item.id);
-  }
 
-  setShowNotifications(false);
-
-
-
-if (notification?.link) {
-  try {
-    const url = new URL(notification.link);
-
-    if (url.hostname === "nemer92.github.io") {
-      const match = url.pathname.match(
-        /^\/sooq-sy\/ad\/([^/]+)\/?$/
-      );
-
-      if (match) {
-        navigate(`/ad/${encodeURIComponent(match[1])}`);
-        return;
+return (
+  <div
+    key={item.id}
+    onClick={async () => {
+      if (!item.read_at) {
+        await markNotificationAsRead(item.id);
       }
-    }
 
-    if (/^https?:\/\//i.test(notification.link)) {
-      window.open(notification.link, "_blank", "noopener,noreferrer");
-    } else {
-      navigate(
-        notification.link.startsWith("/")
-          ? notification.link
-          : `/${notification.link}`
-      );
-    }
-  } catch (error) {
-    console.error("Invalid notification link:", error);
-  }
-}
+      setShowNotifications(false);
 
+      const link = notification?.link;
 
-}}
-  className={`cursor-pointer border-b border-slate-100 p-4 ${
-    !item.read_at ? "bg-emerald-50" : "bg-white"
-  }`}
->
-                <p className="font-bold text-slate-800">
-                  {notification?.title}
-                </p>
+      if (!link) return;
 
-                <p className="mt-1 text-sm text-slate-600">
-                  {notification?.body}
-                </p>
+      try {
+        if (/^https?:\/\//i.test(link)) {
+          const url = new URL(link);
 
-                <p className="mt-2 text-xs text-slate-400">
-                  {new Date(item.created_at).toLocaleString("ar")}
-                </p>
-              </div>
-            );
+          if (
+            url.hostname === "nemer92.github.io" &&
+            url.pathname.startsWith("/sooq-sy/ad/")
+          ) {
+            const adId = url.pathname
+              .replace("/sooq-sy/ad/", "")
+              .replace(/\/$/, "");
+
+            navigate(`/ad/${encodeURIComponent(adId)}`);
+          } else {
+            window.open(link, "_blank", "noopener,noreferrer");
+          }
+        } else {
+          navigate(link.startsWith("/") ? link : `/${link}`);
+        }
+      } catch (error) {
+        console.error("Invalid notification link:", error);
+      }
+    }}
+    className={`cursor-pointer border-b border-slate-100 p-4 ${
+      !item.read_at ? "bg-emerald-50" : "bg-white"
+    }`}
+  >
+    <p className="font-bold text-slate-800">
+      {notification?.title}
+    </p>
+
+    <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
+      {notification?.body}
+    </p>
+
+    <p className="mt-2 text-xs text-slate-400">
+      {new Date(item.created_at).toLocaleString("ar")}
+    </p>
+  </div>
+);
+
           })
         )}
       </div>
@@ -1026,7 +1007,16 @@ onClick={async () => {
     </button>
   )}
 
-  {allowNewAds && (
+{allowNewAds && (
+  <div className="flex items-center gap-2">
+    <button
+      onClick={() => navigate("/add-ad?type=donation")}
+      className="flex items-center gap-2 rounded-xl bg-rose-500 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-rose-600"
+    >
+      <Heart size={19} />
+      تبرع الآن
+    </button>
+
     <button
       onClick={() => navigate("/add-ad")}
       className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
@@ -1034,12 +1024,13 @@ onClick={async () => {
       <Plus size={19} />
       أضف إعلانك
     </button>
-  )}
+  </div>
+)}
+
+
+
+
 </div>
-
-
-
-
 <button
   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
   aria-label="فتح القائمة"
@@ -1088,6 +1079,7 @@ onClick={async () => {
   }}
   className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
 >
+  <MessageCircle size={18} className="ml-2 inline" />
   رسائلي
   {unreadMessagesCount > 0 && (
     <span className="mr-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
@@ -1162,31 +1154,46 @@ onClick={async () => {
       )}
 
       {allowNewAds && (
-        <button
-          onClick={() => {
-            setIsMobileMenuOpen(false);
-            navigate("/add-ad");
-          }}
-          className="rounded-xl bg-emerald-600 px-4 py-3 text-right text-sm font-bold text-white hover:bg-emerald-700"
-        >
-          <Plus size={18} className="ml-2 inline" />
-          أضف إعلانك
-        </button>
+        <>
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              navigate("/add-ad?type=donation");
+            }}
+            className="rounded-xl bg-rose-500 px-4 py-3 text-right text-sm font-bold text-white hover:bg-rose-600"
+          >
+            <Heart size={18} className="ml-2 inline" />
+            تبرع الآن
+          </button>
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              navigate("/add-ad");
+            }}
+            className="rounded-xl bg-emerald-600 px-4 py-3 text-right text-sm font-bold text-white hover:bg-emerald-700"
+          >
+            <Plus size={18} className="ml-2 inline" />
+            أضف إعلانك
+          </button>
+        </>
       )}
     </div>
   </div>
 )}
 
 {showNotifications && (
-  <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 px-4 pt-20 md:hidden">
-    <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-
+  <div
+    className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 px-4 pt-20 md:hidden"
+    onClick={() => setShowNotifications(false)}
+  >
+    <div
+      className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
-        <h3 className="font-bold text-slate-800">
-          الإشعارات
-        </h3>
-
+        <h3 className="font-bold text-slate-800">الإشعارات</h3>
         <button
+          type="button"
           onClick={() => setShowNotifications(false)}
           className="rounded-lg px-3 py-1 text-sm font-bold text-red-600 hover:bg-red-50"
         >
@@ -1215,47 +1222,29 @@ onClick={async () => {
 
                   setShowNotifications(false);
 
-                  if (notification?.link) {
-                    if (/^https?:\/\//i.test(notification.link)) {
-                      
-if (notification?.link) {
-  try {
-    const url = new URL(notification.link);
+                  const link = notification?.link;
+                  if (!link) return;
 
-    if (
-      url.hostname === "nemer92.github.io" &&
-      url.pathname.startsWith("/sooq-sy/ad/")
-    ) {
-      const adId = url.pathname
-        .replace("/sooq-sy/ad/", "")
-        .replace(/\/$/, "");
+                  try {
+                    if (/^https?:\/\//i.test(link)) {
+                      const url = new URL(link);
 
-      navigate(`/ad/${encodeURIComponent(adId)}`);
-    } else if (/^https?:\/\//i.test(notification.link)) {
-      window.open(notification.link, "_blank", "noopener,noreferrer");
-    } else {
-      navigate(
-        notification.link.startsWith("/")
-          ? notification.link
-          : `/${notification.link}`
-      );
-    }
-  } catch (error) {
-    console.error("Invalid notification link:", error);
-  }
-}
-(
-                        notification.link,
-                        "_blank",
-                        "noopener,noreferrer"
-                      );
+                      if (
+                        url.hostname === "nemer92.github.io" &&
+                        url.pathname.startsWith("/sooq-sy/ad/")
+                      ) {
+                        const adId = url.pathname
+                          .replace("/sooq-sy/ad/", "")
+                          .replace(/\/$/, "");
+                        navigate(`/ad/${encodeURIComponent(adId)}`);
+                      } else {
+                        window.open(link, "_blank", "noopener,noreferrer");
+                      }
                     } else {
-                      navigate(
-                        notification.link.startsWith("/")
-                          ? notification.link
-                          : `/${notification.link}`
-                      );
+                      navigate(link.startsWith("/") ? link : `/${link}`);
                     }
+                  } catch (error) {
+                    console.error("Invalid notification link:", error);
                   }
                 }}
                 className={`cursor-pointer border-b border-slate-100 p-4 ${
@@ -1265,11 +1254,9 @@ if (notification?.link) {
                 <p className="font-bold text-slate-800">
                   {notification?.title}
                 </p>
-
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
                   {notification?.body}
                 </p>
-
                 <p className="mt-2 text-xs text-slate-400">
                   {new Date(item.created_at).toLocaleString("ar")}
                 </p>
@@ -1278,7 +1265,6 @@ if (notification?.link) {
           })
         )}
       </div>
-
     </div>
   </div>
 )}

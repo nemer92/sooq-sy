@@ -1,5 +1,4 @@
-
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { ArrowRight, Send } from "lucide-react";
@@ -31,6 +30,14 @@ const [blocking, setBlocking] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+  messagesEndRef.current?.scrollIntoView({
+    behavior: "smooth",
+    block: "end",
+  });
+}, [messages, id]);
 
   useEffect(() => {
     async function loadConversation() {
@@ -610,7 +617,10 @@ async function sendMessage(e: React.FormEvent) {
               );
             })
           )}
+          <div ref={messagesEndRef} />
         </div>
+
+
 
 {blockedByMe || blockedMe ? (
   <div className="mt-4 shrink-0 rounded-xl border border-red-200 bg-red-50 p-5 text-center">

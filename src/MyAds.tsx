@@ -373,14 +373,20 @@ is_featured
       : "تمييز من رصيد اشتراكي"}
   </button>
 )}
-    {ad.published_at && (
-      <Link
-        to={`/featured-campaign/${ad.id}`}
-        className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-amber-600"
-      >
-        تمييز الإعلان
-      </Link>
-    )}
+{ad.published_at && !ad.is_featured && (
+  <Link
+    to={`/featured-campaign/${ad.id}`}
+    className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-amber-600"
+  >
+    تمييز الإعلان
+  </Link>
+)}
+
+{ad.is_featured && (
+  <span className="shrink-0 rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-bold text-amber-700">
+    ⭐ إعلان مميز
+  </span>
+)}
   </div>
 )}
                     

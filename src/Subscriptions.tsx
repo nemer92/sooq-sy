@@ -261,31 +261,113 @@ className={`rounded-2xl border-2 p-4 text-right transition-all ${
           </div>
         )}
       </section>
-      {selectedPackage && (
-        <section className="rounded-2xl border bg-white p-5">
-          <h2 className="font-bold">تفاصيل المبلغ</h2>
 
-          <p className="mt-3">{selectedPackage.name}</p>
+{selectedPackage && (
+  <section className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
+    <div className="border-b border-slate-100 pb-4">
+      <p className="text-sm font-medium text-emerald-700">
+        تفاصيل الباقة المختارة
+      </p>
 
-          <p className="mt-2 text-sm text-slate-500">
-            مدة الاشتراك: {selectedPackage.duration_months} شهر
-          </p>
-          <div className="mt-3 space-y-2 text-sm">
-  <p>
-    الإعلانات العادية:{" "}
-    <strong>{selectedPackage.ordinary_ads_limit} إعلان</strong>
-  </p>
-  <p>
-    الإعلانات المميزة:{" "}
-    <strong>{selectedPackage.featured_ads_limit} إعلان</strong>
-  </p>
-</div>
+      <h2 className="mt-2 text-xl font-black text-slate-800">
+        {selectedPackage.name}
+      </h2>
 
-          <p className="mt-3">${selectedPackage.price}</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <span className="text-3xl font-black text-emerald-700">
+          ${selectedPackage.price}
+        </span>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">
+          {selectedPackage.duration_months} شهر
+        </span>
+      </div>
+    </div>
 
-          <p>{amountSyp.toLocaleString("en-US")} ل.س</p>
-        </section>
-      )}
+    <div className="mt-5">
+      <h3 className="font-bold text-slate-800">
+        ماذا ستحصل عند الاشتراك؟
+      </h3>
+
+      <div className="mt-4 space-y-3">
+        <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3">
+          <CheckCircle2 className="mt-1 shrink-0 text-emerald-600" size={20} />
+          <div>
+            <p className="font-bold text-slate-800">
+              نشر الإعلانات
+            </p>
+            <p className="mt-1 text-sm leading-7 text-slate-600">
+              إمكانية نشر حتى {selectedPackage.ordinary_ads_limit} إعلان بيع خلال مدة الاشتراك، لتعرض منتجاتك وخدماتك على زوار الموقع.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3">
+          <CheckCircle2 className="mt-1 shrink-0 text-emerald-600" size={20} />
+          <div>
+            <p className="font-bold text-slate-800">
+              تمييز الإعلانات
+            </p>
+            <p className="mt-1 text-sm leading-7 text-slate-600">
+              {selectedPackage.featured_ads_limit > 0
+                ? `إمكانية تمييز حتى ${selectedPackage.featured_ads_limit} إعلاناً من رصيد الباقة، لتظهر إعلاناتك بشكل مميز داخل الموقع.`
+                : "هذه الباقة لا تتضمن رصيداً لتمييز الإعلانات. يمكنك اختيار باقة أعلى للاستفادة من هذه الميزة."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3">
+          <CheckCircle2 className="mt-1 shrink-0 text-emerald-600" size={20} />
+          <div>
+            <p className="font-bold text-slate-800">
+              إدارة إعلاناتك
+            </p>
+            <p className="mt-1 text-sm leading-7 text-slate-600">
+              يمكنك متابعة إعلاناتك وإدارتها من حسابك، والاستفادة من رصيد الباقة طوال فترة الاشتراك.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <h3 className="font-bold text-amber-900">
+        حملات التمييز والإشعارات للمحافظات
+      </h3>
+      <p className="mt-2 text-sm leading-7 text-amber-900">
+        تمييز الإعلانات الممنوح ضمن الاشتراك يختلف عن الحملات الترويجية المدفوعة.
+        يمكنك طلب حملة مستقلة، واختيار المحافظات التي تريد استهدافها،
+        لتصل إشعارات الحملة إلى المستخدمين المستهدفين، وتستمر الحملة لمدة 10 أيام.
+        هذه الخدمة ليست ضمن رصيد تمييز الاشتراك، وتُطلب بشكل منفصل.
+      </p>
+    </div>
+
+    <div className="mt-5 rounded-xl bg-slate-50 p-4">
+      <h3 className="font-bold text-slate-800">
+        المبلغ المطلوب للتحويل
+      </h3>
+
+      <div className="mt-3 flex items-center justify-between">
+        <span className="text-sm text-slate-600">قيمة الاشتراك</span>
+        <strong className="text-lg">${selectedPackage.price}</strong>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-sm text-slate-600">المبلغ بالليرة السورية</span>
+        <strong className="text-lg text-emerald-700">
+          {amountSyp.toLocaleString("en-US")} ل.س
+        </strong>
+      </div>
+    </div>
+
+    <div className="mt-4 text-xs leading-7 text-slate-500">
+      <p>• الإعلانات تُخصم من الرصيد بعد موافقة الإدارة.</p>
+      <p>• الإعلانات المميزة تُحتسب من رصيد الإعلانات الإجمالي، وليست رصيداً إضافياً فوقه.</p>
+      <p>• التبرعات لا تُحتسب من رصيد إعلانات البيع.</p>
+      <p>• حذف إعلان تمت الموافقة عليه لا يعيد الرصيد المستهلك.</p>
+    </div>
+  </section>
+)}
+
 
       <section className="rounded-2xl border bg-white p-5">
         <h2 className="font-bold">الدفع عبر شام كاش</h2>

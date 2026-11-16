@@ -210,9 +210,7 @@ const [shamCashQrUploading, setShamCashQrUploading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [settingsSuccess, setSettingsSuccess] = useState("");
-  const [adminLoginUpdating, setAdminLoginUpdating] = useState(false);
-const [adminLoginMessage, setAdminLoginMessage] = useState("");
-const [adminLoginError, setAdminLoginError] = useState("");
+
   const [activeMenu, setActiveMenu] = useState("الرئيسية");
 
   const [stats, setStats] = useState({
@@ -2501,44 +2499,7 @@ function getSubCategories(categoryId: number) {
     (category) => category.parent_id === categoryId
   );
 }
-// تحديث تسجيل دخول المدير إلى رقم الموبايل
-async function updateAdminLogin() {
-  const confirmed = window.confirm(
-    "سيتم تحويل تسجيل دخول حساب المدير الحالي إلى رقم الموبايل المحفوظ. ستبقى كلمة المرور والصلاحيات والبيانات كما هي. هل تريد المتابعة؟"
-  );
 
-  if (!confirmed) return;
-
-  setAdminLoginUpdating(true);
-  setAdminLoginMessage("");
-  setAdminLoginError("");
-
-  try {
-    const { data, error } = await supabase.functions.invoke(
-      "update-admin-login"
-    );
-
-    if (error) throw error;
-
-    if (!data?.success) {
-      throw new Error(
-        data?.error || "تعذر تحديث تسجيل الدخول."
-      );
-    }
-
-    setAdminLoginMessage(
-      data.message || "تم تحديث تسجيل الدخول بنجاح."
-    );
-  } catch (err) {
-    setAdminLoginError(
-      err instanceof Error
-        ? err.message
-        : "حدث خطأ أثناء تحديث تسجيل الدخول."
-    );
-  } finally {
-    setAdminLoginUpdating(false);
-  }
-}
   // شاشة التحميل
   if (loading) {
     return (

@@ -35,16 +35,21 @@ export default function MyAds() {
   const [error, setError] = useState("");
   const [featuringAdId, setFeaturingAdId] = useState<string | null>(null);
 
-async function featureAdWithSubscription(adId: string) {
-  if (!window.confirm("هل تريد استخدام إعلان مميز من رصيد اشتراكك؟")) {
-    return;
-  }
+
+
+
+async function featureAdWithPoints(adId: string) {
+const confirmed = await window.sooqConfirm(
+  "هل تريد تمييز هذا الإعلان مقابل 5 نقاط؟"
+);
+
+if (!confirmed) return;
 
   setFeaturingAdId(adId);
 
   try {
     const { error } = await supabase.rpc(
-      "feature_ad_with_subscription",
+      "feature_ad_with_points",
       { p_ad_id: adId }
     );
 
@@ -56,15 +61,21 @@ async function featureAdWithSubscription(adId: string) {
       )
     );
 
-    window.alert("تم تمييز إعلانك بنجاح من رصيد اشتراكك.");
+    window.alert("تم تمييز إعلانك بنجاح مقابل 5 نقاط.");
   } catch (err) {
-    window.alert(
-      err instanceof Error ? err.message : "تعذر تمييز الإعلان."
-    );
+    const message =
+      err instanceof Error ? err.message : "";
+
+    if (message.includes("لا توجد نقاط كافية")) {
+      window.alert("لا توجد نقاط كافية");
+    } else {
+      window.alert(message || "تعذر تمييز الإعلان.");
+    }
   } finally {
     setFeaturingAdId(null);
   }
 }
+
 
   useEffect(() => {
     async function loadMyAds() {
@@ -339,11 +350,15 @@ is_featured
 
     <button
       type="button"
-      onClick={() => {
-        if (window.confirm("هل تؤكد أن هذا الإعلان تم بيعه؟")) {
-          updateAdStatus(ad.id, "sold");
-        }
-      }}
+onClick={async () => {
+  const confirmed = await window.sooqConfirm(
+    "هل تؤكد أن هذا الإعلان تم بيعه؟"
+  );
+
+  if (confirmed) {
+    updateAdStatus(ad.id, "sold");
+  }
+}}
       className="shrink-0 rounded-xl border border-blue-200 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50"
     >
       تم البيع
@@ -351,27 +366,35 @@ is_featured
 
     <button
       type="button"
-      onClick={() => {
-        if (window.confirm("هل تريد إغلاق الإعلان وأرشفته؟")) {
-          updateAdStatus(ad.id, "archived");
-        }
-      }}
+onClick={async () => {
+  const confirmed = await window.sooqConfirm(
+    "هل تريد إغلاق الإعلان وأرشفته؟"
+  );
+
+  if (confirmed) {
+    updateAdStatus(ad.id, "archived");
+  }
+}}
       className="shrink-0 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
     >
       إغلاق الإعلان
     </button>
 
 {ad.listing_type === "sale" && !ad.is_featured && (
-  <button
-    type="button"
-    onClick={() => featureAdWithSubscription(ad.id)}
-    disabled={featuringAdId === ad.id}
-    className="shrink-0 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-purple-700 disabled:opacity-50"
-  >
-    {featuringAdId === ad.id
-      ? "جارٍ التمييز..."
-      : "تمييز من رصيد اشتراكي"}
-  </button>
+  <div className="flex flex-wrap gap-2">
+
+
+    <button
+      type="button"
+      onClick={() => featureAdWithPoints(ad.id)}
+      disabled={featuringAdId === ad.id}
+      className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-50"
+    >
+      {featuringAdId === ad.id
+        ? "جارٍ التمييز..."
+        : "تمييز مقابل 5 نقاط"}
+    </button>
+  </div>
 )}
 {ad.published_at && !ad.is_featured && (
   <Link
@@ -393,15 +416,15 @@ is_featured
                     {(ad.status === "sold" || ad.status === "archived") && (
   <button
     type="button"
-    onClick={() => {
-      if (
-        window.confirm(
-          "هل تريد إعادة هذا الإعلان إلى قائمة المراجعة؟"
-        )
-      ) {
-        republishAd(ad.id);
-      }
-    }}
+onClick={async () => {
+  const confirmed = await window.sooqConfirm(
+    "هل تريد إعادة هذا الإعلان إلى قائمة المراجعة؟"
+  );
+
+  if (confirmed) {
+    republishAd(ad.id);
+  }
+}}
     className="shrink-0 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-50"
   >
     إعادة نشر الإعلان
@@ -418,15 +441,15 @@ is_featured
 )}
 {(ad.status === "pending" || ad.status === "rejected") && (
   <button
-    onClick={() => {
-      const confirmed = window.confirm(
-        "هل أنت متأكد من حذف هذا الإعلان نهائياً؟ لا يمكن التراجع عن الحذف."
-      );
+onClick={async () => {
+  const confirmed = await window.sooqConfirm(
+    "هل أنت متأكد من حذف هذا الإعلان نهائياً؟ لا يمكن التراجع عن الحذف."
+  );
 
-      if (confirmed) {
-        deleteAd(ad.id);
-      }
-    }}
+  if (confirmed) {
+    deleteAd(ad.id);
+  }
+}}
     className="shrink-0 rounded-xl border border-red-200 px-4 py-2.5 text-center text-sm font-bold text-red-700 hover:bg-red-50"
   >
     حذف الإعلان

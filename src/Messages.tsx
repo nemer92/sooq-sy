@@ -272,12 +272,17 @@ useEffect(() => {
 }, [id]);
 
 // حظر أو إلغاء حظر المستخدم
+
 async function toggleBlock() {
   if (!otherUser || !userId || blocking) return;
 
   const action = blockedByMe ? "إلغاء الحظر" : "حظر هذا المستخدم";
 
-  if (!window.confirm(`هل أنت متأكد من ${action}؟`)) return;
+  const confirmed = await window.sooqConfirm(
+    `هل أنت متأكد من ${action}؟`
+  );
+
+  if (!confirmed) return;
 
   setBlocking(true);
 

@@ -18,7 +18,11 @@ import {
   PawPrint,
   LogOut,
     Heart,
+    Star,
   Bell,
+  SlidersHorizontal,
+  ChevronDown,
+  X,
   MessageCircle
 } from "lucide-react";
 
@@ -178,6 +182,56 @@ const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
 const [selectedSubCategory, setSelectedSubCategory] = useState<number | null>(null);
 const [searchQuery, setSearchQuery] = useState("");
 const [selectedCity, setSelectedCity] = useState("");
+const [selectedConditions, setSelectedConditions] = useState<
+  ("new" | "used")[]
+>(() => {
+  try {
+    const saved = sessionStorage.getItem("sooq_selected_conditions");
+
+    if (saved) {
+      const parsed: unknown = JSON.parse(saved);
+
+      if (
+        Array.isArray(parsed) &&
+        parsed.length > 0 &&
+        parsed.every(
+          (item): item is "new" | "used" =>
+            item === "new" || item === "used"
+        )
+      ) {
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.error("خطأ باستعادة فلتر الحالة:", error);
+  }
+
+  return ["new", "used"];
+});
+
+const toggleCondition = (condition: "new" | "used") => {
+  let updatedConditions: ("new" | "used")[];
+
+  if (selectedConditions.includes(condition)) {
+    if (selectedConditions.length === 1) {
+      window.alert("يجب اختيار حالة واحدة على الأقل: جديد أو مستعمل.");
+      return;
+    }
+
+    updatedConditions = selectedConditions.filter(
+      (item) => item !== condition
+    );
+  } else {
+    updatedConditions = [...selectedConditions, condition];
+  }
+
+  setSelectedConditions(updatedConditions);
+
+  sessionStorage.setItem(
+    "sooq_selected_conditions",
+    JSON.stringify(updatedConditions)
+  );
+};
 const [siteName, setSiteName] = useState("Sooq.Sy");
 const [, setLogoUrl] = useState("");
 const [heroImageUrl, setHeroImageUrl] = useState("");
@@ -706,7 +760,16 @@ const filteredLatestAds = ads.filter((ad) => {
     ad.title.toLowerCase().includes(query) ||
     ad.description.toLowerCase().includes(query);
 
-  return !ad.is_featured && matchesCategory && matchesSearch && matchesCity;
+const matchesCondition = selectedConditions.includes(
+  ad.condition as "new" | "used"
+);
+  return (
+  !ad.is_featured &&
+  matchesCategory &&
+  matchesSearch &&
+  matchesCity &&
+  matchesCondition
+);
 });
 
   return (
@@ -744,6 +807,7 @@ const filteredLatestAds = ads.filter((ad) => {
     </div>
   </div>
 )}
+
       <header className="sticky top-0 z-50 border-b border-slate-100 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-4">
 <a href="/" className="flex items-center gap-2">
@@ -763,73 +827,121 @@ const filteredLatestAds = ads.filter((ad) => {
   </div>
 </a>
 
-          <div className="hidden flex-1 items-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 md:flex">
-            <Search size={19} className="text-slate-400" />
-            <select
-  value={selectedGovernorate}
-  onChange={(e) => {
-    setSelectedGovernorate(e.target.value);
-    setSelectedCity("");
-  }}
-  className="mx-2 max-w-36 border-l border-slate-200 bg-transparent px-2 py-2 text-sm text-slate-600 outline-none"
->
-  <option value="">كل المحافظات</option>
-  {governorates.map((governorate) => (
-    <option key={governorate.id} value={String(governorate.id)}>
-      {governorate.name_ar}
-    </option>
-  ))}
-</select>
-            <select
-  value={selectedCity}
-  onChange={(e) => setSelectedCity(e.target.value)}
-  className="mx-2 max-w-32 border-l border-slate-200 bg-transparent px-2 py-2 text-sm text-slate-600 outline-none"
->
-  <option value="">كل المدن</option>
-{cities
-  .filter(
-    (city) =>
-      selectedGovernorate === "" ||
-      String(city.governorate_id) === selectedGovernorate
-  )
-  .map((city) => (
-    <option key={city.id} value={String(city.id)}>
-      {city.name_ar}
-    </option>
-  ))}
-</select>
-<input
-  value={searchQuery}
-  onChange={(e) => setSearchQuery(e.target.value)}
-  onKeyDown={(e) => {
-    if (e.key === "Enter") {
-      document.getElementById("ads-section")?.scrollIntoView({
-        behavior: "smooth",
-      });
-    }
-  }}
-  className="w-full bg-transparent px-3 text-sm outline-none"
-  placeholder="شو عم تدور عليه؟ ابحث عن أي شيء..."
-/>
-{searchQuery && (
-  <button
-    onClick={() => setSearchQuery("")}
-    className="px-2 text-sm font-bold text-slate-400 hover:text-red-500"
-  >
-    مسح
-  </button>
-)}
-<button
-  onClick={() => {
-    document.getElementById("ads-section")?.scrollIntoView({
-      behavior: "smooth",
-    });
-  }}
-  className="rounded-lg bg-emerald-600 px-6 py-2 text-sm font-bold text-white hover:bg-emerald-700"
->
-  بحث
-</button>
-          </div>
+
+<div className="hidden min-w-0 flex-1 flex-col gap-2.5 md:flex">
+  <div className="flex h-12 items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm transition focus-within:border-emerald-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-50">
+    <Search size={20} className="mr-4 shrink-0 text-emerald-600" />
+
+    <input
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          document.getElementById("ads-section")?.scrollIntoView({
+            behavior: "smooth",
+          });
+        }
+      }}
+      className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+      placeholder="شو عم تدور عليه؟ ابحث عن أي شيء..."
+    />
+
+    {searchQuery && (
+      <button
+        type="button"
+        onClick={() => setSearchQuery("")}
+        className="mx-2 rounded-lg px-2 py-1 text-xs font-bold text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+      >
+        مسح
+      </button>
+    )}
+
+    <button
+      type="button"
+      onClick={() => {
+        document.getElementById("ads-section")?.scrollIntoView({
+          behavior: "smooth",
+        });
+      }}
+      className="m-1.5 flex h-9 shrink-0 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700"
+    >
+      <Search size={16} />
+      بحث
+    </button>
+  </div>
+
+
+<div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white p-1.5 shadow-sm sm:gap-3 sm:rounded-2xl sm:p-2">
+
+  <span className="hidden shrink-0 items-center gap-1.5 text-xs font-bold text-slate-400 sm:flex">
+    <SlidersHorizontal size={15} />
+    تصفية حسب:
+  </span>
+
+  <div className="relative min-w-0 flex-1">
+    <select
+      value={selectedGovernorate}
+      onChange={(e) => {
+        setSelectedGovernorate(e.target.value);
+        setSelectedCity("");
+      }}
+      className="h-9 w-full appearance-none rounded-lg border border-slate-100 bg-slate-50 px-2 pl-7 text-[11px] font-bold text-slate-700 outline-none transition hover:border-emerald-200 focus:border-emerald-400 focus:bg-white sm:h-10 sm:rounded-xl sm:px-3 sm:pl-8 sm:text-xs"
+    >
+      <option value="">كل المحافظات</option>
+      {governorates.map((governorate) => (
+        <option key={governorate.id} value={String(governorate.id)}>
+          {governorate.name_ar}
+        </option>
+      ))}
+    </select>
+    <ChevronDown
+      size={14}
+      className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+    />
+  </div>
+
+  <div className="relative min-w-0 flex-1">
+    <select
+      value={selectedCity}
+      onChange={(e) => setSelectedCity(e.target.value)}
+      className="h-9 w-full appearance-none rounded-lg border border-slate-100 bg-slate-50 px-2 pl-7 text-[11px] font-bold text-slate-700 outline-none transition hover:border-emerald-200 focus:border-emerald-400 focus:bg-white sm:h-10 sm:rounded-xl sm:px-3 sm:pl-8 sm:text-xs"
+    >
+      <option value="">كل المدن</option>
+      {cities
+        .filter(
+          (city) =>
+            selectedGovernorate === "" ||
+            String(city.governorate_id) === selectedGovernorate
+        )
+        .map((city) => (
+          <option key={city.id} value={String(city.id)}>
+            {city.name_ar}
+          </option>
+        ))}
+    </select>
+    <ChevronDown
+      size={14}
+      className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+    />
+  </div>
+
+  {(searchQuery || selectedGovernorate || selectedCity) && (
+    <button
+      type="button"
+      onClick={() => {
+        setSearchQuery("");
+        setSelectedGovernorate("");
+        setSelectedCity("");
+      }}
+      title="مسح البحث والفلاتر"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-500 transition hover:bg-rose-100 sm:h-10 sm:w-10 sm:rounded-xl"
+    >
+      <X size={16} />
+    </button>
+  )}
+</div>
+
+</div>
 
 
 <div className="hidden items-center gap-4 md:flex">
@@ -975,8 +1087,9 @@ return (
       </button>
 
       <button
+
 onClick={async () => {
-  const confirmed = window.confirm(
+  const confirmed = await window.sooqConfirm(
     "هل أنت متأكد أنك تريد تسجيل الخروج؟"
   );
 
@@ -993,6 +1106,7 @@ onClick={async () => {
 }}
         className="flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700"
       >
+
         <LogOut size={18} />
         تسجيل الخروج
       </button>
@@ -1117,28 +1231,30 @@ onClick={async () => {
             مفضلتي
           </button>
 
-          <button
-onClick={async () => {
-  const confirmed = window.confirm(
-    "هل أنت متأكد أنك تريد تسجيل الخروج؟"
-  );
 
-  if (!confirmed) return;
+<button
+  onClick={async () => {
+    const confirmed = await window.sooqConfirm(
+      "هل أنت متأكد أنك تريد تسجيل الخروج؟"
+    );
 
-  const { error } = await supabase.auth.signOut();
+    if (!confirmed) return;
 
-  if (error) {
-    alert("تعذر تسجيل الخروج، حاول مرة أخرى.");
-    return;
-  }
+    const { error } = await supabase.auth.signOut();
 
-  setIsMobileMenuOpen(false);
-  navigate("/");
-}}
-            className="rounded-xl px-4 py-3 text-right text-sm font-semibold text-red-600 hover:bg-red-50"
-          >
-            تسجيل الخروج
-          </button>
+    if (error) {
+      alert("تعذر تسجيل الخروج، حاول مرة أخرى.");
+      return;
+    }
+
+    setIsMobileMenuOpen(false);
+    navigate("/");
+  }}
+  className="rounded-xl px-4 py-3 text-right text-sm font-semibold text-red-600 hover:bg-red-50"
+>
+  تسجيل الخروج
+</button>
+
         </>
       ) : (
         <button
@@ -1269,60 +1385,112 @@ onClick={async () => {
   </div>
 )}
 
-<div className="border-t border-slate-100 px-5 py-3 md:hidden">
-  <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-    <Search size={18} className="text-slate-400" />
-<input
-  value={searchQuery}
-  onChange={(e) => setSearchQuery(e.target.value)}
-  onKeyDown={(e) => {
-    if (e.key === "Enter") {
-      document.getElementById("ads-section")?.scrollIntoView({
-        behavior: "smooth",
-      });
-    }
-  }}
-  className="w-full bg-transparent px-3 text-sm outline-none"
-  placeholder="ابحث في السوق..."
-/>
-  </div>
-  <div className="mt-3 grid grid-cols-2 gap-2">
-  <select
-    value={selectedGovernorate}
-    onChange={(e) => {
-      setSelectedGovernorate(e.target.value);
-      setSelectedCity("");
-    }}
-    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none"
-  >
-    <option value="">كل المحافظات</option>
-    {governorates.map((governorate) => (
-      <option key={governorate.id} value={String(governorate.id)}>
-        {governorate.name_ar}
-      </option>
-    ))}
-  </select>
 
-  <select
-    value={selectedCity}
-    onChange={(e) => setSelectedCity(e.target.value)}
-    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm outline-none"
-  >
-    <option value="">كل المدن</option>
-    {cities
-      .filter(
-        (city) =>
-          selectedGovernorate === "" ||
-          String(city.governorate_id) === selectedGovernorate
-      )
-      .map((city) => (
-        <option key={city.id} value={String(city.id)}>
-          {city.name_ar}
-        </option>
-      ))}
-  </select>
+<div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4 md:hidden">
+  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm focus-within:border-emerald-400">
+    <div className="flex h-12 items-center px-3">
+      <Search size={19} className="shrink-0 text-emerald-600" />
+
+      <input
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            document.getElementById("ads-section")?.scrollIntoView({
+              behavior: "smooth",
+            });
+          }
+        }}
+        className="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:text-slate-400"
+        placeholder="ابحث عن أي شيء في السوق..."
+      />
+
+      {searchQuery && (
+        <button
+          type="button"
+          onClick={() => setSearchQuery("")}
+          className="shrink-0 px-2 text-xs font-bold text-rose-500"
+        >
+          مسح
+        </button>
+      )}
+
+      <button
+        type="button"
+        onClick={() => {
+          document.getElementById("ads-section")?.scrollIntoView({
+            behavior: "smooth",
+          });
+        }}
+        className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white"
+      >
+        بحث
+      </button>
+    </div>
+  </div>
+
+  <div className="mt-3 grid grid-cols-2 gap-2">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+      <span className="mb-1 block text-[10px] font-bold text-slate-400">
+        المحافظة
+      </span>
+      <select
+        value={selectedGovernorate}
+        onChange={(e) => {
+          setSelectedGovernorate(e.target.value);
+          setSelectedCity("");
+        }}
+        className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
+      >
+        <option value="">كل المحافظات</option>
+        {governorates.map((governorate) => (
+          <option key={governorate.id} value={String(governorate.id)}>
+            {governorate.name_ar}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+      <span className="mb-1 block text-[10px] font-bold text-slate-400">
+        المدينة
+      </span>
+      <select
+        value={selectedCity}
+        onChange={(e) => setSelectedCity(e.target.value)}
+        className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
+      >
+        <option value="">كل المدن</option>
+        {cities
+          .filter(
+            (city) =>
+              selectedGovernorate === "" ||
+              String(city.governorate_id) === selectedGovernorate
+          )
+          .map((city) => (
+            <option key={city.id} value={String(city.id)}>
+              {city.name_ar}
+            </option>
+          ))}
+      </select>
+    </div>
+  </div>
+
+  {(searchQuery || selectedGovernorate || selectedCity) && (
+    <button
+      type="button"
+      onClick={() => {
+        setSearchQuery("");
+        setSelectedGovernorate("");
+        setSelectedCity("");
+      }}
+      className="mt-3 w-full rounded-xl border border-rose-200 bg-white py-2.5 text-xs font-bold text-rose-600 transition hover:bg-rose-50"
+    >
+      مسح البحث والفلاتر
+    </button>
+  )}
 </div>
-</div>
+
 </header>
 
 
@@ -1342,214 +1510,529 @@ onClick={async () => {
       : undefined
   }
 >
-          <div className="relative z-10 max-w-2xl">
-            <span className="mb-5 inline-block rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold">
-              سوق واحد... كل ما تبحث عنه
-            </span>
-            <h2 className="text-3xl font-black leading-tight md:text-5xl">
-              بيع واشتري بكل سهولة
-              <br />
-              <span className="text-emerald-200">من أي مكان في سوريا</span>
-            </h2>
-            <p className="mt-5 max-w-xl text-sm leading-7 text-emerald-50/80 md:text-base">
-              اكتشف آلاف الإعلانات المبوبة، واعثر على ما تحتاجه، أو انشر إعلانك
-              وتواصل مباشرة مع المهتمين.
-            </p>
-{allowNewAds && (
-  <button
-    onClick={() => navigate("/add-ad")}
-    className="mt-7 flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 font-bold text-emerald-800 hover:bg-emerald-50"
-  >
-    <Plus size={19} />
-    أضف إعلانك الآن
-  </button>
-)}
-          </div>
-          <div className="pointer-events-none absolute -left-20 -top-28 h-80 w-80 rounded-full border-[45px] border-white/5" />
-          <div className="pointer-events-none absolute -bottom-40 left-1/3 h-96 w-96 rounded-full bg-emerald-400/10 blur-3xl" />
-        </section>
+
+
+
+<div className="relative z-10 w-full max-w-xl">
+  <span className="mb-1.5 inline-block rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-semibold">
+    سوق واحد... كل ما تبحث عنه
+  </span>
+
+  <h2 className="text-lg font-black leading-snug sm:text-xl md:text-3xl">
+    بيع واشتري بكل سهولة
+    <span className="mr-1.5 text-emerald-200">
+      من أي مكان في سوريا
+    </span>
+  </h2>
+
+  <p className="mt-1.5 max-w-lg text-[10px] leading-4 text-emerald-50/80 sm:text-xs sm:leading-5">
+    اكتشف آلاف الإعلانات المبوبة، واعثر على ما تحتاجه، أو انشر إعلانك وتواصل مباشرة مع المهتمين.
+  </p>
+
+  {allowNewAds && (
+    <button
+      onClick={() => navigate("/add-ad")}
+      className="mt-2 flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[10px] font-bold text-emerald-800 transition hover:bg-emerald-50 sm:text-xs"
+    >
+      <Plus size={14} />
+      أضف إعلانك الآن
+    </button>
+  )}
+</div>
+
+
+<div className="pointer-events-none absolute -left-12 -top-16 h-48 w-48 rounded-full border-[25px] border-white/5" />
+<div className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
+
+</section>
 {true && (
-  <section className="mt-8 overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-amber-50 p-6 shadow-sm md:flex md:items-center md:justify-between md:p-9">
-    <div>
-      <span className="mb-2 inline-block rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
+
+<section className="mt-5 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-amber-50 px-4 py-4 shadow-sm sm:mt-8 sm:rounded-3xl sm:p-6 md:flex md:items-center md:justify-between md:gap-5">
+  <div className="flex min-w-0 items-start gap-3">
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 sm:h-12 sm:w-12">
+      <Star size={22} />
+    </span>
+
+    <div className="min-w-0">
+      <span className="inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 sm:text-xs">
         باقات Sooq.Sy
       </span>
 
-      <h2 className="text-2xl font-extrabold text-gray-900">
+      <h2 className="mt-1.5 text-sm font-extrabold leading-6 text-gray-900 sm:text-lg">
         ارتقِ بإعلاناتك مع باقات الاشتراك
       </h2>
 
-      <p className="mt-2 text-gray-600">
-        احصل على حصة أكبر من الإعلانات العادية والمميزة، واختر الباقة المناسبة لك.
+      <p className="mt-1 text-[11px] leading-5 text-gray-600 sm:text-sm">
+        فرص ظهور أكبر وإعلانات مميزة مع الباقة المناسبة لك.
       </p>
     </div>
+  </div>
 
-    <button
-      onClick={() => navigate("/subscriptions")}
-      className="mt-5 shrink-0 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white transition hover:bg-emerald-700 md:mt-0"
-    >
-      استكشف باقات الاشتراك
-    </button>
-  </section>
+  <button
+    onClick={() => navigate("/subscriptions")}
+    className="mt-3 flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 sm:mt-4 sm:w-auto sm:px-5 sm:py-3 sm:text-sm md:mt-0"
+  >
+    <Star size={15} />
+    استكشف الباقات
+  </button>
+</section>
+
 )}
-        <section className="mt-12">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-black text-slate-900">تصفح حسب التصنيف</h2>
-              <p className="mt-1 text-sm text-slate-500">كل ما تحتاجه في مكان واحد</p>
-            </div>
-          </div>
 
-          
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-9">
-            <button
-onClick={() => {
-  setSelectedCategory(null);
-  setSelectedSubCategory(null);
-}}  className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${
-    selectedCategory === null
-      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-      : "border-slate-100 bg-white text-slate-600 hover:border-emerald-200"
-  }`}
->
-  كل الإعلانات
-</button>
-{categories
-  .filter((category) => category.parent_id === null)
-  .map((category) => {
-    const Icon =
-      categoryIconMap[category.name_ar as keyof typeof categoryIconMap] ?? Menu;
 
-    const subCategories = categories.filter(
-      (sub) => sub.parent_id === category.id
-    );
+<section className="mt-5 sm:mt-8">
+  <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:rounded-3xl sm:p-6">
 
-    return (
-      <div key={category.id} className="flex flex-col gap-3">
+    {/* عنوان القسم */}
+    <div className="mb-3 flex items-center justify-between sm:mb-5">
+      <div>
+        <h2 className="text-base font-black text-slate-900 sm:text-xl">
+          تصفح حسب التصنيف
+        </h2>
+        <p className="mt-1 text-[11px] text-slate-500 sm:text-sm">
+          اختر القسم المناسب للعثور على ما تبحث عنه
+        </p>
+      </div>
+
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 sm:h-11 sm:w-11">
+        <Menu size={21} />
+      </span>
+    </div>
+
+    {/* نسخة الموبايل */}
+    <div className="sm:hidden">
+      <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
         <button
           onClick={() => {
-            setSelectedCategory(category.id);
+            setSelectedCategory(null);
             setSelectedSubCategory(null);
           }}
-          className={`group flex flex-col items-center justify-center gap-3 rounded-2xl border p-4 text-center transition hover:-translate-y-1 hover:shadow-md ${
-            selectedCategory === category.id
-              ? "border-emerald-500 bg-emerald-50"
-              : "border-slate-100 bg-white hover:border-emerald-200"
+          className={`flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 transition ${
+            selectedCategory === null
+              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+              : "border-slate-100 bg-slate-50 text-slate-600"
           }`}
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-600 group-hover:text-white">
-            <Icon size={23} />
-          </span>
-
-          <span className="text-xs font-bold text-slate-700">
-            {category.name_ar}
-          </span>
+          <Menu size={20} />
+          <span className="whitespace-nowrap text-[11px] font-bold">الكل</span>
         </button>
 
-{selectedCategory === category.id && subCategories.length > 0 && (
-  <div className="flex flex-wrap justify-center gap-2">
+        {categories
+          .filter((category) => category.parent_id === null)
+          .map((category) => {
+            const Icon =
+              categoryIconMap[
+                category.name_ar as keyof typeof categoryIconMap
+              ] ?? Menu;
 
-    <button
-      onClick={() => setSelectedSubCategory(null)}
-      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-        selectedSubCategory === null
-          ? "border-emerald-500 bg-emerald-600 text-white"
-          : "border-slate-200 bg-white text-slate-600 hover:border-emerald-400"
-      }`}
-    >
-      كل إعلانات التصنيف
-    </button>
+            return (
+              <button
+                key={category.id}
+                onClick={() => {
+                  setSelectedCategory(category.id);
+                  setSelectedSubCategory(null);
+                }}
+                className={`flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 transition ${
+                  selectedCategory === category.id
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-slate-100 bg-slate-50 text-slate-600"
+                }`}
+              >
+                <Icon size={20} />
+                <span className="max-w-[85px] truncate text-[11px] font-bold">
+                  {category.name_ar}
+                </span>
+              </button>
+            );
+          })}
+      </div>
 
-    {subCategories.map((sub) => (
+      {selectedCategory && (
+        <div className="mt-2 rounded-xl bg-slate-50 p-2">
+          <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <button
+              onClick={() => setSelectedSubCategory(null)}
+              className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-bold ${
+                selectedSubCategory === null
+                  ? "border-emerald-500 bg-emerald-600 text-white"
+                  : "border-slate-200 bg-white text-slate-600"
+              }`}
+            >
+              كل التصنيف
+            </button>
+
+            {categories
+              .filter((sub) => sub.parent_id === selectedCategory)
+              .map((sub) => (
+                <button
+                  key={sub.id}
+                  onClick={() => setSelectedSubCategory(sub.id)}
+                  className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold ${
+                    selectedSubCategory === sub.id
+                      ? "border-emerald-500 bg-emerald-600 text-white"
+                      : "border-slate-200 bg-white text-slate-600"
+                  }`}
+                >
+                  {sub.name_ar}
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* نسخة الكمبيوتر */}
+    <div className="hidden grid-cols-4 gap-3 sm:grid md:grid-cols-5 lg:grid-cols-9">
+
       <button
-        key={sub.id}
-        onClick={() => setSelectedSubCategory(sub.id)}
-        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-          selectedSubCategory === sub.id
-            ? "border-emerald-500 bg-emerald-600 text-white"
-            : "border-slate-200 bg-white text-slate-600 hover:border-emerald-400"
+        onClick={() => {
+          setSelectedCategory(null);
+          setSelectedSubCategory(null);
+        }}
+        className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${
+          selectedCategory === null
+            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+            : "border-slate-100 bg-slate-50 text-slate-600 hover:border-emerald-200"
         }`}
       >
-        {sub.name_ar}
+        كل الإعلانات
       </button>
-    ))}
+
+      {categories
+        .filter((category) => category.parent_id === null)
+        .map((category) => {
+          const Icon =
+            categoryIconMap[
+              category.name_ar as keyof typeof categoryIconMap
+            ] ?? Menu;
+
+          const subCategories = categories.filter(
+            (sub) => sub.parent_id === category.id
+          );
+
+          return (
+            <div key={category.id} className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setSelectedCategory(category.id);
+                  setSelectedSubCategory(null);
+                }}
+                className={`group flex flex-col items-center justify-center gap-3 rounded-2xl border p-4 text-center transition hover:-translate-y-1 hover:shadow-md ${
+                  selectedCategory === category.id
+                    ? "border-emerald-500 bg-emerald-50"
+                    : "border-slate-100 bg-slate-50 hover:border-emerald-200"
+                }`}
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-600 group-hover:text-white">
+                  <Icon size={23} />
+                </span>
+
+                <span className="text-xs font-bold text-slate-700">
+                  {category.name_ar}
+                </span>
+              </button>
+
+              {selectedCategory === category.id &&
+                subCategories.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <button
+                      onClick={() => setSelectedSubCategory(null)}
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                        selectedSubCategory === null
+                          ? "border-emerald-500 bg-emerald-600 text-white"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-emerald-400"
+                      }`}
+                    >
+                      كل إعلانات التصنيف
+                    </button>
+
+                    {subCategories.map((sub) => (
+                      <button
+                        key={sub.id}
+                        onClick={() => setSelectedSubCategory(sub.id)}
+                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                          selectedSubCategory === sub.id
+                            ? "border-emerald-500 bg-emerald-600 text-white"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-emerald-400"
+                        }`}
+                      >
+                        {sub.name_ar}
+                      </button>
+                    ))}
+                  </div>
+                )}
+            </div>
+          );
+        })}
+    </div>
 
   </div>
-)}
-      </div>
-    );
-  })}
-          </div>
-        </section>
+</section>
 
+<section
+  dir="rtl"
+  className="mt-5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-4"
+>
+  <div className="mb-3 flex items-center gap-2">
+    <SlidersHorizontal size={18} className="text-emerald-600" />
+    <h3 className="text-sm font-black text-slate-800">
+      حالة الإعلان
+    </h3>
+    <span className="text-[10px] text-slate-400">
+      يمكنك اختيار الحالتين معاً
+    </span>
+  </div>
 
-<section className="mt-14">
-  <div className="mb-6 flex items-center justify-between">
+  <div className="grid grid-cols-2 gap-3">
+    <label
+      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
+        selectedConditions.includes("new")
+          ? "border-emerald-400 bg-emerald-50"
+          : "border-slate-200 bg-slate-50"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={selectedConditions.includes("new")}
+        onChange={() => toggleCondition("new")}
+        className="h-5 w-5 accent-emerald-600"
+      />
+      <span className="text-sm font-bold text-slate-700">
+        جديد
+      </span>
+    </label>
+
+    <label
+      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
+        selectedConditions.includes("used")
+          ? "border-emerald-400 bg-emerald-50"
+          : "border-slate-200 bg-slate-50"
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={selectedConditions.includes("used")}
+        onChange={() => toggleCondition("used")}
+        className="h-5 w-5 accent-emerald-600"
+      />
+      <span className="text-sm font-bold text-slate-700">
+        مستعمل
+      </span>
+    </label>
+  </div>
+</section>
+
+<section
+  dir="rtl"
+  className="mt-14 overflow-hidden rounded-3xl border border-amber-300 bg-gradient-to-bl from-amber-100 via-yellow-50 to-amber-200 p-4 shadow-sm shadow-amber-200/60 sm:p-6"
+>
+  <div className="mb-6 flex items-center justify-between gap-3">
     <div>
-      <div className="flex items-center gap-2">
-        <h2 className="text-xl font-black text-slate-900">إعلانات مميزة</h2>
-        <span className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">
-          مختارة
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-2xl">⭐</span>
+        <h2 className="text-xl font-black text-amber-950">
+          إعلانات مميزة
+        </h2>
+        <span className="rounded-md border border-amber-300 bg-amber-200 px-2 py-1 text-[10px] font-bold text-amber-900">
+          مختارة بعناية
         </span>
       </div>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-amber-800">
         مجموعة من الإعلانات التي تستحق المشاهدة
       </p>
     </div>
+
+    <button
+      type="button"
+      onClick={() => navigate("/featured-ads")}
+      className="shrink-0 rounded-xl border border-amber-400 bg-white/80 px-3 py-2 text-xs font-black text-amber-900 transition hover:bg-amber-300 sm:px-4 sm:text-sm"
+    >
+      عرض الكل ←
+    </button>
   </div>
 
   {featuredAdsLoading && (
-    <p className="py-8 text-center text-sm text-slate-500">
+    <p className="py-8 text-center text-sm text-amber-800">
       جارٍ تحميل الإعلانات...
     </p>
   )}
 
- {!featuredAdsLoading && featuredAds.length === 0 && (
-    <p className="py-10 text-center text-sm text-slate-500">
+  {!featuredAdsLoading && featuredAds.length === 0 && (
+    <p className="py-10 text-center text-sm text-amber-800">
       لا توجد إعلانات مميزة حالياً.
     </p>
   )}
 
-  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-    {featuredAds
-      .filter((ad) => {
-        const matchesCategory =
-          selectedSubCategory !== null
-            ? Number(ad.category_id) === selectedSubCategory
-            : selectedCategory === null ||
-              Number(ad.category_id) === selectedCategory ||
-              categories.some(
-                (sub) =>
-                  sub.parent_id === selectedCategory &&
-                  sub.id === Number(ad.category_id)
-              );
+  {!featuredAdsLoading && featuredAds.length > 0 && (
+    <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+      {featuredAds
+        .filter((ad) => {
+          const matchesCategory =
+            selectedSubCategory !== null
+              ? Number(ad.category_id) === selectedSubCategory
+              : selectedCategory === null ||
+                Number(ad.category_id) === selectedCategory ||
+                categories.some(
+                  (sub) =>
+                    sub.parent_id === selectedCategory &&
+                    sub.id === Number(ad.category_id)
+                );
 
-        const matchesCity =
-          selectedCity !== ""
-            ? String(ad.city_id) === selectedCity
-            : selectedGovernorate === "" ||
-              cities.some(
-                (city) =>
-                  String(city.governorate_id) === selectedGovernorate &&
-                  city.id === ad.city_id
-              );
+                const matchesCondition = selectedConditions.includes(
+  ad.condition as "new" | "used"
+);
 
-        const query = searchQuery.trim().toLowerCase();
+          const matchesCity =
+            selectedCity !== ""
+              ? String(ad.city_id) === selectedCity
+              : selectedGovernorate === "" ||
+                cities.some(
+                  (city) =>
+                    String(city.governorate_id) === selectedGovernorate &&
+                    city.id === ad.city_id
+                );
 
-        const matchesSearch =
-          query === "" ||
-          ad.title.toLowerCase().includes(query) ||
-          ad.description.toLowerCase().includes(query);
+          const query = searchQuery.trim().toLowerCase();
 
-        return matchesCategory && matchesSearch && matchesCity;
-      })
-      .map((ad) => (
+          const matchesSearch =
+            query === "" ||
+            ad.title.toLowerCase().includes(query) ||
+            ad.description.toLowerCase().includes(query);
+
+          return (
+  matchesCategory &&
+  matchesSearch &&
+  matchesCity &&
+  matchesCondition
+);
+        })
+        .map((ad) => (
+          <article
+            key={ad.id}
+            onClick={() => navigate(`/ad/${ad.id}`)}
+            className="group w-[270px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-2xl border-2 border-amber-300 bg-white shadow-md shadow-amber-200/50 transition hover:-translate-y-1 hover:shadow-xl sm:w-[300px] lg:w-[310px]"
+          >
+            <div className="relative h-52 overflow-hidden bg-amber-50">
+              {ad.images.length > 0 ? (
+                <img
+                  src={ad.images[0]}
+                  alt={ad.title}
+                  className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-amber-400">
+                  <Car size={48} />
+                </div>
+              )}
+
+              <span className="absolute right-3 top-3 rounded-lg border border-amber-300 bg-gradient-to-l from-amber-200 to-yellow-100 px-3 py-1.5 text-xs font-black text-amber-900 shadow-sm">
+                ⭐ إعلان مميز
+              </span>
+
+              <button
+                type="button"
+                aria-label="إضافة للمفضلة"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFavorite(ad.id);
+                }}
+                className="absolute left-3 top-3 rounded-full bg-white/90 p-2 text-slate-500 hover:text-red-500"
+              >
+                <Heart
+                  size={18}
+                  fill={favoriteAdIds.includes(ad.id) ? "currentColor" : "none"}
+                  className={favoriteAdIds.includes(ad.id) ? "text-red-500" : ""}
+                />
+              </button>
+            </div>
+
+            <div className="p-4">
+              <h3 className="line-clamp-2 min-h-12 font-bold leading-6 text-slate-800">
+                {ad.title}
+              </h3>
+
+              <div className="mt-3 flex items-baseline gap-1">
+                <span className="text-xl font-black text-emerald-700">
+                  {ad.price?.toLocaleString("en-US") ?? "السعر عند التواصل"}
+                </span>
+                <span className="text-xs font-semibold text-slate-500">
+                  {ad.currency === "USD"
+                    ? "دولار"
+                    : ad.currency === "SYP"
+                      ? "ليرة سورية"
+                      : ad.currency}
+                </span>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between border-t border-amber-100 pt-3 text-xs text-slate-400">
+                <span className="flex items-center gap-1">
+                  <MapPin size={14} /> {ad.city_name}
+                </span>
+                <span>
+                  {new Date(ad.created_at).toLocaleDateString("ar-SY")}
+                </span>
+              </div>
+            </div>
+          </article>
+        ))}
+    </div>
+  )}
+</section>
+
+
+
+
+
+<section
+  className="mt-14 rounded-3xl border border-emerald-200 bg-gradient-to-bl from-emerald-50 via-white to-teal-50 p-4 shadow-sm sm:p-6"
+  id="ads-section"
+  dir="rtl"
+>
+  <div className="mb-6 flex items-center justify-between gap-3">
+    <div>
+      <h2 className="text-xl font-black text-emerald-950">
+        أحدث الإعلانات
+      </h2>
+      <p className="mt-1 text-sm text-emerald-800">
+        تصفح أحدث ما أُضيف إلى السوق
+      </p>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => navigate("/regular-ads")}
+      className="shrink-0 rounded-xl border border-emerald-300 bg-white/80 px-3 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100 sm:px-4 sm:text-sm"
+    >
+      عرض الكل ←
+    </button>
+  </div>
+
+  {adsLoading && (
+    <p className="py-8 text-center text-sm text-emerald-800">
+      جارٍ تحميل الإعلانات...
+    </p>
+  )}
+
+  {!adsLoading && filteredLatestAds.length === 0 && (
+    <p className="py-10 text-center text-sm text-emerald-800">
+      لا توجد إعلانات جديدة حالياً.
+    </p>
+  )}
+
+  {!adsLoading && filteredLatestAds.length > 0 && (
+    <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+      {filteredLatestAds.slice(0, 8).map((ad) => (
         <article
           key={ad.id}
-          onClick={() => navigate(`/ad/${ad.id}`)}
-          className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-100 bg-white transition hover:-translate-y-1 hover:shadow-lg"
+          onClick={() =>
+            navigate(`/ad/${ad.id}`, {
+              state: { from: "/" },
+            })
+          }
+          className="group w-[270px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md shadow-emerald-100/50 transition hover:-translate-y-1 hover:shadow-xl sm:w-[300px] lg:w-[310px]"
         >
-          <div className="relative h-52 overflow-hidden bg-slate-100">
+          <div className="relative h-52 overflow-hidden bg-emerald-50">
             {ad.images.length > 0 ? (
               <img
                 src={ad.images[0]}
@@ -1557,13 +2040,13 @@ onClick={() => {
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
               />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-slate-100 text-slate-400">
+              <div className="flex h-full w-full items-center justify-center bg-emerald-50 text-emerald-400">
                 <Car size={48} />
               </div>
             )}
 
-            <span className="absolute right-3 top-3 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700">
-              إعلان مميز
+            <span className="absolute right-3 top-3 rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800">
+              إعلان للبيع
             </span>
 
             <button
@@ -1601,9 +2084,10 @@ onClick={() => {
               </span>
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-400">
+            <div className="mt-4 flex items-center justify-between border-t border-emerald-100 pt-3 text-xs text-slate-400">
               <span className="flex items-center gap-1">
-                <MapPin size={14} /> {ad.city_name}
+                <MapPin size={14} />
+                {ad.city_name}
               </span>
               <span>
                 {new Date(ad.created_at).toLocaleDateString("ar-SY")}
@@ -1612,34 +2096,48 @@ onClick={() => {
           </div>
         </article>
       ))}
-  </div>
+    </div>
+  )}
 </section>
 
 
 
-<section className="mt-14">
-  <div className="mb-6 flex items-center justify-between">
+
+
+<section
+  className="mt-14 rounded-3xl border border-rose-200 bg-gradient-to-bl from-rose-50 via-white to-pink-50 p-4 shadow-sm sm:p-6"
+  dir="rtl"
+>
+  <div className="mb-6 flex items-center justify-between gap-3">
     <div>
       <div className="flex items-center gap-2">
         <Heart className="text-rose-500" size={23} />
-        <h2 className="text-xl font-black text-slate-900">
+        <h2 className="text-xl font-black text-rose-950">
           أغراض مجانية للتبرع
         </h2>
       </div>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-rose-800">
         خذ ما تحتاجه، وتبرع بما لم تعد بحاجة إليه
       </p>
     </div>
+
+    <button
+      type="button"
+      onClick={() => navigate("/donations")}
+      className="shrink-0 rounded-xl border border-rose-300 bg-white/80 px-3 py-2 text-xs font-black text-rose-900 transition hover:bg-rose-100 sm:px-4 sm:text-sm"
+    >
+      عرض الكل ←
+    </button>
   </div>
 
   {donationsLoading && (
-    <p className="py-8 text-center text-sm text-slate-500">
+    <p className="py-8 text-center text-sm text-rose-800">
       جارٍ تحميل التبرعات...
     </p>
   )}
 
   {!donationsLoading && donations.length === 0 && (
-    <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-10 text-center">
+    <div className="rounded-2xl border border-dashed border-rose-200 bg-white/80 py-10 text-center">
       <Heart size={35} className="mx-auto text-rose-300" />
       <p className="mt-3 font-bold text-slate-700">
         لا توجد أغراض متاحة للتبرع حالياً
@@ -1650,90 +2148,15 @@ onClick={() => {
     </div>
   )}
 
-  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-    {donations.slice(0, 8).map((ad) => (
-      <article
-        key={ad.id}
-        onClick={() => navigate(`/ad/${ad.id}`)}
-        className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-100 bg-white transition hover:-translate-y-1 hover:shadow-lg"
-      >
-        <div className="relative h-52 overflow-hidden bg-slate-100">
-          {ad.images.length > 0 ? (
-            <img
-              src={ad.images[0]}
-              alt={ad.title}
-              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center text-rose-300">
-              <Heart size={45} />
-            </div>
-          )}
-
-          <span className="absolute right-3 top-3 rounded-lg bg-rose-500 px-3 py-1.5 text-xs font-bold text-white">
-            للتبرع مجاناً
-          </span>
-        </div>
-
-        <div className="p-4">
-          <h3 className="line-clamp-2 min-h-12 font-bold leading-6 text-slate-800">
-            {ad.title}
-          </h3>
-
-          <p className="mt-3 text-lg font-black text-emerald-700">
-            مجاناً ❤️
-          </p>
-
-          <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-400">
-            <span className="flex items-center gap-1">
-              <MapPin size={14} />
-              {ad.city_name}
-            </span>
-            <span>
-              {new Date(ad.created_at).toLocaleDateString("ar-SY")}
-            </span>
-          </div>
-        </div>
-      </article>
-    ))}
-  </div>
-</section>
-
-
-<section className="mt-14" id="ads-section">
-  <div className="mb-6 flex items-center justify-between">
-    <div>
-      <h2 className="text-xl font-black text-slate-900">
-        أحدث الإعلانات
-      </h2>
-      <p className="mt-1 text-sm text-slate-500">
-        تصفح أحدث ما أُضيف إلى السوق
-      </p>
-    </div>
-  </div>
-
-  {adsLoading && (
-    <p className="py-8 text-center text-sm text-slate-500">
-      جارٍ تحميل الإعلانات...
-    </p>
-  )}
-
-  {!adsLoading && filteredLatestAds.length === 0 && (
-    <p className="py-10 text-center text-sm text-slate-500">
-      لا توجد إعلانات جديدة حالياً.
-    </p>
-  )}
-
-  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-{filteredLatestAds
-  .slice(0, 8)
-  .map((ad) => (
+  {!donationsLoading && donations.length > 0 && (
+    <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+      {donations.slice(0, 8).map((ad) => (
         <article
           key={ad.id}
           onClick={() => navigate(`/ad/${ad.id}`)}
-          className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-100 bg-white transition hover:-translate-y-1 hover:shadow-lg"
+          className="group w-[270px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-2xl border-2 border-rose-200 bg-white shadow-md shadow-rose-100/50 transition hover:-translate-y-1 hover:shadow-xl sm:w-[300px] lg:w-[310px]"
         >
-          <div className="relative h-52 overflow-hidden bg-slate-100">
+          <div className="relative h-52 overflow-hidden bg-rose-50">
             {ad.images.length > 0 ? (
               <img
                 src={ad.images[0]}
@@ -1741,26 +2164,14 @@ onClick={() => {
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
               />
             ) : (
-              <div className="flex h-full items-center justify-center text-slate-400">
-                <Car size={45} />
+              <div className="flex h-full w-full items-center justify-center bg-rose-50 text-rose-400">
+                <Heart size={48} />
               </div>
             )}
 
-            <button
-              type="button"
-              aria-label="إضافة للمفضلة"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavorite(ad.id);
-              }}
-              className="absolute left-3 top-3 rounded-full bg-white/90 p-2 text-slate-500 hover:text-red-500"
-            >
-              <Heart
-                size={18}
-                fill={favoriteAdIds.includes(ad.id) ? "currentColor" : "none"}
-                className={favoriteAdIds.includes(ad.id) ? "text-red-500" : ""}
-              />
-            </button>
+            <span className="absolute right-3 top-3 rounded-lg border border-rose-300 bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-800">
+              ❤️ للتبرع مجاناً
+            </span>
           </div>
 
           <div className="p-4">
@@ -1768,22 +2179,14 @@ onClick={() => {
               {ad.title}
             </h3>
 
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="text-xl font-black text-emerald-700">
-                {ad.price?.toLocaleString("en-US") ?? "السعر عند التواصل"}
-              </span>
-              <span className="text-xs font-semibold text-slate-500">
-                {ad.currency === "USD"
-                  ? "دولار"
-                  : ad.currency === "SYP"
-                    ? "ليرة سورية"
-                    : ad.currency}
-              </span>
-            </div>
+            <p className="mt-3 text-xl font-black text-rose-600">
+              مجاناً ❤️
+            </p>
 
-            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-400">
+            <div className="mt-4 flex items-center justify-between border-t border-rose-100 pt-3 text-xs text-slate-400">
               <span className="flex items-center gap-1">
-                <MapPin size={14} /> {ad.city_name}
+                <MapPin size={14} />
+                {ad.city_name}
               </span>
               <span>
                 {new Date(ad.created_at).toLocaleDateString("ar-SY")}
@@ -1792,31 +2195,8 @@ onClick={() => {
           </div>
         </article>
       ))}
-  </div>
-</section>
-
-<section className="mt-8 overflow-hidden rounded-3xl border border-rose-100 bg-gradient-to-l from-rose-50 to-white p-7 md:flex md:items-center md:justify-between md:p-10">
-  <div>
-    <div className="flex items-center gap-2">
-      <Heart className="text-rose-500" size={25} />
-      <h2 className="text-2xl font-black text-slate-900">
-        عندك غرض ما عاد تحتاجه؟
-      </h2>
     </div>
-
-    <p className="mt-3 text-sm leading-7 text-slate-600">
-      بدل ما يضل مركون عندك، تبرع فيه وخلي غيرك يستفيد منه.
-      الخير لما نتشاركه بيكبر.
-    </p>
-  </div>
-
-  <button
-    onClick={() => navigate("/add-ad?type=donation")}
-    className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-6 py-3.5 font-bold text-white transition hover:bg-rose-600 md:mt-0"
-  >
-    <Heart size={19} />
-    تبرع بغرض الآن
-  </button>
+  )}
 </section>
 
         <section className="mt-14 rounded-3xl border border-emerald-100 bg-emerald-50 p-7 md:flex md:items-center md:justify-between md:p-10">
@@ -1835,6 +2215,40 @@ onClick={() => {
   </button>
 )}
         </section>
+
+<section
+  dir="rtl"
+  className="mt-8 overflow-hidden rounded-3xl border border-rose-200 bg-gradient-to-l from-rose-100 via-pink-50 to-white p-7 shadow-sm md:flex md:items-center md:justify-between md:p-10"
+>
+  <div>
+    <div className="mb-3 flex items-center gap-2">
+      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-sm">
+        <Heart size={23} />
+      </span>
+      <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700">
+        الخير بيجمعنا ❤️
+      </span>
+    </div>
+
+    <h2 className="text-2xl font-black text-rose-950">
+      عندك شي حابب تتبرع فيه؟
+    </h2>
+
+    <p className="mt-2 max-w-xl text-sm leading-7 text-rose-800">
+      غرض ما عدت بحاجة إله ممكن يكون سبب فرحة لشخص تاني.
+      شارك أغراضك مجاناً وساهم بنشر الخير ومساعدة غيرك.
+    </p>
+  </div>
+
+  <button
+    onClick={() => navigate("/add-ad?type=donation")}
+    className="mt-6 flex shrink-0 items-center justify-center gap-2 rounded-xl bg-rose-500 px-7 py-4 font-bold text-white shadow-md shadow-rose-200 transition hover:-translate-y-1 hover:bg-rose-600 md:mt-0"
+  >
+    <Heart size={20} />
+    تبرع الآن
+  </button>
+</section>
+
       </main>
 
 <footer className="border-t border-slate-200 bg-white px-5 py-8 text-center">

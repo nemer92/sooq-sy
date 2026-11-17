@@ -113,23 +113,35 @@ setCategories(
     loadData();
   }, [navigate]);
 
-  function handleImages(event: React.ChangeEvent<HTMLInputElement>) {
-    const selectedFiles = Array.from(event.target.files ?? []);
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
-    const validFiles = selectedFiles.filter(
-      (file) => allowedTypes.includes(file.type) && file.size <= 5 * 1024 * 1024
+function handleImages(event: React.ChangeEvent<HTMLInputElement>) {
+  const selectedFiles = Array.from(event.target.files ?? []);
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  const validFiles = selectedFiles.filter(
+    (file) =>
+      allowedTypes.includes(file.type) &&
+      file.size <= 5 * 1024 * 1024
+  );
+
+  const remainingSlots = Math.max(0, 3 - images.length);
+  const filesToAdd = validFiles.slice(0, remainingSlots);
+
+  setImages((current) => [...current, ...filesToAdd].slice(0, 3));
+
+  if (validFiles.length !== selectedFiles.length) {
+    setError(
+      "الصور يجب أن تكون JPG أو PNG أو WEBP، وبحجم لا يتجاوز 5 ميغابايت للصورة."
     );
-
-    if (validFiles.length !== selectedFiles.length) {
-      setError("الصور يجب أن تكون JPG أو PNG أو WEBP، وبحجم لا يتجاوز 5 ميغابايت للصورة.");
-    } else {
-      setError("");
-    }
-
-    setImages((current) => [...current, ...validFiles].slice(0, 10));
-    event.target.value = "";
+  } else if (validFiles.length > remainingSlots) {
+    setError("الحد الأقصى المسموح به هو 3 صور للإعلان الواحد.");
+  } else {
+    setError("");
   }
+
+  event.target.value = "";
+}
+
 
   function removeImage(index: number) {
     setImages((current) => current.filter((_, i) => i !== index));
@@ -181,6 +193,12 @@ if (description.trim().length < 10) {
   setError("وصف الإعلان يجب ألا يقل عن 10 أحرف.");
   return;
 }
+
+if (images.length > 3) {
+  setError("لا يمكن إضافة أكثر من 3 صور للإعلان الواحد.");
+  return;
+}
+
     setSaving(true);
 
     try {
@@ -442,7 +460,12 @@ setSuccess(
           </div>
 
           <div>
-            <label className="mb-3 block text-sm font-bold">صور الإعلان (حتى 10 صور)</label>
+            <label className="mb-3 block text-sm font-bold">
+  صور الإعلان (حتى 3 صور)
+  <span className="mr-2 text-emerald-600">
+    {images.length}/3
+  </span>
+</label>
 
             <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center hover:border-emerald-500">
               <UploadCloud size={32} className="mb-3 text-emerald-600" />

@@ -135,6 +135,12 @@ setImages(imagesWithUrls);
 }, [id, navigate]);
 
 const handleSave = async () => {
+
+  if (images.length + newImages.length > 3) {
+  alert("الحد الأقصى المسموح به هو 3 صور للإعلان.");
+  return;
+}
+
   if (title.trim().length < 5) {
     alert("عنوان الإعلان يجب أن يكون 5 أحرف على الأقل.");
     return;
@@ -262,7 +268,12 @@ return (
       </div>
 
 <div>
-  <label className="block mb-2 font-medium">الصور الحالية</label>
+ <label className="block mb-2 font-medium">
+  صور الإعلان
+  <span className="mr-2 text-emerald-600">
+    {images.length + newImages.length}/3
+  </span>
+</label>
 
   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
 {images.map((image) => (
@@ -328,7 +339,7 @@ return (
   )}
   <div className="mt-4">
   <label className="block mb-2 font-medium">
-    إضافة صور جديدة
+    إضافة صور جديدة (المجموع الأقصى 3 صور)
   </label>
 
   <input
@@ -338,11 +349,19 @@ return (
     onChange={(e) => {
       const files = Array.from(e.target.files || []);
 
-      if (images.length + newImages.length + files.length > 10) {
-        alert("الحد الأقصى هو 10 صور للإعلان.");
-        e.target.value = "";
-        return;
-      }
+const remainingSlots = 3 - images.length - newImages.length;
+
+if (remainingSlots <= 0) {
+  alert("وصلت للحد الأقصى، وهو 3 صور للإعلان.");
+  e.target.value = "";
+  return;
+}
+
+if (files.length > remainingSlots) {
+  alert(`يمكنك إضافة ${remainingSlots} صورة فقط.`);
+  e.target.value = "";
+  return;
+}
 
       const validFiles = files.filter((file) => {
         const validType = [

@@ -373,10 +373,22 @@ if (userError) throw userError;
     <main dir="rtl" className="min-h-screen bg-slate-50">
       <header className="border-b bg-white px-4 py-4">
         <div className="mx-auto flex max-w-6xl items-center gap-3">
-          <Link to="/" className="flex items-center gap-2 font-bold text-emerald-700">
-            <ArrowRight size={20} />
-            العودة للإعلانات
-          </Link>
+<button
+  type="button"
+  onClick={() => {
+    const from = location.state?.from;
+
+    if (typeof from === "string" && from.startsWith("/")) {
+      navigate(from);
+    } else {
+      navigate(-1);
+    }
+  }}
+  className="flex items-center gap-2 font-bold text-emerald-700"
+>
+  <ArrowRight size={20} />
+  العودة للإعلانات
+</button>
           <span className="mr-auto text-xl font-black text-emerald-700">
             Sooq.sy
           </span>

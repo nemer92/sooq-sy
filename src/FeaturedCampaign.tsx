@@ -2,7 +2,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "./lib/supabase";
-import { ArrowRight, MapPin } from "lucide-react";
+import {
+  ArrowRight,
+  MapPin,
+  Crown,
+  BellRing,
+  CalendarDays,
+  Eye,
+  Megaphone,
+  CheckCircle2,
+} from "lucide-react";
 
 type Ad = {
   id: string;
@@ -44,53 +53,52 @@ export default function FeaturedCampaign() {
   const [phone, setPhone] = useState("");
   const [qrUrl, setQrUrl] = useState("");
   const [exchangeRate, setExchangeRate] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [requestId, setRequestId] = useState("");
+
   async function submitCampaignRequest() {
-  if (!ad) return;
+    if (!ad) return;
 
-  if (
-    selectedCount < 1 ||
-    (selectedCount > 10 && selectedCount !== 14)
-  ) {
-    alert("اختر من محافظة واحدة إلى 10 محافظات، أو جميع المحافظات الـ14.");
-    return;
+    if (
+      selectedCount < 1 ||
+      (selectedCount > 10 && selectedCount !== 14)
+    ) {
+      alert("اختر من محافظة واحدة إلى 10 محافظات، أو جميع المحافظات الـ14.");
+      return;
+    }
+
+    if (!qrUrl) {
+      alert("رمز الدفع غير متوفر حالياً. يرجى التواصل مع الإدارة.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const { data, error } = await supabase.rpc(
+        "create_featured_campaign_request",
+        {
+          p_ad_id: ad.id,
+          p_governorate_ids: selectedGovernorates,
+        }
+      );
+
+      if (error) throw error;
+
+      setRequestId(data || "");
+      alert("تم إنشاء طلب الحملة بنجاح. يرجى انتظار مراجعة الإدارة.");
+    } catch (err) {
+      console.error("خطأ إنشاء طلب الحملة:", err);
+
+      alert(
+        err instanceof Error
+          ? err.message
+          : "تعذر إنشاء طلب الحملة. حاول مرة أخرى."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
-
-  if (!qrUrl) {
-    alert("رمز الدفع غير متوفر حالياً. يرجى التواصل مع الإدارة.");
-    return;
-  }
-
-  setSubmitting(true);
-
-  try {
-    const { data, error } = await supabase.rpc(
-      "create_featured_campaign_request",
-      {
-        p_ad_id: ad.id,
-        p_governorate_ids: selectedGovernorates,
-      }
-    );
-
-    if (error) throw error;
-
-    setRequestId(data || "");
-    alert("تم إنشاء طلب الحملة بنجاح. يرجى انتظار مراجعة الإدارة.");
-
-  } catch (err) {
-    console.error("خطأ إنشاء طلب الحملة:", err);
-
-    alert(
-      err instanceof Error
-        ? err.message
-        : "تعذر إنشاء طلب الحملة. حاول مرة أخرى."
-    );
-  } finally {
-    setSubmitting(false);
-  }
-}
-const [submitting, setSubmitting] = useState(false);
-const [requestId, setRequestId] = useState("");
-
 
   useEffect(() => {
     async function loadCampaignData() {
@@ -183,21 +191,21 @@ const [requestId, setRequestId] = useState("");
     loadCampaignData();
   }, [adId, navigate]);
 
-function toggleGovernorate(id: number) {
-  setSelectedGovernorates((previous) => {
-    if (previous.includes(id)) {
-      return previous.filter((item) => item !== id);
-    }
+  function toggleGovernorate(id: number) {
+    setSelectedGovernorates((previous) => {
+      if (previous.includes(id)) {
+        return previous.filter((item) => item !== id);
+      }
 
-    // السماح باختيار 10 محافظات كحد أقصى
-    if (previous.length >= 10) {
-      alert("يمكنك اختيار 10 محافظات كحد أقصى، أو تحديد المحافظات الـ14 جميعها.");
-      return previous;
-    }
+      if (previous.length >= 10) {
+        alert("يمكنك اختيار 10 محافظات كحد أقصى، أو تحديد المحافظات الـ14 جميعها.");
+        return previous;
+      }
 
-    return [...previous, id];
-  });
-}
+      return [...previous, id];
+    });
+  }
+
   const selectedCount = selectedGovernorates.length;
   const amountUsd = campaignPrices[selectedCount] ?? 0;
   const amountSyp = Math.floor(amountUsd * exchangeRate);
@@ -251,19 +259,116 @@ function toggleGovernorate(id: number) {
       </header>
 
       <div className="mx-auto max-w-3xl space-y-5 px-4 py-7">
-        <section className="rounded-2xl border bg-white p-5">
-          <h2 className="font-bold text-slate-800">
-            الإعلان المراد تمييزه
-          </h2>
 
-          <p className="mt-3 text-lg font-black text-emerald-700">
-            {ad.title}
-          </p>
+        {/* بطاقة شرح خدمة تمييز الإعلان */}
+        <section className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
+          <div className="bg-gradient-to-l from-amber-500 to-yellow-400 p-5 text-white">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+                <Crown size={28} />
+              </div>
 
-          <p className="mt-2 text-sm text-slate-500">
-            مدة الحملة 10 أيام.
-          </p>
+              <div>
+                <h2 className="text-xl font-black">
+                  خلّي إعلانك مميز!
+                </h2>
+                <p className="mt-1 text-sm text-white/90">
+                  أبرز إعلانك وامنحه فرصة أكبر للوصول إلى المهتمين
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4 p-5">
+            <div className="flex items-center justify-between rounded-xl bg-amber-50 p-3">
+              <div className="flex items-center gap-2 font-bold text-amber-800">
+                <CalendarDays size={20} />
+                مدة التمييز
+              </div>
+
+              <span className="rounded-lg bg-amber-100 px-3 py-1.5 font-black text-amber-800">
+                10 أيام كاملة
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <Crown size={21} />
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-slate-800">
+                    الظهور ضمن الإعلانات المميزة
+                  </h3>
+                  <p className="mt-1 text-sm leading-7 text-slate-600">
+                    ينتقل إعلانك إلى قسم الإعلانات المميزة ليظهر بشكل بارز أمام زوار الموقع.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <BellRing size={21} />
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-slate-800">
+                    إشعار يومي عن إعلانك
+                  </h3>
+                  <p className="mt-1 text-sm leading-7 text-slate-600">
+                    يتم إرسال إشعار يومي داخل التطبيق للتعريف بإعلانك المميز، لمدة 10 أيام متتالية.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <Megaphone size={21} />
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-slate-800">
+                    استهداف المحافظات التي تختارها
+                  </h3>
+                  <p className="mt-1 text-sm leading-7 text-slate-600">
+                    يمكنك تحديد المحافظات التي تريد توجيه حملة التمييز إليها، حسب حاجتك وميزانيتك.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
+                  <Eye size={21} />
+                </div>
+
+                <div>
+                  <h3 className="font-bold text-slate-800">
+                    فرصة أكبر للمشاهدة والتواصل
+                  </h3>
+                  <p className="mt-1 text-sm leading-7 text-slate-600">
+                    يساعد إبراز الإعلان والإشعارات اليومية على لفت انتباه المهتمين وزيادة فرص مشاهدة إعلانك والتواصل معك.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-emerald-600" />
+                <p className="text-sm leading-7 text-emerald-800">
+                  تبدأ الحملة بعد موافقة الإدارة وتأكيد الدفع، وتستمر لمدة 10 أيام.
+                </p>
+              </div>
+            </div>
+
+            <p className="text-center text-xs leading-6 text-slate-400">
+              التمييز يزيد فرص ظهور إعلانك، لكنه لا يضمن إتمام عملية البيع.
+            </p>
+          </div>
         </section>
+
+
 
         <section className="rounded-2xl border bg-white p-5">
           <h2 className="flex items-center gap-2 font-bold text-slate-800">
@@ -276,26 +381,26 @@ function toggleGovernorate(id: number) {
           </p>
 
           <button
-  type="button"
-  onClick={() => {
-    if (selectedGovernorates.length === 14) {
-      setSelectedGovernorates([]);
-    } else {
-      setSelectedGovernorates(governorates.map((item) => item.id));
-    }
-  }}
-  className={`mb-3 w-full rounded-xl border p-3 text-sm font-bold ${
-    selectedGovernorates.length === 14
-      ? "border-emerald-500 bg-emerald-50 text-emerald-800"
-      : "border-slate-200 bg-slate-50 text-slate-700"
-  }`}
->
-  {selectedGovernorates.length === 14
-    ? "إلغاء تحديد جميع المحافظات"
-    : "تحديد جميع المحافظات الـ14 — 15 دولار"}
-</button>
+            type="button"
+            onClick={() => {
+              if (selectedGovernorates.length === 14) {
+                setSelectedGovernorates([]);
+              } else {
+                setSelectedGovernorates(governorates.map((item) => item.id));
+              }
+            }}
+            className={`mb-3 w-full rounded-xl border p-3 text-sm font-bold ${
+              selectedGovernorates.length === 14
+                ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                : "border-slate-200 bg-slate-50 text-slate-700"
+            }`}
+          >
+            {selectedGovernorates.length === 14
+              ? "إلغاء تحديد جميع المحافظات"
+              : "تحديد جميع المحافظات الـ14 — 15 دولار"}
+          </button>
 
-<div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {governorates.map((governorate) => {
               const checked = selectedGovernorates.includes(governorate.id);
 
@@ -389,40 +494,57 @@ function toggleGovernorate(id: number) {
             </p>
           </div>
 
-          <p className="mt-4 text-sm leading-7 text-slate-600">
-            عند تحويل المبلغ، اكتب رقم هاتفك
-            المسجل في Sooq.Sy ضمن ملاحظة الحوالة، ثم اسم الحملة.
-          </p>
+
+
+          <div className="mt-4 rounded-xl border-2 border-red-500 bg-yellow-50 p-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+                <BellRing size={21} />
+              </span>
+              <h3 className="text-base font-black text-red-700">
+                تنبيه مهم جداً عند تحويل مبلغ تمييز الإعلان
+              </h3>
+            </div>
+
+            <p className="mt-3 text-sm font-medium leading-7 text-slate-800">
+              عند إجراء التحويل عبر شام كاش، يجب كتابة رقم الهاتف المسجل في حسابك على Sooq.Sy ضمن خانة الملاحظات أو وصف الحوالة، حتى تتمكن الإدارة من مطابقة الحوالة مع طلب تمييز الإعلان وتأكيد الدفع.
+            </p>
+
+            <p className="mt-3 rounded-lg border border-red-200 bg-red-100 p-3 text-center text-sm font-black text-red-700">
+              لا تنسَ كتابة رقم هاتفك في ملاحظات الحوالة.
+            </p>
+          </div>
+
           {requestId ? (
-  <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
-    <p className="font-bold text-emerald-800">
-      تم إرسال طلب الحملة بنجاح
-    </p>
-    <p className="mt-2 text-sm text-slate-600">
-      رقم الطلب: 
-    </p>
-    <p className="mt-1 break-all text-xs text-slate-500" dir="ltr">
-      {requestId}
-    </p>
-    <p className="mt-3 text-sm text-slate-600">
-      طلبك بانتظار مراجعة الإدارة وتأكيد الدفع.
-    </p>
-  </div>
-) : (
-  <button
-    type="button"
-    onClick={submitCampaignRequest}
-    disabled={
-      submitting ||
-      !amountUsd ||
-      !qrUrl ||
-      selectedCount === 0
-    }
-    className="mt-5 w-full rounded-xl bg-emerald-600 px-5 py-4 font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-  >
-    {submitting ? "جارٍ إرسال الطلب..." : "أكملت التحويل، إرسال طلب الحملة"}
-  </button>
-)}
+            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+              <p className="font-bold text-emerald-800">
+                تم إرسال طلب الحملة بنجاح
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                رقم الطلب:
+              </p>
+              <p className="mt-1 break-all text-xs text-slate-500" dir="ltr">
+                {requestId}
+              </p>
+              <p className="mt-3 text-sm text-slate-600">
+                طلبك بانتظار مراجعة الإدارة وتأكيد الدفع.
+              </p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={submitCampaignRequest}
+              disabled={
+                submitting ||
+                !amountUsd ||
+                !qrUrl ||
+                selectedCount === 0
+              }
+              className="mt-5 w-full rounded-xl bg-emerald-600 px-5 py-4 font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? "جارٍ إرسال الطلب..." : "أكملت التحويل، إرسال طلب الحملة"}
+            </button>
+          )}
         </section>
       </div>
     </main>

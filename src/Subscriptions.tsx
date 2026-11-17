@@ -384,9 +384,29 @@ className={`rounded-2xl border-2 p-4 text-right transition-all ${
           {phone}
         </p>
 
-        <p className="mt-3 text-sm leading-7">
-          حوّل المبلغ الموضح أعلاه، واكتب رقم هاتفك المسجل في Sooq.Sy فقط ضمن ملاحظة الحوالة.
+        <p className="mt-3 text-sm leading-7 text-slate-600">
+          حوّل المبلغ الموضح أعلاه، واكتب رقم هاتفك المسجل في Sooq.Sy ضمن ملاحظة الحوالة.
         </p>
+
+        <div className="mt-4 rounded-xl border-2 border-red-500 bg-yellow-50 p-4 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+              <CheckCircle2 size={21} />
+            </span>
+
+            <h3 className="text-base font-black text-red-700">
+              تنبيه مهم جداً عند تحويل مبلغ الاشتراك
+            </h3>
+          </div>
+
+          <p className="mt-3 text-sm font-medium leading-7 text-slate-800">
+            عند إجراء التحويل عبر شام كاش، يجب كتابة رقم الهاتف المسجل في حسابك على Sooq.Sy ضمن خانة الملاحظات أو وصف الحوالة، حتى تتمكن الإدارة من مطابقة الحوالة مع طلب الاشتراك وتأكيد الدفع.
+          </p>
+
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-100 p-3 text-center text-sm font-black text-red-700">
+            لا تنسَ كتابة رقم هاتفك في ملاحظات الحوالة.
+          </p>
+        </div>
 
         {requestSent ? (
           <p className="mt-4 rounded-xl bg-emerald-50 p-4 text-center text-emerald-700">

@@ -134,45 +134,47 @@ export default function Donations() {
     }
   }
 
-  async function deleteDonation(donation: Donation) {
-    const confirmed = window.confirm(
-      `هل أنت متأكد من حذف التبرع "${donation.title}" نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`
+
+async function deleteDonation(donation: Donation) {
+  const confirmed = await window.sooqConfirm(
+    `هل أنت متأكد من حذف التبرع "${donation.title}" نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`
+  );
+
+  if (!confirmed) return;
+
+  setActionLoading(donation.id);
+  setError("");
+
+  try {
+    const { error } = await supabase
+      .from("ads")
+      .delete()
+      .eq("id", donation.id)
+      .eq("listing_type", "donation")
+      .select("id");
+
+    if (error) throw error;
+
+    setDonations((current) =>
+      current.filter((item) => item.id !== donation.id)
     );
 
-    if (!confirmed) return;
-
-    setActionLoading(donation.id);
-    setError("");
-
-    try {
-      const { error } = await supabase
-        .from("ads")
-        .delete()
-        .eq("id", donation.id)
-        .eq("listing_type", "donation")
-        .select("id");
-
-      if (error) throw error;
-
-      setDonations((current) =>
-        current.filter((item) => item.id !== donation.id)
-      );
-
-      setSelectedDonation((current) =>
-        current?.id === donation.id ? null : current
-      );
-    } catch (err: any) {
-      console.error("Donation delete error:", err);
-      setError(
-        err?.message ||
-        err?.details ||
-        err?.hint ||
-        "تعذر حذف التبرع."
-      );
-    } finally {
-      setActionLoading(null);
-    }
+    setSelectedDonation((current) =>
+      current?.id === donation.id ? null : current
+    );
+  } catch (err: any) {
+    console.error("Donation delete error:", err);
+    setError(
+      err?.message ||
+      err?.details ||
+      err?.hint ||
+      "تعذر حذف التبرع."
+    );
+  } finally {
+    setActionLoading(null);
   }
+}
+
 
   return (
     <div className="donations-section" dir="rtl">

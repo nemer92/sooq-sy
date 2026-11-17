@@ -1,5 +1,11 @@
 
-import { StrictMode, useEffect, useState } from "react";
+import {
+  StrictMode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Capacitor } from "@capacitor/core";
 import { App as CapacitorApp } from "@capacitor/app";
 import { supabase } from "./lib/supabase";
@@ -10,6 +16,7 @@ import {
   Route,
   useLocation,
   useNavigate,
+  useNavigationType,
 } from "react-router-dom";
 
 import Auth from "./Auth.tsx";
@@ -28,8 +35,363 @@ import PushNotificationsSetup from "./PushNotificationsSetup";
 import LiveUpdateReady from "./LiveUpdateReady";
 import FeaturedCampaign from "./FeaturedCampaign.tsx";
 import Subscriptions from "./Subscriptions.tsx";
+import AllAds from "./AllAds.tsx";
 
+// ==========================================
+// أنواع نوافذ Sooq.sy المخصصة
+// ==========================================
+
+declare global {
+  interface Window {
+    sooqConfirm: (message: string) => Promise<boolean>;
+    sooqPrompt: (message: string) => Promise<string | null>;
+  }
+}
+
+type DialogRequest =
+  | {
+      id: number;
+      type: "alert";
+      message: string;
+    }
+  | {
+      id: number;
+      type: "confirm";
+      message: string;
+      resolve: (value: boolean) => void;
+    }
+  | {
+      id: number;
+      type: "prompt";
+      message: string;
+      resolve: (value: string | null) => void;
+    };
+
+let enqueueCustomDialog:
+  | ((dialog: DialogRequest) => void)
+  | null = null;
+
+const pendingDialogs: DialogRequest[] = [];
+let nextDialogId = 0;
+
+function queueCustomDialog(dialog: DialogRequest) {
+  if (enqueueCustomDialog) {
+    enqueueCustomDialog(dialog);
+  } else {
+    pendingDialogs.push(dialog);
+  }
+}
+
+// استبدال alert الافتراضي
+window.alert = (message?: any): void => {
+  queueCustomDialog({
+    id: ++nextDialogId,
+    type: "alert",
+    message: String(message ?? ""),
+  });
+};
+
+// نافذة تأكيد مخصصة
+window.sooqConfirm = (message: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    queueCustomDialog({
+      id: ++nextDialogId,
+      type: "confirm",
+      message: String(message ?? ""),
+      resolve,
+    });
+  });
+};
+
+// نافذة إدخال نص مخصصة
+window.sooqPrompt = (message: string): Promise<string | null> => {
+  return new Promise((resolve) => {
+    queueCustomDialog({
+      id: ++nextDialogId,
+      type: "prompt",
+      message: String(message ?? ""),
+      resolve,
+    });
+  });
+};
+
+// ==========================================
+// عرض نوافذ التنبيه والتأكيد والإدخال
+// ==========================================
+
+function CustomAlertHost() {
+  const [dialogs, setDialogs] = useState<DialogRequest[]>([]);
+  const [promptValue, setPromptValue] = useState("");
+
+  useEffect(() => {
+    enqueueCustomDialog = (dialog: DialogRequest) => {
+      setDialogs((previous) => [...previous, dialog]);
+    };
+
+    if (pendingDialogs.length > 0) {
+      const previousDialogs = pendingDialogs.splice(0);
+
+      setDialogs((previous) => [
+        ...previous,
+        ...previousDialogs,
+      ]);
+    }
+
+    return () => {
+      enqueueCustomDialog = null;
+    };
+  }, []);
+
+  const currentDialog = dialogs[0];
+
+  useEffect(() => {
+    setPromptValue("");
+  }, [currentDialog?.id]);
+
+  const finishDialog = (
+    result: boolean | string | null = null
+  ) => {
+    if (!currentDialog) return;
+
+    if (currentDialog.type === "confirm") {
+      currentDialog.resolve(result === true);
+    }
+
+    if (currentDialog.type === "prompt") {
+      currentDialog.resolve(
+        typeof result === "string" ? result : null
+      );
+    }
+
+    setDialogs((previous) => previous.slice(1));
+  };
+
+  if (!currentDialog) {
+    return null;
+  }
+
+  const isAlert = currentDialog.type === "alert";
+  const isConfirm = currentDialog.type === "confirm";
+  const isPrompt = currentDialog.type === "prompt";
+
+  return (
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/50 px-5 py-6 backdrop-blur-sm"
+      dir="rtl"
+      role="presentation"
+    >
+      <div
+        className="w-full max-w-sm overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-2xl"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="sooq-dialog-title"
+        aria-describedby="sooq-dialog-message"
+      >
+        <div className="flex flex-col items-center px-6 pb-5 pt-7 text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="34"
+              height="34"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-emerald-600"
+              aria-hidden="true"
+            >
+              <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z" />
+              <path d="M12 16v-4" />
+              <path d="M12 8h.01" />
+            </svg>
+          </div>
+
+          <h2
+            id="sooq-dialog-title"
+            className="text-xl font-black text-emerald-700"
+          >
+            Sooq.sy
+          </h2>
+
+          <div className="mt-2 h-1 w-12 rounded-full bg-emerald-500" />
+
+          <p
+            id="sooq-dialog-message"
+            className="mt-5 w-full whitespace-pre-wrap break-words text-[15px] font-medium leading-8 text-slate-700"
+          >
+            {currentDialog.message}
+          </p>
+
+          {isPrompt && (
+            <input
+              key={currentDialog.id}
+              type="text"
+              value={promptValue}
+              onChange={(event) =>
+                setPromptValue(event.target.value)
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  finishDialog(promptValue);
+                }
+              }}
+              autoFocus
+              className="mt-5 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-right text-base text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              placeholder="اكتب هنا..."
+            />
+          )}
+        </div>
+
+        <div className="flex gap-3 px-6 pb-6">
+          {isAlert && (
+            <button
+              type="button"
+              onClick={() => finishDialog()}
+              autoFocus
+              className="w-full rounded-2xl bg-emerald-600 px-5 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
+            >
+              حسناً
+            </button>
+          )}
+
+          {isConfirm && (
+            <>
+              <button
+                type="button"
+                onClick={() => finishDialog(false)}
+                autoFocus
+                className="w-1/2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3.5 text-base font-bold text-slate-700 transition-colors hover:bg-slate-200 active:scale-[0.98]"
+              >
+                إلغاء
+              </button>
+
+              <button
+                type="button"
+                onClick={() => finishDialog(true)}
+                className="w-1/2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
+              >
+                تأكيد
+              </button>
+            </>
+          )}
+
+          {isPrompt && (
+            <>
+              <button
+                type="button"
+                onClick={() => finishDialog(null)}
+                className="w-1/2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3.5 text-base font-bold text-slate-700 transition-colors hover:bg-slate-200 active:scale-[0.98]"
+              >
+                إلغاء
+              </button>
+
+              <button
+                type="button"
+                onClick={() => finishDialog(promptValue)}
+                className="w-1/2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
+              >
+                متابعة
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// حفظ واستعادة موضع التمرير على أندرويد فقط
+// ==========================================
+
+function MobileScrollRestoration() {
+  const location = useLocation();
+  const navigationType = useNavigationType();
+
+  const positionsRef = useRef<Map<string, number>>(new Map());
+  const currentKeyRef = useRef(location.key);
+
+  const isAndroid =
+    Capacitor.isNativePlatform() &&
+    Capacitor.getPlatform() === "android";
+
+  useEffect(() => {
+    if (!isAndroid) return;
+
+    const saveScrollPosition = () => {
+      positionsRef.current.set(
+        currentKeyRef.current,
+        window.scrollY
+      );
+    };
+
+    window.addEventListener("scroll", saveScrollPosition, {
+      passive: true,
+    });
+
+    return () => {
+      window.removeEventListener("scroll", saveScrollPosition);
+    };
+  }, [isAndroid]);
+
+  useLayoutEffect(() => {
+    if (!isAndroid) return;
+
+    currentKeyRef.current = location.key;
+
+    if (navigationType !== "POP") {
+      positionsRef.current.set(location.key, 0);
+      return;
+    }
+
+    const savedPosition = positionsRef.current.get(location.key);
+
+    if (savedPosition === undefined) return;
+
+    let frameId = 0;
+    let attempts = 0;
+    let cancelled = false;
+
+    const restorePosition = () => {
+      if (cancelled) return;
+
+      const maximumScroll =
+        document.documentElement.scrollHeight - window.innerHeight;
+
+      if (
+        maximumScroll >= savedPosition ||
+        attempts >= 120
+      ) {
+        window.scrollTo({
+          top: Math.min(savedPosition, Math.max(0, maximumScroll)),
+          left: 0,
+          behavior: "instant",
+        });
+
+        return;
+      }
+
+      attempts += 1;
+      frameId = requestAnimationFrame(restorePosition);
+    };
+
+    frameId = requestAnimationFrame(restorePosition);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frameId);
+    };
+  }, [location.key, navigationType, isAndroid]);
+
+  return null;
+}
+
+// ==========================================
 // معالجة زر الرجوع في تطبيق أندرويد فقط
+// ==========================================
+
 function MobileBackButtonHandler() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -58,19 +420,16 @@ function MobileBackButtonHandler() {
               ? historyState.idx
               : 0;
 
-          // إذا توجد صفحة سابقة، ارجع إليها
           if (historyIndex > 0) {
             window.history.back();
             return;
           }
 
-          // إذا لا توجد صفحة سابقة، ارجع للرئيسية
           if (location.pathname !== "/") {
             navigate("/", { replace: true });
             return;
           }
 
-          // إذا كان المستخدم في الرئيسية، اخرج من التطبيق
           void CapacitorApp.exitApp();
         }
       );
@@ -97,6 +456,10 @@ function MobileBackButtonHandler() {
 
   return null;
 }
+
+// ==========================================
+// التحقق من وضع الصيانة
+// ==========================================
 
 function MaintenanceGuard({
   children,
@@ -168,11 +531,16 @@ function MaintenanceGuard({
   return <>{children}</>;
 }
 
+// ==========================================
+// تشغيل التطبيق
+// ==========================================
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter
       basename={Capacitor.isNativePlatform() ? "/" : "/sooq-sy"}
     >
+      <MobileScrollRestoration />
       <MobileBackButtonHandler />
 
       <LiveUpdateReady />
@@ -200,13 +568,17 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/subscriptions" element={<Subscriptions />} />
-
+          <Route path="/featured-ads" element={<AllAds />} />
+          <Route path="/regular-ads" element={<AllAds />} />
+          <Route path="/donations" element={<AllAds />} />
           <Route
             path="/featured-campaign/:adId"
             element={<FeaturedCampaign />}
           />
         </Routes>
       </MaintenanceGuard>
+
+      <CustomAlertHost />
     </BrowserRouter>
   </StrictMode>
 );

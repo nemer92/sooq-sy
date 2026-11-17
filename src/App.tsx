@@ -35,7 +35,12 @@ import {
 
 import { supabase } from "./lib/supabase";
 import "./App.css";
-
+declare global {
+  interface Window {
+    sooqConfirm: (message: string) => Promise<boolean>;
+    sooqPrompt: (message: string) => Promise<string | null>;
+  }
+}
 type AdminSession = {
   id: string;
   email?: string;
@@ -1081,9 +1086,9 @@ const loadCampaignRequests = useCallback(async () => {
     setCampaignRequestsLoading(false);
   }
 }, []);
-const approveSubscriptionRequest = async (requestId: string) => {
 
-  const confirmed = window.confirm(
+const approveSubscriptionRequest = async (requestId: string) => {
+  const confirmed = await window.sooqConfirm(
     "هل تأكدت من وصول الحوالة وصحة المبلغ ورقم الهاتف؟ سيتم تفعيل الاشتراك أو جدولته."
   );
 
@@ -1115,7 +1120,7 @@ const approveSubscriptionRequest = async (requestId: string) => {
 };
 
 const approveCampaignRequest = async (requestId: string) => {
-  const confirmed = window.confirm(
+  const confirmed = await window.sooqConfirm(
     "هل تأكدت من وصول الحوالة وصحة المبلغ؟ سيتم تفعيل حملة التمييز لمدة 10 أيام."
   );
 
@@ -1133,6 +1138,7 @@ const approveCampaignRequest = async (requestId: string) => {
     if (error) throw error;
 
     alert("تم اعتماد حملة التمييز وتفعيلها بنجاح.");
+
     await loadCampaignRequests();
 } catch (err: any) {
   console.error("Error approving campaign:", err);
@@ -1156,7 +1162,9 @@ const approveCampaignRequest = async (requestId: string) => {
 };
 
 const rejectCampaignRequest = async (requestId: string) => {
-  const adminNote = window.prompt("اكتب سبب رفض طلب الحملة:");
+  const adminNote = await window.sooqPrompt(
+  "اكتب سبب رفض طلب الاشتراك:"
+);
 
   if (!adminNote || !adminNote.trim()) return;
 
@@ -1188,10 +1196,13 @@ const rejectCampaignRequest = async (requestId: string) => {
   }
 };
 
-const rejectSubscriptionRequest = async (requestId: string) => {
-  const adminNote = window.prompt("اكتب سبب رفض طلب الاشتراك:");
 
-  if (!adminNote || !adminNote.trim()) return;
+const rejectSubscriptionRequest = async (requestId: string) => {
+  const adminNote = await window.sooqPrompt(
+    "اكتب سبب رفض طلب الاشتراك:"
+  );
+
+  if (adminNote === null || !adminNote.trim()) return;
 
   setSubscriptionRequestsLoading(true);
   setSubscriptionRequestsError("");
@@ -1220,6 +1231,7 @@ const rejectSubscriptionRequest = async (requestId: string) => {
     setSubscriptionRequestsLoading(false);
   }
 };
+
 useEffect(() => {
   if (activeMenu === "طلبات الاشتراك") {
     loadSubscriptionRequests();
@@ -1230,23 +1242,22 @@ useEffect(() => {
   loadSubscriptionRequests,
   loadCampaignRequests,
 ]);
+
 const handleAdminBan = async (
   report: Report,
   banType: "temporary" | "permanent"
 ) => {
-  const reason = window.prompt(
-    "اكتب سبب حظر المستخدم:",
-    report.reason
+  const reason = await window.sooqPrompt(
+    "اكتب سبب حظر المستخدم:"
   );
 
-  if (!reason?.trim()) return;
+  if (reason === null || !reason.trim()) return;
 
   let bannedUntil: string | null = null;
 
   if (banType === "temporary") {
-    const daysInput = window.prompt(
-      "مدة الحظر بالأيام:",
-      "7"
+    const daysInput = await window.sooqPrompt(
+      "مدة الحظر بالأيام:"
     );
 
     if (daysInput === null) return;
@@ -1270,6 +1281,7 @@ const handleAdminBan = async (
     } = await supabase.auth.getUser();
 
     if (userError) throw userError;
+
     if (!user) throw new Error("لم يتم العثور على حساب المدير.");
 
     const { data: history, error: historyError } = await supabase
@@ -1323,10 +1335,13 @@ alert("تم حظر المستخدم بنجاح.");
 };
 
 
+
 const handleAdminUnban = async (report: Report) => {
-  if (!window.confirm("هل أنت متأكد من فك الحظر عن هذا المستخدم؟")) {
-    return;
-  }
+  const confirmed = await window.sooqConfirm(
+    "هل أنت متأكد من فك الحظر عن هذا المستخدم؟"
+  );
+
+  if (!confirmed) return;
 
   try {
     const {
@@ -1338,6 +1353,7 @@ const handleAdminUnban = async (report: Report) => {
     if (!user) throw new Error("لم يتم العثور على حساب المدير.");
 
     const { data: history, error: historyError } = await supabase
+
       .from("user_bans")
       .select("id, ban_type, banned_until, lifted_at")
       .eq("user_id", report.reported_user_id);
@@ -2213,8 +2229,9 @@ async function loadNotifications() {
   }
 }
 
+
 async function deleteNotification(id: string) {
-  const confirmed = window.confirm(
+  const confirmed = await window.sooqConfirm(
     "هل أنت متأكد من حذف هذا الإشعار؟"
   );
 
@@ -2237,8 +2254,10 @@ async function deleteNotification(id: string) {
   }
 }
 
+
+
 async function sendNotificationNow(notification: Notification) {
-  const confirmed = window.confirm(
+  const confirmed = await window.sooqConfirm(
     `هل أنت متأكد من إرسال الإشعار "${notification.title}" الآن؟`
   );
 
@@ -2262,6 +2281,7 @@ async function sendNotificationNow(notification: Notification) {
     alert("تعذر إرسال الإشعار. تأكد من حالة الإشعار وصلاحياتك.");
   }
 }
+
 
 function editNotification(notification: Notification) {
   setEditingNotificationId(notification.id);
@@ -2289,162 +2309,158 @@ function editNotification(notification: Notification) {
   });
 }
   // قبول إعلان
-  async function approveAd(adId: string) {
-    if (
-      !window.confirm(
-        "هل أنت متأكد من قبول هذا الإعلان؟"
-      )
-    ) {
-      return;
-    }
 
-    setActionLoading(adId);
-    setDataError("");
+async function approveAd(adId: string) {
+  const confirmed = await window.sooqConfirm(
+    "هل أنت متأكد من قبول هذا الإعلان؟"
+  );
 
-    try {
-      const { error } = await supabase.rpc(
-        "approve_ad",
-        {
-          p_ad_id: adId,
-          p_notes: null,
-        }
-      );
+  if (!confirmed) return;
 
-      if (error) throw error;
+  setActionLoading(adId);
+  setDataError("");
 
-      setSelectedAd(null);
-      await loadDashboard();
-    } catch (err) {
-      setDataError(
-        err instanceof Error
-          ? err.message
-          : "تعذر قبول الإعلان."
-      );
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  // رفض إعلان
-  async function rejectAd(adId: string) {
-    const reason = window.prompt(
-      "اكتب سبب رفض الإعلان:"
+  try {
+    const { error } = await supabase.rpc(
+      "approve_ad",
+      {
+        p_ad_id: adId,
+        p_notes: null,
+      }
     );
 
-    if (!reason || !reason.trim()) {
-      return;
-    }
+    if (error) throw error;
 
-    setActionLoading(adId);
-    setDataError("");
-
-    try {
-      const { error } = await supabase.rpc(
-        "reject_ad",
-        {
-          p_ad_id: adId,
-          p_reason: reason.trim(),
-          p_notes: null,
-        }
-      );
-
-      if (error) throw error;
-
-      setSelectedAd(null);
-      await loadDashboard();
-    } catch (err) {
-      setDataError(
-        err instanceof Error
-          ? err.message
-          : "تعذر رفض الإعلان."
-      );
-    } finally {
-      setActionLoading(null);
-    }
+    setSelectedAd(null);
+    await loadDashboard();
+  } catch (err) {
+    setDataError(
+      err instanceof Error
+        ? err.message
+        : "تعذر قبول الإعلان."
+    );
+  } finally {
+    setActionLoading(null);
   }
+}
+
+
+  // رفض إعلان
+
+async function rejectAd(adId: string) {
+  const reason = await window.sooqPrompt(
+    "اكتب سبب رفض الإعلان:"
+  );
+
+  if (!reason || !reason.trim()) {
+    return;
+  }
+
+  setActionLoading(adId);
+  setDataError("");
+
+  try {
+    const { error } = await supabase.rpc(
+      "reject_ad",
+      {
+        p_ad_id: adId,
+        p_reason: reason.trim(),
+        p_notes: null,
+      }
+    );
+
+    if (error) throw error;
+
+    setSelectedAd(null);
+    await loadDashboard();
+  } catch (err) {
+    setDataError(
+      err instanceof Error
+        ? err.message
+        : "تعذر رفض الإعلان."
+    );
+  } finally {
+    setActionLoading(null);
+  }
+}
+
 
   // أرشفة إعلان منشور
-  async function archiveAd(adId: string) {
-    if (
-      !window.confirm(
-        "هل أنت متأكد من أرشفة هذا الإعلان؟ لن يظهر للمستخدمين بعد الأرشفة."
-      )
-    ) {
-      return;
-    }
 
-    setActionLoading(adId);
-    setDataError("");
-
-    try {
-      const { error } = await supabase.rpc(
-        "archive_ad",
-        {
-          p_ad_id: adId,
-          p_notes: null,
-        }
-      );
-
-      if (error) throw error;
-
-      await loadApprovedAds();
-    } catch (err) {
-  console.error("خطأ أرشفة الإعلان:", err);
-
-  setDataError(
-    err instanceof Error
-      ? err.message
-      : (err as { message?: string })?.message ||
-        JSON.stringify(err)
+async function archiveAd(adId: string) {
+  const confirmed = await window.sooqConfirm(
+    "هل أنت متأكد من أرشفة هذا الإعلان؟ لن يظهر للمستخدمين بعد الأرشفة."
   );
-}
- finally {
-      setActionLoading(null);
-    }
+
+  if (!confirmed) return;
+
+  setActionLoading(adId);
+  setDataError("");
+
+  try {
+    const { error } = await supabase.rpc(
+      "archive_ad",
+      {
+        p_ad_id: adId,
+        p_notes: null,
+      }
+    );
+
+    if (error) throw error;
+
+    await loadApprovedAds();
+  } catch (err) {
+    console.error("خطأ أرشفة الإعلان:", err);
+
+    setDataError(
+      err instanceof Error
+        ? err.message
+        : (err as { message?: string })?.message ||
+          JSON.stringify(err)
+    );
+  } finally {
+    setActionLoading(null);
   }
+}
 
-  // إعادة نشر إعلان مؤرشف
-  async function restoreAd(adId: string) {
-    if (
-      !window.confirm(
-        "هل تريد إعادة نشر هذا الإعلان؟"
-      )
-    ) {
-      return;
-    }
 
-    setActionLoading(adId);
-    setDataError("");
-
-    try {
-      const { error } = await supabase.rpc(
-        "restore_ad",
-        {
-          p_ad_id: adId,
-          p_notes: null,
-        }
-      );
-
-      if (error) throw error;
-
-      await Promise.all([
-  loadApprovedAds(),
-  loadArchivedAds(),
-]);
-    } catch (err) {
-  console.error("خطأ إعادة نشر الإعلان:", err);
-
-  setDataError(
-    err instanceof Error
-      ? err.message
-      : (err as { message?: string })?.message ||
-        JSON.stringify(err)
+// إعادة نشر إعلان مؤرشف
+async function restoreAd(adId: string) {
+  const confirmed = await window.sooqConfirm(
+    "هل تريد إعادة نشر هذا الإعلان؟"
   );
-}
- finally {
-      setActionLoading(null);
-    }
+
+  if (!confirmed) return;
+
+  setActionLoading(adId);
+  setDataError("");
+
+  try {
+const { error } = await supabase.rpc(
+  "restore_ad",
+  {
+    p_ad_id: adId,
+    p_notes: null,
   }
+);
+
+    if (error) throw error;
+
+    await loadApprovedAds();
+  } catch (err) {
+    console.error("خطأ إعادة نشر الإعلان:", err);
+
+    setDataError(
+      err instanceof Error
+        ? err.message
+        : (err as { message?: string })?.message ||
+          JSON.stringify(err)
+    );
+  } finally {
+    setActionLoading(null);
+  }
+}
+
 
   // تنسيق التاريخ
   const formatDate = (date: string) =>
@@ -3018,112 +3034,169 @@ function getSubCategories(categoryId: number) {
       </div>
     )}
 
-    {/* طلبات حملات التمييز المدفوعة */}
-    <div className="mt-10">
-      <div className="section-heading">
-        <div>
-          <h2>طلبات حملات التمييز المدفوعة</h2>
-          <p>مراجعة الحوالات وتفعيل الحملات لمدة 10 أيام</p>
-        </div>
 
-        <button
-          className="refresh-button"
-          onClick={loadCampaignRequests}
-          disabled={campaignRequestsLoading}
-        >
-          <RefreshCw size={17} />
-          تحديث
-        </button>
-      </div>
-
-      {campaignRequestsLoading ? (
-        <p>جارٍ تحميل طلبات الحملات...</p>
-      ) : campaignRequestsError ? (
-        <p className="error-message">{campaignRequestsError}</p>
-      ) : campaignRequests.length === 0 ? (
-        <p>لا توجد طلبات حملات تمييز حالياً.</p>
-      ) : (
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>رقم الطلب</th>
-                <th>المستخدم / الهاتف</th>
-                <th>المبلغ بالدولار</th>
-                <th>المبلغ بالليرة</th>
-                <th>الحالة</th>
-                <th>تاريخ الطلب</th>
-                <th>الإجراءات</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {campaignRequests.map((request) => (
-                <tr key={request.id}>
-                  <td>
-                    <span className="text-xs break-all" dir="ltr">
-                      {request.id}
-                    </span>
-                  </td>
-
-                  <td>
-                    <div className="font-medium">
-                      {request.user_name || "مستخدم غير معروف"}
-                    </div>
-                    <div className="text-xs text-gray-500" dir="ltr">
-                      {request.phone}
-                    </div>
-                  </td>
-
-                  <td>${Number(request.amount_usd).toFixed(2)}</td>
-
-                  <td>
-                    {Number(request.amount_syp).toLocaleString("en-US")} ل.س
-                  </td>
-
-                  <td>
-                    {request.status === "pending"
-                      ? "بانتظار المراجعة"
-                      : request.status === "approved"
-                      ? "مقبول"
-                      : request.status === "rejected"
-                      ? "مرفوض"
-                      : "ملغي"}
-                  </td>
-
-                  <td>{formatDate(request.created_at)}</td>
-
-                  <td>
-                    {request.status === "pending" ? (
-                      <div className="flex gap-2">
-                        <button
-                          className="refresh-button"
-                          disabled={campaignRequestsLoading}
-                          onClick={() => approveCampaignRequest(request.id)}
-                        >
-                          موافقة وتفعيل
-                        </button>
-
-                        <button
-                          className="refresh-button"
-                          disabled={campaignRequestsLoading}
-                          onClick={() => rejectCampaignRequest(request.id)}
-                        >
-                          رفض
-                        </button>
-                      </div>
-                    ) : (
-                      <span>تمت المراجعة</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+{/* طلبات حملات التمييز المدفوعة */}
+<div className="mt-10 space-y-5" dir="rtl">
+  <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+    <div>
+      <h2 className="text-lg font-black text-slate-800">
+        طلبات حملات التمييز المدفوعة
+      </h2>
+      <p className="mt-1 text-sm leading-6 text-slate-500">
+        مراجعة الحوالات وتفعيل الحملات لمدة 10 أيام
+      </p>
     </div>
-  </>
+
+    <button
+      type="button"
+      className="refresh-button inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4"
+      onClick={loadCampaignRequests}
+      disabled={campaignRequestsLoading}
+    >
+      <RefreshCw
+        size={17}
+        className={campaignRequestsLoading ? "animate-spin" : ""}
+      />
+      تحديث الطلبات
+    </button>
+  </div>
+
+  {campaignRequestsLoading ? (
+    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+      جارٍ تحميل طلبات الحملات...
+    </div>
+  ) : campaignRequestsError ? (
+    <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-center text-sm font-medium text-red-700">
+      {campaignRequestsError}
+    </div>
+  ) : campaignRequests.length === 0 ? (
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center">
+      <p className="font-bold text-slate-700">
+        لا توجد طلبات حملات تمييز حالياً
+      </p>
+      <p className="mt-2 text-sm text-slate-500">
+        ستظهر الطلبات الجديدة هنا عند إرسالها.
+      </p>
+    </div>
+  ) : (
+    <div className="grid grid-cols-1 gap-4">
+      {campaignRequests.map((request) => (
+        <div
+          key={request.id}
+          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+        >
+          <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-slate-500">
+                رقم الطلب
+              </p>
+              <p
+                className="mt-1 break-all text-sm font-bold text-slate-700"
+                dir="ltr"
+              >
+                {request.id}
+              </p>
+            </div>
+
+            <div>
+              {request.status === "pending" ? (
+                <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700">
+                  بانتظار المراجعة
+                </span>
+              ) : request.status === "approved" ? (
+                <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                  مقبول
+                </span>
+              ) : request.status === "rejected" ? (
+                <span className="inline-flex rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700">
+                  مرفوض
+                </span>
+              ) : (
+                <span className="inline-flex rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                  ملغي
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4 p-4 sm:p-5">
+            <div>
+              <p className="text-xs font-semibold text-slate-500">
+                بيانات المستخدم
+              </p>
+              <p className="mt-1 font-bold text-slate-800">
+                {request.user_name || "مستخدم غير معروف"}
+              </p>
+              <p
+                className="mt-1 text-sm text-slate-500"
+                dir="ltr"
+              >
+                {request.phone}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
+                <p className="text-xs font-medium text-emerald-700">
+                  المبلغ بالدولار
+                </p>
+                <p className="mt-1 text-xl font-black text-emerald-800">
+                  ${Number(request.amount_usd).toFixed(2)}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-sky-100 bg-sky-50/70 p-3">
+                <p className="text-xs font-medium text-sky-700">
+                  المبلغ بالليرة السورية
+                </p>
+                <p className="mt-1 text-lg font-black text-sky-800">
+                  {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1 border-t border-slate-100 pt-3">
+              <span className="text-xs font-semibold text-slate-500">
+                تاريخ تقديم الطلب
+              </span>
+              <span className="text-sm font-medium text-slate-700">
+                {formatDate(request.created_at)}
+              </span>
+            </div>
+
+            {request.status === "pending" ? (
+              <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={campaignRequestsLoading}
+                  onClick={() => approveCampaignRequest(request.id)}
+                  className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <CheckCircle size={18} className="ml-2" />
+                  موافقة وتفعيل الحملة
+                </button>
+
+                <button
+                  type="button"
+                  disabled={campaignRequestsLoading}
+                  onClick={() => rejectCampaignRequest(request.id)}
+                  className="flex min-h-12 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  رفض الطلب
+                </button>
+              </div>
+            ) : (
+              <div className="border-t border-slate-100 pt-3 text-center text-sm font-medium text-slate-400">
+                تمت مراجعة هذا الطلب
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+</>
 )}
 
 {/* قسم إدارة الإعلانات */}
@@ -4975,14 +5048,18 @@ function UserDetailsModal({
 
   // تنفيذ الحظر
   async function handleBan(type: "temporary" | "permanent") {
-    const reason = window.prompt("اكتب سبب حظر هذا المستخدم:");
+const duration = await window.sooqPrompt(
+  "أدخل مدة الحظر بالساعات:"
+);
 
-    if (!reason?.trim()) return;
+if (duration === null) return;
 
     let duration_hours: number | undefined;
 
     if (type === "temporary") {
-      const duration = window.prompt("أدخل مدة الحظر بالساعات:");
+      const duration = await window.sooqPrompt(
+  "أدخل مدة الحظر بالساعات:"
+);
 
       if (!duration || !/^\d+$/.test(duration)) {
         alert("يرجى إدخال مدة صحيحة بالساعات.");
@@ -4997,54 +5074,64 @@ function UserDetailsModal({
       }
     }
 
-    if (
-      type === "permanent" &&
-      !window.confirm("هل أنت متأكد من حظر هذا المستخدم نهائياً؟")
-    ) {
-      return;
+
+if (type === "permanent") {
+  const confirmed = await window.sooqConfirm(
+    "هل أنت متأكد من حظر هذا المستخدم نهائياً؟"
+  );
+
+  if (!confirmed) return;
+}
+
+const reason = await window.sooqPrompt(
+  "اكتب سبب حظر هذا المستخدم:"
+);
+
+if (reason === null || !reason.trim()) return;
+
+setBanActionLoading(true);
+
+try {
+  const { data, error } = await supabase.functions.invoke(
+    "manage-user-ban",
+    {
+      body: {
+        action: "ban",
+        user_id: user.id,
+        ban_type: type,
+        reason: reason.trim(),
+        duration_hours,
+      },
     }
+  );
 
-    setBanActionLoading(true);
+  if (error) throw error;
 
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        "manage-user-ban",
-        {
-          body: {
-            action: "ban",
-            user_id: user.id,
-            ban_type: type,
-            reason: reason.trim(),
-            duration_hours,
-          },
-        }
-      );
+  if (data?.error) {
+    throw new Error(data.error);
+  }
 
-      if (error) throw error;
+  alert(data?.message || "تم تنفيذ الحظر.");
 
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      alert(data?.message || "تم تنفيذ الحظر.");
-
-      await loadUserBan();
-    } catch (err) {
-      alert(
-        err instanceof Error
-          ? err.message
-          : "فشل تنفيذ الحظر."
-      );
-    } finally {
-      setBanActionLoading(false);
-    }
+  await loadUserBan();
+} catch (err) {
+  alert(
+    err instanceof Error
+      ? err.message
+      : "فشل تنفيذ الحظر."
+  );
+} finally {
+  setBanActionLoading(false);
+}
   }
 
   // فك الحظر
   async function handleUnban() {
-    if (!window.confirm("هل أنت متأكد من فك الحظر عن هذا المستخدم؟")) {
-      return;
-    }
+const confirmed = await window.sooqConfirm(
+  "هل أنت متأكد من فك الحظر عن هذا المستخدم؟"
+);
+
+if (!confirmed) return;
 
     setBanActionLoading(true);
 

@@ -38,10 +38,11 @@ export default function AdDetails() {
         return;
       }
 
-const { data, error } = await supabase
+const adQuery = supabase
   .from("ads")
   .select(`
     id,
+    public_code,
     user_id,
     title,
     description,
@@ -55,9 +56,11 @@ const { data, error } = await supabase
     cities(name_ar),
     ad_images(image_path, sort_order)
   `)
-  .eq("id", id)
-  .eq("status", "approved")
-  .maybeSingle();
+.eq("status", "approved");
+
+const { data, error } = /^\d+$/.test(id)
+  ? await adQuery.eq("public_code", Number(id)).maybeSingle()
+  : await adQuery.eq("id", id).maybeSingle();
 
       if (error) {
         console.error("خطأ تحميل الإعلان:", error);
@@ -225,7 +228,7 @@ async function getShareUrl() {
   if (error) throw error;
   if (!token) throw new Error("تعذر إنشاء رابط المشاركة.");
 
-  return `https://sooq-sy.pages.dev/ad/${ad.id}?share=${token}`;
+  return `https://sooq-sy.pages.dev/ad/${ad.public_code}?share=${token}`;
 }
 
 async function copyAdLink() {

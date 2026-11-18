@@ -39,12 +39,15 @@ android {
             if (releaseKeystorePath) {
                 signingConfig signingConfigs.release
             }
+<<<<<<< HEAD
         }
     }
 
     packaging {
         resources {
             excludes += ['META-INF/versions/9/OSGI-INF/MANIFEST.MF']
+=======
+>>>>>>> 8d79207 (Update Sooq SY app and website icons)
         }
     }
 }

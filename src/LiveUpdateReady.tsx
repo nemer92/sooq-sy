@@ -23,9 +23,13 @@ export default function LiveUpdateReady() {
     updateCheckStarted = true;
 
     const checkForUpdates = async () => {
-      await LiveUpdate.ready();
+const readyResult = await LiveUpdate.ready();
+const currentBundle = await LiveUpdate.getCurrentBundle();
+const nextBundle = await LiveUpdate.getNextBundle();
 
-      const currentBundle = await LiveUpdate.getCurrentBundle();
+console.log("LiveUpdate ready:", readyResult);
+console.log("Current bundle:", currentBundle.bundleId ?? "default");
+console.log("Next bundle:", nextBundle.bundleId ?? "none");
 
       const response = await fetch(UPDATE_MANIFEST_URL, {
         cache: "no-store",

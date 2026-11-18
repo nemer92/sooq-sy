@@ -538,7 +538,7 @@ function MaintenanceGuard({
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter
-      basename={Capacitor.isNativePlatform() ? "/" : "/sooq-sy"}
+      basename="/"
     >
       <MobileScrollRestoration />
       <MobileBackButtonHandler />

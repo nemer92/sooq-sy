@@ -1,0 +1,57 @@
+
+name: Build Sooq SY Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          CAPACITOR_BUILD: "true"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build Release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: sooq-sy-release-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error

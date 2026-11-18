@@ -225,7 +225,7 @@ async function getShareUrl() {
   if (error) throw error;
   if (!token) throw new Error("تعذر إنشاء رابط المشاركة.");
 
-  return `https://nemer92.github.io/sooq-sy/ad/${ad.id}?share=${token}`;
+  return `https://sooq-sy.pages.dev/ad/${ad.id}?share=${token}`;
 }
 
 async function copyAdLink() {

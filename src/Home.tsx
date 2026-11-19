@@ -1602,13 +1602,14 @@ const matchesCondition = selectedConditions.includes(
 )}
 
 
-<section className="mt-5 sm:mt-8">
-  <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:rounded-3xl sm:p-6">
 
-    {/* عنوان القسم */}
-    <div className="mb-3 flex items-center justify-between sm:mb-5">
+<section className="mt-5 sm:mt-8">
+  <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white to-slate-50/70 p-3 shadow-sm sm:rounded-3xl sm:p-6">
+
+    {/* رأس القسم */}
+    <div className="mb-4 flex items-center justify-between sm:mb-6">
       <div>
-        <h2 className="text-base font-black text-slate-900 sm:text-xl">
+        <h2 className="text-base font-black tracking-tight text-slate-900 sm:text-xl">
           تصفح حسب التصنيف
         </h2>
         <p className="mt-1 text-[11px] text-slate-500 sm:text-sm">
@@ -1616,28 +1617,39 @@ const matchesCondition = selectedConditions.includes(
         </p>
       </div>
 
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 sm:h-11 sm:w-11">
-        <Menu size={21} />
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm sm:h-12 sm:w-12 sm:rounded-2xl">
+        <Menu size={22} />
       </span>
     </div>
 
-    {/* نسخة الموبايل */}
+    {/* ألوان التصنيفات */}
+    {/*
+      نسخة الموبايل
+    */}
     <div className="sm:hidden">
-      <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-2.5 overflow-x-auto pb-3 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
         <button
           onClick={() => {
             setSelectedCategory(null);
             setSelectedSubCategory(null);
           }}
-          className={`flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 transition ${
+          className={`flex min-w-[76px] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border px-3 py-3 transition-all duration-200 ${
             selectedCategory === null
-              ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-              : "border-slate-100 bg-slate-50 text-slate-600"
+              ? "border-emerald-500 bg-emerald-600 text-white shadow-md shadow-emerald-200"
+              : "border-slate-200 bg-white text-slate-600 active:bg-emerald-50"
           }`}
         >
-          <Menu size={20} />
-          <span className="whitespace-nowrap text-[11px] font-bold">الكل</span>
+          <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+            selectedCategory === null
+              ? "bg-white/20"
+              : "bg-emerald-50 text-emerald-700"
+          }`}>
+            <Menu size={21} />
+          </span>
+          <span className="whitespace-nowrap text-[11px] font-extrabold">
+            الكل
+          </span>
         </button>
 
         {categories
@@ -1648,6 +1660,26 @@ const matchesCondition = selectedConditions.includes(
                 category.name_ar as keyof typeof categoryIconMap
               ] ?? Menu;
 
+            const isActive = selectedCategory === category.id;
+
+            const colorStyles = [
+              "bg-blue-50 text-blue-600 border-blue-100",
+              "bg-purple-50 text-purple-600 border-purple-100",
+              "bg-rose-50 text-rose-600 border-rose-100",
+              "bg-amber-50 text-amber-600 border-amber-100",
+              "bg-cyan-50 text-cyan-600 border-cyan-100",
+              "bg-emerald-50 text-emerald-600 border-emerald-100",
+              "bg-orange-50 text-orange-600 border-orange-100",
+              "bg-indigo-50 text-indigo-600 border-indigo-100",
+            ];
+
+            const colorIndex =
+              Math.abs(
+                category.name_ar
+                  .split("")
+                  .reduce((sum, char) => sum + char.charCodeAt(0), 0)
+              ) % colorStyles.length;
+
             return (
               <button
                 key={category.id}
@@ -1655,14 +1687,21 @@ const matchesCondition = selectedConditions.includes(
                   setSelectedCategory(category.id);
                   setSelectedSubCategory(null);
                 }}
-                className={`flex shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 transition ${
-                  selectedCategory === category.id
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                    : "border-slate-100 bg-slate-50 text-slate-600"
+                className={`flex min-w-[82px] shrink-0 flex-col items-center justify-center gap-2 rounded-2xl border px-3 py-3 transition-all duration-200 ${
+                  isActive
+                    ? "border-emerald-500 bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                    : "border-slate-200 bg-white text-slate-700 active:bg-slate-50"
                 }`}
               >
-                <Icon size={20} />
-                <span className="max-w-[85px] truncate text-[11px] font-bold">
+                <span className={`flex h-10 w-10 items-center justify-center rounded-xl border ${
+                  isActive
+                    ? "border-white/20 bg-white/20 text-white"
+                    : colorStyles[colorIndex]
+                }`}>
+                  <Icon size={21} />
+                </span>
+
+                <span className="whitespace-nowrap text-[11px] font-extrabold">
                   {category.name_ar}
                 </span>
               </button>
@@ -1670,15 +1709,20 @@ const matchesCondition = selectedConditions.includes(
           })}
       </div>
 
+      {/* التصنيفات الفرعية للموبايل */}
       {selectedCategory && (
-        <div className="mt-2 rounded-xl bg-slate-50 p-2">
-          <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mt-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
+          <p className="mb-2 text-[11px] font-black text-emerald-800">
+            التصنيفات الفرعية
+          </p>
+
+          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               onClick={() => setSelectedSubCategory(null)}
-              className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-bold ${
+              className={`shrink-0 whitespace-nowrap rounded-xl border px-3.5 py-2.5 text-[11px] font-bold transition ${
                 selectedSubCategory === null
-                  ? "border-emerald-500 bg-emerald-600 text-white"
-                  : "border-slate-200 bg-white text-slate-600"
+                  ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                  : "border-white bg-white text-slate-600"
               }`}
             >
               كل التصنيف
@@ -1690,10 +1734,10 @@ const matchesCondition = selectedConditions.includes(
                 <button
                   key={sub.id}
                   onClick={() => setSelectedSubCategory(sub.id)}
-                  className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold ${
+                  className={`shrink-0 whitespace-nowrap rounded-xl border px-3.5 py-2.5 text-[11px] font-bold transition ${
                     selectedSubCategory === sub.id
-                      ? "border-emerald-500 bg-emerald-600 text-white"
-                      : "border-slate-200 bg-white text-slate-600"
+                      ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                      : "border-white bg-white text-slate-600"
                   }`}
                 >
                   {sub.name_ar}
@@ -1704,150 +1748,149 @@ const matchesCondition = selectedConditions.includes(
       )}
     </div>
 
-{/* نسخة الكمبيوتر - سكرول أفقي */}
-<div className="hidden sm:block mt-1">
-  <div className="flex gap-3 overflow-x-auto overflow-y-hidden pb-3 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
-
-    {/* كل الإعلانات */}
-    <button
-      onClick={() => {
-        setSelectedCategory(null);
-        setSelectedSubCategory(null);
-      }}
-      className={`flex min-w-[180px] shrink-0 items-center gap-3 rounded-2xl border p-3 text-right transition-all hover:-translate-y-0.5 hover:shadow-md ${
-        selectedCategory === null
-          ? "border-emerald-400 bg-emerald-50 shadow-sm"
-          : "border-slate-100 bg-white hover:border-emerald-200"
-      }`}
-    >
-      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-        selectedCategory === null
-          ? "bg-emerald-600 text-white"
-          : "bg-slate-100 text-slate-600"
-      }`}>
-        <Menu size={23} />
-      </span>
-      <span className={`whitespace-nowrap text-sm font-black ${
-        selectedCategory === null ? "text-emerald-800" : "text-slate-800"
-      }`}>
-        كل الإعلانات
-      </span>
-    </button>
-
-    {categories
-      .filter((category) => category.parent_id === null)
-      .map((category) => {
-        const Icon =
-          categoryIconMap[
-            category.name_ar as keyof typeof categoryIconMap
-          ] ?? Menu;
-
-        const isActive = selectedCategory === category.id;
-
-        const colorStyles = [
-          "bg-blue-50 text-blue-600",
-          "bg-purple-50 text-purple-600",
-          "bg-rose-50 text-rose-600",
-          "bg-amber-50 text-amber-600",
-          "bg-cyan-50 text-cyan-600",
-          "bg-emerald-50 text-emerald-600",
-          "bg-orange-50 text-orange-600",
-          "bg-indigo-50 text-indigo-600",
-        ];
-
-        const colorIndex =
-          Math.abs(
-            category.name_ar
-              .split("")
-              .reduce((sum, char) => sum + char.charCodeAt(0), 0)
-          ) % colorStyles.length;
-
-        const subCategories = categories.filter(
-          (sub) => sub.parent_id === category.id
-        );
-
-        return (
-          <button
-            key={category.id}
-            onClick={() => {
-              setSelectedCategory(category.id);
-              setSelectedSubCategory(null);
-            }}
-            className={`group flex min-w-[170px] shrink-0 items-center gap-3 rounded-2xl border p-3 text-right transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-              isActive
-                ? "border-emerald-400 bg-emerald-50 shadow-sm"
-                : "border-slate-100 bg-white hover:border-emerald-200"
-            }`}
-          >
-            <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-              isActive
-                ? "bg-emerald-600 text-white"
-                : colorStyles[colorIndex]
-            }`}>
-              <Icon size={23} />
-            </span>
-
-            <span className="min-w-0 flex-1">
-              <span className={`block whitespace-nowrap text-sm font-black ${
-                isActive ? "text-emerald-800" : "text-slate-800"
-              }`}>
-                {category.name_ar}
-              </span>
-
-              <span className="mt-1 block whitespace-nowrap text-[10px] font-medium text-slate-400">
-                {subCategories.length > 0
-                  ? `${subCategories.length} تصنيف فرعي`
-                  : "تصفح الإعلانات"}
-              </span>
-            </span>
-          </button>
-        );
-      })}
-  </div>
-
-  {/* التصنيفات الفرعية */}
-  {selectedCategory && (
-    <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-3">
-      <div className="mb-2 text-xs font-black text-slate-600">
-        التصنيفات الفرعية
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
+    {/* نسخة الكمبيوتر */}
+    <div className="hidden sm:block">
+      <div className="flex gap-3 overflow-x-auto overflow-y-hidden px-1 pb-4 pt-1 [scrollbar-width:thin] [scrollbar-color:#a7f3d0_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-emerald-300">
 
         <button
-          onClick={() => setSelectedSubCategory(null)}
-          className={`shrink-0 whitespace-nowrap rounded-xl border px-4 py-2.5 text-xs font-bold transition ${
-            selectedSubCategory === null
-              ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
-              : "border-white bg-white text-slate-600 hover:border-emerald-300"
+          onClick={() => {
+            setSelectedCategory(null);
+            setSelectedSubCategory(null);
+          }}
+          className={`flex min-w-[175px] shrink-0 items-center gap-3 rounded-2xl border p-3.5 text-right transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${
+            selectedCategory === null
+              ? "border-emerald-400 bg-emerald-50 shadow-sm"
+              : "border-slate-200 bg-white hover:border-emerald-200"
           }`}
         >
-          كل إعلانات التصنيف
+          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+            selectedCategory === null
+              ? "bg-emerald-600 text-white"
+              : "bg-emerald-50 text-emerald-700"
+          }`}>
+            <Menu size={23} />
+          </span>
+          <span className={`whitespace-nowrap text-sm font-black ${
+            selectedCategory === null ? "text-emerald-800" : "text-slate-800"
+          }`}>
+            كل الإعلانات
+          </span>
         </button>
 
         {categories
-          .filter((sub) => sub.parent_id === selectedCategory)
-          .map((sub) => (
+          .filter((category) => category.parent_id === null)
+          .map((category) => {
+            const Icon =
+              categoryIconMap[
+                category.name_ar as keyof typeof categoryIconMap
+              ] ?? Menu;
+
+            const isActive = selectedCategory === category.id;
+
+            const colorStyles = [
+              "bg-blue-50 text-blue-600 border-blue-100",
+              "bg-purple-50 text-purple-600 border-purple-100",
+              "bg-rose-50 text-rose-600 border-rose-100",
+              "bg-amber-50 text-amber-600 border-amber-100",
+              "bg-cyan-50 text-cyan-600 border-cyan-100",
+              "bg-emerald-50 text-emerald-600 border-emerald-100",
+              "bg-orange-50 text-orange-600 border-orange-100",
+              "bg-indigo-50 text-indigo-600 border-indigo-100",
+            ];
+
+            const colorIndex =
+              Math.abs(
+                category.name_ar
+                  .split("")
+                  .reduce((sum, char) => sum + char.charCodeAt(0), 0)
+              ) % colorStyles.length;
+
+            const subCategories = categories.filter(
+              (sub) => sub.parent_id === category.id
+            );
+
+            return (
+              <button
+                key={category.id}
+                onClick={() => {
+                  setSelectedCategory(category.id);
+                  setSelectedSubCategory(null);
+                }}
+                className={`group flex min-w-[175px] shrink-0 items-center gap-3 rounded-2xl border p-3.5 text-right transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${
+                  isActive
+                    ? "border-emerald-400 bg-emerald-50 shadow-sm"
+                    : "border-slate-200 bg-white hover:border-emerald-200"
+                }`}
+              >
+                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border ${
+                  isActive
+                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    : colorStyles[colorIndex]
+                }`}>
+                  <Icon size={23} />
+                </span>
+
+                <span className="min-w-0 flex-1">
+                  <span className={`block whitespace-nowrap text-sm font-black ${
+                    isActive ? "text-emerald-800" : "text-slate-800"
+                  }`}>
+                    {category.name_ar}
+                  </span>
+
+                  <span className="mt-1.5 block whitespace-nowrap text-[10px] font-medium text-slate-400">
+                    {subCategories.length > 0
+                      ? `${subCategories.length} تصنيف فرعي`
+                      : "تصفح الإعلانات"}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+      </div>
+
+      {/* التصنيفات الفرعية للكمبيوتر */}
+      {selectedCategory && (
+        <div className="mt-2 rounded-2xl border border-emerald-100 bg-gradient-to-l from-emerald-50/80 to-white p-3.5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-black text-emerald-800">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+            التصنيفات الفرعية
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:#a7f3d0_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-emerald-300">
             <button
-              key={sub.id}
-              onClick={() => setSelectedSubCategory(sub.id)}
-              className={`shrink-0 whitespace-nowrap rounded-xl border px-4 py-2.5 text-xs font-bold transition ${
-                selectedSubCategory === sub.id
+              onClick={() => setSelectedSubCategory(null)}
+              className={`shrink-0 whitespace-nowrap rounded-xl border px-4 py-2.5 text-xs font-bold transition-all ${
+                selectedSubCategory === null
                   ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
-                  : "border-white bg-white text-slate-600 hover:border-emerald-300"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700"
               }`}
             >
-              {sub.name_ar}
+              كل إعلانات التصنيف
             </button>
-          ))}
-      </div>
-    </div>
-  )}
-</div>
 
+            {categories
+              .filter((sub) => sub.parent_id === selectedCategory)
+              .map((sub) => (
+                <button
+                  key={sub.id}
+                  onClick={() => setSelectedSubCategory(sub.id)}
+                  className={`shrink-0 whitespace-nowrap rounded-xl border px-4 py-2.5 text-xs font-bold transition-all ${
+                    selectedSubCategory === sub.id
+                      ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700"
+                  }`}
+                >
+                  {sub.name_ar}
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
+    </div>
 
   </div>
 </section>
+
 
 <section
   dir="rtl"

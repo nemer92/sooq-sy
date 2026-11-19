@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useParams, Link, useNavigate } from "react-router-dom";
@@ -14,11 +15,14 @@ import {
   Share2,
   Copy,
   Heart,
+  ShoppingCart,
 } from "lucide-react";
+
 export default function AdDetails() {
   const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
+
   const [ad, setAd] = useState<any>(null);
   const [seller, setSeller] = useState<any>(null);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -30,6 +34,8 @@ export default function AdDetails() {
   const [reportDetails, setReportDetails] = useState("");
   const [reportLoading, setReportLoading] = useState(false);
   const [reportMessage, setReportMessage] = useState("");
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [purchaseMessage, setPurchaseMessage] = useState("");
 
   useEffect(() => {
     async function loadAd() {
@@ -38,29 +44,30 @@ export default function AdDetails() {
         return;
       }
 
-const adQuery = supabase
-  .from("ads")
-  .select(`
-    id,
-    public_code,
-    user_id,
-    title,
-    description,
-    price,
-    currency,
-    condition,
-    created_at,
-    category_id,
-    city_id,
-    categories(name_ar),
-    cities(name_ar),
-    ad_images(image_path, sort_order)
-  `)
-.eq("status", "approved");
+      const adQuery = supabase
+        .from("ads")
+        .select(`
+          id,
+          public_code,
+          user_id,
+          title,
+          description,
+          price,
+          currency,
+          condition,
+          listing_type,
+          created_at,
+          category_id,
+          city_id,
+          categories(name_ar),
+          cities(name_ar),
+          ad_images(image_path, sort_order)
+        `)
+        .eq("status", "approved");
 
-const { data, error } = /^\d+$/.test(id)
-  ? await adQuery.eq("public_code", Number(id)).maybeSingle()
-  : await adQuery.eq("id", id).maybeSingle();
+      const { data, error } = /^\d+$/.test(id)
+        ? await adQuery.eq("public_code", Number(id)).maybeSingle()
+        : await adQuery.eq("id", id).maybeSingle();
 
       if (error) {
         console.error("خطأ تحميل الإعلان:", error);
@@ -69,74 +76,85 @@ const { data, error } = /^\d+$/.test(id)
       if (data) {
         setAd(data);
 
-// تسجيل الزيارة القادمة من رابط مشاركة
-const shareToken = new URLSearchParams(window.location.search).get("share");
+        // تسجيل الزيارة القادمة من رابط مشاركة
+        const shareToken = new URLSearchParams(
+          window.location.search
+        ).get("share");
 
-if (shareToken) {
-  try {
-    let visitorId: string;
+        if (shareToken) {
+          try {
+            let visitorId: string;
 
-if (Capacitor.isNativePlatform()) {
-  const deviceInfo = await Device.getId();
-  visitorId = `android:${deviceInfo.identifier}`;
-} else {
-  visitorId = localStorage.getItem("sooqsy_visitor_id") || "";
+            if (Capacitor.isNativePlatform()) {
+              const deviceInfo = await Device.getId();
+              visitorId = `android:${deviceInfo.identifier}`;
+            } else {
+              visitorId =
+                localStorage.getItem("sooqsy_visitor_id") || "";
 
-  if (!visitorId) {
-    visitorId = crypto.randomUUID();
-    localStorage.setItem("sooqsy_visitor_id", visitorId);
-  }
-}
+              if (!visitorId) {
+                visitorId = crypto.randomUUID();
+                localStorage.setItem("sooqsy_visitor_id", visitorId);
+              }
+            }
 
-    if (!visitorId) {
-      visitorId = crypto.randomUUID();
-      localStorage.setItem("sooqsy_visitor_id", visitorId);
-    }
+            if (!visitorId) {
+              visitorId = crypto.randomUUID();
+              localStorage.setItem("sooqsy_visitor_id", visitorId);
+            }
 
-    const { data: visitRecorded, error: visitError } =
-      await supabase.rpc("record_ad_share_visit", {
-        p_token: shareToken,
-        p_visitor_id: visitorId,
-      });
+            const {
+              data: visitRecorded,
+              error: visitError,
+            } = await supabase.rpc("record_ad_share_visit", {
+              p_token: shareToken,
+              p_visitor_id: visitorId,
+            });
 
-    if (visitError) {
-      console.error("خطأ تسجيل زيارة المشاركة:", visitError);
-    } else if (visitRecorded) {
-      console.log("تم تسجيل زيارة المشاركة ومنح النقطة.");
-    }
-  } catch (error) {
-    console.error("تعذر تسجيل زيارة المشاركة:", error);
-  }
-}
-        const { data: { user } } = await supabase.auth.getUser();
+            if (visitError) {
+              console.error("خطأ تسجيل زيارة المشاركة:", visitError);
+            } else if (visitRecorded) {
+              console.log("تم تسجيل زيارة المشاركة ومنح النقطة.");
+            }
+          } catch (error) {
+            console.error("تعذر تسجيل زيارة المشاركة:", error);
+          }
+        }
 
-if (user) {
-  const { data: favoriteData, error: favoriteError } = await supabase
-    .from("favorites")
-    .select("ad_id")
-    .eq("user_id", user.id)
-    .eq("ad_id", data.id)
-    .maybeSingle();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-  if (favoriteError) {
-    console.error("خطأ التحقق من المفضلة:", favoriteError);
-  } else {
-    setIsFavorite(!!favoriteData);
-  }
-} else {
-  setIsFavorite(false);
-}
-        const { data: sellerData, error: sellerError } = await supabase
-  .from("profiles")
-  .select("display_name, avatar_url, created_at")
-  .eq("id", data.user_id)
-  .maybeSingle();
+        if (user) {
+          const { data: favoriteData, error: favoriteError } =
+            await supabase
+              .from("favorites")
+              .select("ad_id")
+              .eq("user_id", user.id)
+              .eq("ad_id", data.id)
+              .maybeSingle();
 
-if (sellerError) {
-  console.error("خطأ تحميل بيانات البائع:", sellerError);
-} else {
-  setSeller(sellerData);
-}
+          if (favoriteError) {
+            console.error("خطأ التحقق من المفضلة:", favoriteError);
+          } else {
+            setIsFavorite(!!favoriteData);
+          }
+        } else {
+          setIsFavorite(false);
+        }
+
+        const { data: sellerData, error: sellerError } =
+          await supabase
+            .from("profiles")
+            .select("display_name, avatar_url, created_at")
+            .eq("id", data.user_id)
+            .maybeSingle();
+
+        if (sellerError) {
+          console.error("خطأ تحميل بيانات البائع:", sellerError);
+        } else {
+          setSeller(sellerData);
+        }
 
         const sortedImages = [...(data.ad_images ?? [])].sort(
           (a: any, b: any) => a.sort_order - b.sort_order
@@ -168,110 +186,188 @@ if (sellerError) {
   }, [id, location.search]);
 
   async function submitReport() {
-  if (!reportReason) {
-    setReportMessage("يرجى اختيار سبب البلاغ.");
-    return;
-  }
-
-  setReportLoading(true);
-  setReportMessage("");
-
-  try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError) throw userError;
-
-    if (!user) {
-      setReportMessage("يجب تسجيل الدخول أولاً لإرسال بلاغ.");
+    if (!reportReason) {
+      setReportMessage("يرجى اختيار سبب البلاغ.");
       return;
     }
 
-    if (user.id === ad.user_id) {
-      setReportMessage("لا يمكنك الإبلاغ عن إعلانك الشخصي.");
-      return;
-    }
+    setReportLoading(true);
+    setReportMessage("");
 
-    const { error } = await supabase.from("reports").insert({
-      reporter_id: user.id,
-      ad_id: ad.id,
-      reported_user_id: ad.user_id,
-      reason: reportReason,
-      details: reportDetails.trim() || null,
-      status: "pending",
-    });
-
-    if (error) throw error;
-
-    setReportMessage("تم إرسال البلاغ بنجاح، شكراً لمساهمتك.");
-    setReportReason("");
-    setReportDetails("");
-    setShowReportForm(false);
-  } catch (error) {
-    console.error("خطأ إرسال البلاغ:", error);
-    setReportMessage("تعذر إرسال البلاغ، يرجى المحاولة مرة أخرى.");
-  } finally {
-    setReportLoading(false);
-  }
-}
-
-async function getShareUrl() {
-  const { data: token, error } = await supabase.rpc(
-    "get_or_create_ad_share_link",
-    {
-      p_ad_id: ad.id,
-    }
-  );
-
-  if (error) throw error;
-  if (!token) throw new Error("تعذر إنشاء رابط المشاركة.");
-
-  return `https://sooq-sy.pages.dev/ad/${ad.public_code}?share=${token}`;
-}
-
-async function copyAdLink() {
-  try {
-    const link = await getShareUrl();
-    await navigator.clipboard.writeText(link);
-    alert("تم نسخ رابط المشاركة بنجاح.");
-  } catch (error) {
-    console.error("خطأ نسخ رابط المشاركة:", error);
-    alert("تعذر إنشاء أو نسخ رابط المشاركة. تأكد من تسجيل الدخول.");
-  }
-}
-
-async function shareAdOnWhatsApp() {
-  try {
-    const link = await getShareUrl();
-
-    const message = `شاهد هذا الإعلان على Sooq.sy:\n${ad.title}\n${link}`;
-
-    window.open(
-      `https://wa.me/?text=${encodeURIComponent(message)}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
-  } catch (error) {
-    console.error("خطأ مشاركة الإعلان:", error);
-    alert("تعذرت المشاركة. تأكد من تسجيل الدخول.");
-  }
-}
-    async function startConversation() {
     try {
       const {
         data: { user },
         error: userError,
       } = await supabase.auth.getUser();
 
-if (!user) {
-  alert("يرجى تسجيل الدخول أولاً لمراسلة البائع.");
-  navigate("/auth");
-  return;
-}
+      if (userError) throw userError;
 
-if (userError) throw userError;
+      if (!user) {
+        setReportMessage("يجب تسجيل الدخول أولاً لإرسال بلاغ.");
+        return;
+      }
+
+      if (user.id === ad.user_id) {
+        setReportMessage("لا يمكنك الإبلاغ عن إعلانك الشخصي.");
+        return;
+      }
+
+      const { error } = await supabase.from("reports").insert({
+        reporter_id: user.id,
+        ad_id: ad.id,
+        reported_user_id: ad.user_id,
+        reason: reportReason,
+        details: reportDetails.trim() || null,
+        status: "pending",
+      });
+
+      if (error) throw error;
+
+      setReportMessage("تم إرسال البلاغ بنجاح، شكراً لمساهمتك.");
+      setReportReason("");
+      setReportDetails("");
+      setShowReportForm(false);
+    } catch (error) {
+      console.error("خطأ إرسال البلاغ:", error);
+      setReportMessage("تعذر إرسال البلاغ، يرجى المحاولة مرة أخرى.");
+    } finally {
+      setReportLoading(false);
+    }
+  }
+
+  async function getShareUrl() {
+    const { data: token, error } = await supabase.rpc(
+      "get_or_create_ad_share_link",
+      {
+        p_ad_id: ad.id,
+      }
+    );
+
+    if (error) throw error;
+    if (!token) throw new Error("تعذر إنشاء رابط المشاركة.");
+
+    return `https://sooq-sy.pages.dev/ad/${ad.public_code}?share=${token}`;
+  }
+
+  async function copyAdLink() {
+    try {
+      const link = await getShareUrl();
+      await navigator.clipboard.writeText(link);
+      alert("تم نسخ رابط المشاركة بنجاح.");
+    } catch (error) {
+      console.error("خطأ نسخ رابط المشاركة:", error);
+      alert("تعذر إنشاء أو نسخ رابط المشاركة. تأكد من تسجيل الدخول.");
+    }
+  }
+
+  async function shareAdOnWhatsApp() {
+    try {
+      const link = await getShareUrl();
+
+      const message = `شاهد هذا الإعلان على Sooq.sy:\n${ad.title}\n${link}`;
+
+      window.open(
+        `https://wa.me/?text=${encodeURIComponent(message)}`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    } catch (error) {
+      console.error("خطأ مشاركة الإعلان:", error);
+      alert("تعذرت المشاركة. تأكد من تسجيل الدخول.");
+    }
+  }
+
+  async function requestPurchase() {
+    if (purchaseLoading) return;
+
+    setPurchaseLoading(true);
+    setPurchaseMessage("");
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError) throw userError;
+
+      if (!user) {
+        alert("يرجى تسجيل الدخول أولاً لطلب شراء الإعلان.");
+        navigate("/auth");
+        return;
+      }
+
+      if (user.id === ad.user_id) {
+        alert("لا يمكنك طلب شراء إعلانك الشخصي.");
+        return;
+      }
+
+      if (ad.listing_type !== "sale") {
+        alert("طلب الشراء متاح لإعلانات البيع فقط.");
+        return;
+      }
+
+      const { data: requestId, error: requestError } =
+        await supabase.rpc("create_sale_request", {
+          p_ad_id: ad.id,
+          p_buyer_note: null,
+        });
+
+      if (requestError) throw requestError;
+
+      if (!requestId) {
+        throw new Error("لم يتم إنشاء طلب الشراء.");
+      }
+
+      const { data: requestData, error: fetchError } =
+        await supabase
+          .from("sale_requests")
+          .select("conversation_id")
+          .eq("id", requestId)
+          .single();
+
+      if (fetchError) throw fetchError;
+
+      alert(
+        "تم إرسال طلب الشراء بنجاح. يمكنك متابعة الاتفاق مع البائع عبر المحادثة."
+      );
+
+      if (requestData?.conversation_id) {
+        navigate(`/messages/${requestData.conversation_id}`);
+      }
+    } catch (error: any) {
+      console.error("خطأ إنشاء طلب الشراء:", error);
+
+      const message = error?.message || "";
+
+      if (message.includes("sale_requests_one_active_per_ad")) {
+        setPurchaseMessage(
+          "يوجد طلب شراء نشط لهذا الإعلان حالياً."
+        );
+      } else {
+        setPurchaseMessage(
+          message || "تعذر إرسال طلب الشراء. حاول مرة أخرى."
+        );
+      }
+    } finally {
+      setPurchaseLoading(false);
+    }
+  }
+
+  async function startConversation() {
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert("يرجى تسجيل الدخول أولاً لمراسلة البائع.");
+        navigate("/auth");
+        return;
+      }
+
+      if (userError) throw userError;
 
       if (user.id === ad.user_id) {
         alert("لا يمكنك مراسلة نفسك على إعلانك الشخصي.");
@@ -313,49 +409,51 @@ if (userError) throw userError;
       alert("تعذر فتح المحادثة. حاول مرة أخرى.");
     }
   }
+
   async function toggleFavorite() {
     console.log("تم الضغط على زر المفضلة");
-  try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
 
-    if (userError) throw userError;
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
 
-    if (!user) {
-      alert("يرجى تسجيل الدخول لإضافة الإعلان إلى المفضلة.");
-      navigate("/auth");
-      return;
+      if (userError) throw userError;
+
+      if (!user) {
+        alert("يرجى تسجيل الدخول لإضافة الإعلان إلى المفضلة.");
+        navigate("/auth");
+        return;
+      }
+
+      if (isFavorite) {
+        const { error } = await supabase
+          .from("favorites")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("ad_id", ad.id);
+
+        if (error) throw error;
+
+        setIsFavorite(false);
+      } else {
+        const { error } = await supabase
+          .from("favorites")
+          .insert({
+            user_id: user.id,
+            ad_id: ad.id,
+          });
+
+        if (error) throw error;
+
+        setIsFavorite(true);
+      }
+    } catch (error) {
+      console.error("خطأ تحديث المفضلة:", error);
+      alert("تعذر تحديث المفضلة. حاول مرة أخرى.");
     }
-
-    if (isFavorite) {
-      const { error } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("ad_id", ad.id);
-
-      if (error) throw error;
-
-      setIsFavorite(false);
-    } else {
-      const { error } = await supabase
-        .from("favorites")
-        .insert({
-          user_id: user.id,
-          ad_id: ad.id,
-        });
-
-      if (error) throw error;
-
-      setIsFavorite(true);
-    }
-  } catch (error) {
-    console.error("خطأ تحديث المفضلة:", error);
-    alert("تعذر تحديث المفضلة. حاول مرة أخرى.");
   }
-}
 
   if (loading) {
     return <div className="p-10 text-center">جارٍ تحميل الإعلان...</div>;
@@ -364,7 +462,9 @@ if (userError) throw userError;
   if (!ad) {
     return (
       <div dir="rtl" className="min-h-screen bg-slate-50 p-10 text-center">
-        <h2 className="mb-4 text-xl font-bold">الإعلان غير موجود أو غير متاح</h2>
+        <h2 className="mb-4 text-xl font-bold">
+          الإعلان غير موجود أو غير متاح
+        </h2>
         <Link to="/" className="text-emerald-700 font-bold">
           العودة إلى الصفحة الرئيسية
         </Link>
@@ -376,22 +476,23 @@ if (userError) throw userError;
     <main dir="rtl" className="min-h-screen bg-slate-50">
       <header className="border-b bg-white px-4 py-4">
         <div className="mx-auto flex max-w-6xl items-center gap-3">
-<button
-  type="button"
-  onClick={() => {
-    const from = location.state?.from;
+          <button
+            type="button"
+            onClick={() => {
+              const from = location.state?.from;
 
-    if (typeof from === "string" && from.startsWith("/")) {
-      navigate(from);
-    } else {
-      navigate(-1);
-    }
-  }}
-  className="flex items-center gap-2 font-bold text-emerald-700"
->
-  <ArrowRight size={20} />
-  العودة للإعلانات
-</button>
+              if (typeof from === "string" && from.startsWith("/")) {
+                navigate(from);
+              } else {
+                navigate(-1);
+              }
+            }}
+            className="flex items-center gap-2 font-bold text-emerald-700"
+          >
+            <ArrowRight size={20} />
+            العودة للإعلانات
+          </button>
+
           <span className="mr-auto text-xl font-black text-emerald-700">
             Sooq.sy
           </span>
@@ -408,22 +509,29 @@ if (userError) throw userError;
                 className="h-full w-full object-contain"
               />
             ) : (
-              <span className="text-slate-400">لا توجد صور لهذا الإعلان</span>
+              <span className="text-slate-400">
+                لا توجد صور لهذا الإعلان
+              </span>
             )}
 
             {images.length > 1 && (
               <>
                 <button
                   onClick={() =>
-                    setActiveImage((activeImage - 1 + images.length) % images.length)
+                    setActiveImage(
+                      (activeImage - 1 + images.length) % images.length
+                    )
                   }
                   className="absolute right-3 rounded-full bg-white p-2 shadow"
                   aria-label="الصورة السابقة"
                 >
                   <ChevronRight />
                 </button>
+
                 <button
-                  onClick={() => setActiveImage((activeImage + 1) % images.length)}
+                  onClick={() =>
+                    setActiveImage((activeImage + 1) % images.length)
+                  }
                   className="absolute left-3 rounded-full bg-white p-2 shadow"
                   aria-label="الصورة التالية"
                 >
@@ -445,7 +553,11 @@ if (userError) throw userError;
                       : "border-transparent"
                   }`}
                 >
-                  <img src={src} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={src}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
                 </button>
               ))}
             </div>
@@ -483,30 +595,55 @@ if (userError) throw userError;
                   ? "جديد"
                   : ad.condition}
             </span>
+
             <span className="flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-2">
               <MapPin size={16} />
               {ad.cities?.name_ar}
             </span>
           </div>
 
+          {ad.listing_type === "sale" && (
+            <>
+              <button
+                type="button"
+                onClick={requestPurchase}
+                disabled={purchaseLoading}
+                className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3.5 font-bold text-white hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ShoppingCart size={20} />
+                {purchaseLoading
+                  ? "جارٍ إرسال الطلب..."
+                  : "طلب شراء"}
+              </button>
+
+              {purchaseMessage && (
+                <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm font-bold text-red-700">
+                  {purchaseMessage}
+                </p>
+              )}
+            </>
+          )}
+
           <button
-  type="button"
-  onClick={startConversation}
-  className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 font-bold text-white hover:bg-emerald-700"
->
-  راسل البائع
-</button>
-<button
-  type="button"
-onClick={toggleFavorite}
-  className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-3.5 font-bold text-rose-600 hover:bg-rose-50"
->
-  <Heart
-    size={20}
-    fill={isFavorite ? "currentColor" : "none"}
-  />
-  {isFavorite ? "إزالة من المفضلة" : "أضف إلى المفضلة"}
-</button>
+            type="button"
+            onClick={startConversation}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3.5 font-bold text-white hover:bg-emerald-700"
+          >
+            راسل البائع
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleFavorite}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-3.5 font-bold text-rose-600 hover:bg-rose-50"
+          >
+            <Heart
+              size={20}
+              fill={isFavorite ? "currentColor" : "none"}
+            />
+            {isFavorite ? "إزالة من المفضلة" : "أضف إلى المفضلة"}
+          </button>
+
           <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
@@ -526,6 +663,7 @@ onClick={toggleFavorite}
               نسخ رابط الإعلان
             </button>
           </div>
+
           <hr className="my-5 border-slate-100" />
 
           <h2 className="mb-3 text-lg font-bold text-slate-800">
@@ -536,113 +674,125 @@ onClick={toggleFavorite}
             {ad.description || "لا يوجد وصف لهذا الإعلان."}
           </p>
 
-<div className="mt-8 rounded-xl border border-slate-100 bg-slate-50 p-4">
-  <h2 className="mb-4 font-bold text-slate-800">
-    معلومات البائع
-  </h2>
+          <Link
+            to={`/user/${ad.user_id}`}
+            className="mt-5 flex items-center gap-3 rounded-xl transition hover:bg-white"
+          >
+            {seller?.avatar_url ? (
+              <img
+                src={seller.avatar_url}
+                alt="صورة البائع"
+                className="h-12 w-12 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-lg font-bold text-emerald-700">
+                {(seller?.display_name || "م").charAt(0)}
+              </div>
+            )}
 
-  <div className="flex items-center gap-3">
-    {seller?.avatar_url ? (
-      <img
-        src={seller.avatar_url}
-        alt="صورة البائع"
-        className="h-12 w-12 rounded-full object-cover"
-      />
-    ) : (
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-lg font-bold text-emerald-700">
-        {(seller?.display_name || "م").charAt(0)}
-      </div>
-    )}
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-slate-800">
+                {seller?.display_name || "مستخدم Sooq.sy"}
+              </p>
 
-    <div>
-      <p className="font-bold text-slate-800">
-        {seller?.display_name || "مستخدم Sooq.sy"}
-      </p>
+              <p className="mt-1 text-xs text-slate-500">
+                عضو منذ{" "}
+                {seller?.created_at
+                  ? new Date(seller.created_at).toLocaleDateString("ar-SY")
+                  : "غير محدد"}
+              </p>
 
-      <p className="mt-1 text-xs text-slate-500">
-        عضو منذ{" "}
-{seller?.created_at
-  ? new Date(seller.created_at).toLocaleDateString("ar-SY")
-  : "غير محدد"}
-      </p>
-    </div>
-  </div>
-</div>
+              <span className="mt-2 inline-block text-xs font-bold text-emerald-700">
+                عرض الملف الشخصي
+              </span>
+            </div>
+
+            <ArrowRight size={18} className="shrink-0 text-emerald-600" />
+          </Link>
+
           <div className="mt-5">
-  <button
-    onClick={() => {
-      setShowReportForm(!showReportForm);
-      setReportMessage("");
-    }}
-    className="flex items-center gap-2 text-sm font-bold text-red-600 hover:text-red-700"
-  >
-    <Flag size={17} />
-    الإبلاغ عن الإعلان
-  </button>
+            <button
+              onClick={() => {
+                setShowReportForm(!showReportForm);
+                setReportMessage("");
+              }}
+              className="flex items-center gap-2 text-sm font-bold text-red-600 hover:text-red-700"
+            >
+              <Flag size={17} />
+              الإبلاغ عن الإعلان
+            </button>
 
-  {showReportForm && (
-    <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="font-bold text-slate-800">
-          الإبلاغ عن هذا الإعلان
-        </h3>
+            {showReportForm && (
+              <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-4">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-800">
+                    الإبلاغ عن هذا الإعلان
+                  </h3>
 
-        <button
-          onClick={() => setShowReportForm(false)}
-          className="text-slate-500"
-        >
-          <X size={20} />
-        </button>
-      </div>
+                  <button
+                    onClick={() => setShowReportForm(false)}
+                    className="text-slate-500"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
 
-      <label className="mb-2 block text-sm font-bold text-slate-700">
-        سبب البلاغ
-      </label>
+                <label className="mb-2 block text-sm font-bold text-slate-700">
+                  سبب البلاغ
+                </label>
 
-      <select
-        value={reportReason}
-        onChange={(e) => setReportReason(e.target.value)}
-        className="mb-4 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm"
-      >
-        <option value="">اختر سبب البلاغ</option>
-        <option value="إعلان وهمي أو احتيالي">إعلان وهمي أو احتيالي</option>
-        <option value="محتوى غير مناسب">محتوى غير مناسب</option>
-        <option value="معلومات مضللة">معلومات مضللة</option>
-        <option value="منتج ممنوع أو مخالف">منتج ممنوع أو مخالف</option>
-        <option value="تكرار الإعلان">تكرار الإعلان</option>
-        <option value="سبب آخر">سبب آخر</option>
-      </select>
+                <select
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  className="mb-4 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm"
+                >
+                  <option value="">اختر سبب البلاغ</option>
+                  <option value="إعلان وهمي أو احتيالي">
+                    إعلان وهمي أو احتيالي
+                  </option>
+                  <option value="محتوى غير مناسب">محتوى غير مناسب</option>
+                  <option value="معلومات مضللة">معلومات مضللة</option>
+                  <option value="منتج ممنوع أو مخالف">
+                    منتج ممنوع أو مخالف
+                  </option>
+                  <option value="تكرار الإعلان">تكرار الإعلان</option>
+                  <option value="سبب آخر">سبب آخر</option>
+                </select>
 
-      <label className="mb-2 block text-sm font-bold text-slate-700">
-        تفاصيل إضافية (اختياري)
-      </label>
+                <label className="mb-2 block text-sm font-bold text-slate-700">
+                  تفاصيل إضافية (اختياري)
+                </label>
 
-      <textarea
-        value={reportDetails}
-        onChange={(e) => setReportDetails(e.target.value)}
-        placeholder="اشرح لنا سبب البلاغ..."
-        rows={3}
-        className="mb-4 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm"
-      />
+                <textarea
+                  value={reportDetails}
+                  onChange={(e) => setReportDetails(e.target.value)}
+                  placeholder="اشرح لنا سبب البلاغ..."
+                  rows={3}
+                  className="mb-4 w-full rounded-lg border border-slate-200 bg-white p-3 text-sm"
+                />
 
-      <button
-        onClick={submitReport}
-        disabled={reportLoading}
-        className="w-full rounded-lg bg-red-600 px-4 py-3 font-bold text-white disabled:opacity-50"
-      >
-        {reportLoading ? "جارٍ إرسال البلاغ..." : "إرسال البلاغ"}
-      </button>
-    </div>
-  )}
+                <button
+                  onClick={submitReport}
+                  disabled={reportLoading}
+                  className="w-full rounded-lg bg-red-600 px-4 py-3 font-bold text-white disabled:opacity-50"
+                >
+                  {reportLoading
+                    ? "جارٍ إرسال البلاغ..."
+                    : "إرسال البلاغ"}
+                </button>
+              </div>
+            )}
 
-  {reportMessage && (
-    <p className="mt-3 text-sm font-bold text-slate-700">
-      {reportMessage}
-    </p>
-  )}
-</div>
+            {reportMessage && (
+              <p className="mt-3 text-sm font-bold text-slate-700">
+                {reportMessage}
+              </p>
+            )}
+          </div>
+
           <div className="mt-6 border-t border-slate-100 pt-4 text-xs text-slate-400">
-            تاريخ النشر: {new Date(ad.created_at).toLocaleDateString("ar-SY")}
+            تاريخ النشر:{" "}
+            {new Date(ad.created_at).toLocaleDateString("ar-SY")}
           </div>
         </section>
       </div>

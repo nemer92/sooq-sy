@@ -41,6 +41,8 @@ import StoreDetails from "./StoreDetails";
 import MyStores from "./MyStores";
 import ManageStore from "./ManageStore";
 import StoreSubscription from "./StoreSubscription.tsx";
+import PublicProfile from "./PublicProfile";
+import MySales from "./MySales";
 
 // ==========================================
 // أنواع نوافذ Sooq.sy المخصصة
@@ -580,6 +582,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/store/:id" element={<StoreDetails />} />
           <Route path="/my-stores" element={<MyStores />} />
           <Route path="/manage-store/:id" element={<ManageStore />} />
+          <Route path="/user/:id" element={<PublicProfile />} />
+          <Route path="/my-sales" element={<MySales />} />
           <Route
   path="/store-subscription"
   element={<StoreSubscription />}

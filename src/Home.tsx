@@ -2528,7 +2528,7 @@ const matchesCondition = selectedConditions.includes(
       {/* تحميل التطبيق */}
       <div>
         <h3 className="mb-2 text-sm font-black text-white md:mb-3 md:text-base">
-          حمّل تطبيق سوق سوريا
+          حمّل تطبيق Sooq Sy
         </h3>
 
         <p className="text-xs leading-6 text-slate-400 md:text-sm md:leading-7">

@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import {
@@ -19,6 +19,10 @@ import {
   CalendarDays,
   CheckCircle2,
   ShieldCheck,
+  Camera,
+  BadgeCheck,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function Profile() {
@@ -27,6 +31,8 @@ export default function Profile() {
   const [savingPhone, setSavingPhone] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
+  const [savingProfileDetails, setSavingProfileDetails] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [userId, setUserId] = useState("");
   const [referralCode, setReferralCode] = useState("");
@@ -35,6 +41,10 @@ export default function Profile() {
   const [phone, setPhone] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [bio, setBio] = useState("");
+  const [showPhone, setShowPhone] = useState(false);
 
   const [governorates, setGovernorates] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
@@ -170,7 +180,7 @@ export default function Profile() {
       const { data: profile, error: profileError } =
         await supabase
           .from("profiles")
-          .select("display_name, city_id")
+          .select("display_name, city_id, avatar_url, bio, show_phone")
           .eq("id", id)
           .single();
 
@@ -208,6 +218,9 @@ export default function Profile() {
 
       setName(profile.display_name || "");
       setPhone(privateProfile.phone || "");
+      setAvatarUrl(profile.avatar_url || "");
+      setBio(profile.bio || "");
+      setShowPhone(profile.show_phone ?? false);
 
       await loadLocations(profile.city_id ?? null);
       await loadSubscription(id);
@@ -219,6 +232,114 @@ export default function Profile() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveProfileDetails() {
+    setError("");
+    setMessage("");
+
+    if (bio.length > 300) {
+      setError("النبذة يجب ألا تتجاوز 300 حرف.");
+      return;
+    }
+
+    setSavingProfileDetails(true);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          bio: bio.trim(),
+          show_phone: showPhone,
+        })
+        .eq("id", userId);
+
+      if (error) throw error;
+
+      setMessage("تم حفظ معلومات البروفايل بنجاح.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "تعذر حفظ معلومات البروفايل."
+      );
+    } finally {
+      setSavingProfileDetails(false);
+    }
+  }
+
+  async function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      setError("يرجى اختيار صورة بصيغة JPG أو PNG أو WEBP.");
+      setMessage("");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError("حجم الصورة يجب ألا يتجاوز 5 ميغابايت.");
+      setMessage("");
+      return;
+    }
+
+    setError("");
+    setMessage("");
+    setUploadingAvatar(true);
+
+    try {
+      const extension = file.type === "image/png"
+        ? "png"
+        : file.type === "image/webp"
+          ? "webp"
+          : "jpg";
+
+      const filePath = `${userId}/avatar-${Date.now()}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("profile-images")
+        .upload(filePath, file, {
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from("profile-images")
+        .getPublicUrl(filePath);
+
+      const newAvatarUrl = data.publicUrl;
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: newAvatarUrl })
+        .eq("id", userId);
+
+      if (updateError) {
+        await supabase.storage
+          .from("profile-images")
+          .remove([filePath]);
+
+        throw updateError;
+      }
+
+      setAvatarUrl(newAvatarUrl);
+      setMessage("تم تحديث الصورة الشخصية بنجاح.");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "تعذر رفع الصورة الشخصية."
+      );
+    } finally {
+      setUploadingAvatar(false);
     }
   }
 
@@ -437,28 +558,54 @@ export default function Profile() {
           العودة إلى السوق
         </Link>
 
-        {/* رأس الصفحة */}
-        <div className="mb-5 overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-700 via-emerald-600 to-teal-500 p-5 text-white shadow-lg shadow-emerald-900/10 sm:p-7">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/15 shadow-inner">
-              <UserRound size={34} strokeWidth={1.8} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-emerald-50">
-                أهلاً بك في Sooq.Sy
-              </p>
-              <h1 className="mt-1 truncate text-2xl font-black sm:text-3xl">
-                {name || "الملف الشخصي"}
-              </h1>
-              <p className="mt-1 text-xs text-emerald-50/90">
-                إدارة حسابك ومعلوماتك الشخصية
-              </p>
-            </div>
-          </div>
+        {/* رأس الصفحة والصورة الشخصية */}
+        <div className="mb-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="h-24 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-32" />
 
-          <div className="mt-5 flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs text-white/95">
-            <ShieldCheck size={17} />
-            بيانات حسابك وإعدادات الأمان
+          <div className="px-5 pb-5 sm:px-7">
+            <div className="-mt-12 flex flex-wrap items-end gap-4">
+              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-emerald-50 shadow-md">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt="الصورة الشخصية"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-emerald-700">
+                    <UserRound size={42} />
+                  </div>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1 pb-1">
+                <p className="text-xs font-semibold text-emerald-700">
+                  أهلاً بك في Sooq.Sy
+                </p>
+                <h1 className="mt-1 truncate text-xl font-black text-slate-900 sm:text-2xl">
+                  {name || "الملف الشخصي"}
+                </h1>
+                <p className="mt-1 text-xs text-slate-500">
+                  إدارة معلوماتك الشخصية وإعدادات حسابك
+                </p>
+              </div>
+            </div>
+
+            <label className="mt-4 flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100">
+              <Camera size={18} />
+              {uploadingAvatar ? "جارٍ رفع الصورة..." : "تغيير الصورة الشخصية"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                disabled={uploadingAvatar}
+                onChange={uploadAvatar}
+              />
+            </label>
+
+            <p className="mt-2 text-[11px] text-slate-400">
+              الصورة اختيارية، ويمكنك استخدام الحساب دون صورة شخصية.
+            </p>
           </div>
         </div>
 
@@ -493,6 +640,25 @@ export default function Profile() {
             </span>
           </div>
           <ArrowRight className="shrink-0 text-emerald-600" size={21} />
+        </Link>
+
+                {/* المبيعات وطلبات الشراء */}
+        <Link
+          to="/my-sales"
+          className="mb-5 flex items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md active:scale-[0.99]"
+        >
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+            <Gift size={25} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <strong className="block text-base font-black text-slate-800">
+              مبيعاتي وطلبات الشراء
+            </strong>
+            <span className="mt-1 block text-xs text-slate-500">
+              متابعة طلبات الشراء والمبيعات وتأكيد إتمام الصفقات والتقييمات
+            </span>
+          </div>
+          <ArrowRight className="shrink-0 text-blue-600" size={21} />
         </Link>
 
         {/* الاشتراك الإعلاني */}
@@ -650,6 +816,115 @@ export default function Profile() {
             <Save size={18} />
             {savingName ? "جارٍ الحفظ..." : "حفظ الاسم"}
           </button>
+        </section>
+
+        {/* النبذة والخصوصية والتوثيق */}
+        <section className={`${sectionClass} mb-4`}>
+          <div className="mb-5 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
+              <UserRound size={21} />
+            </div>
+            <div>
+              <h2 className="font-black text-slate-800">
+                معلومات البروفايل
+              </h2>
+              <p className="mt-1 text-xs text-slate-400">
+                المعلومات التي يمكن أن تظهر للزوار
+              </p>
+            </div>
+          </div>
+
+          <label className="mb-2 block text-sm font-bold text-slate-600">
+            نبذة عنك
+          </label>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            maxLength={300}
+            rows={4}
+            className={`${inputClass} resize-y`}
+            placeholder="اكتب نبذة مختصرة عنك..."
+          />
+
+          <p className="mt-1 text-left text-xs text-slate-400">
+            {bio.length}/300
+          </p>
+
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3">
+            <div className="flex items-center gap-2">
+              {showPhone ? (
+                <Eye size={19} className="text-emerald-600" />
+              ) : (
+                <EyeOff size={19} className="text-slate-500" />
+              )}
+              <div>
+                <p className="text-sm font-bold text-slate-800">
+                  إظهار رقم الهاتف في البروفايل
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  يمكنك تغيير هذا الخيار في أي وقت
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowPhone(!showPhone)}
+              role="switch"
+              aria-checked={showPhone}
+              className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                showPhone ? "bg-emerald-600" : "bg-slate-300"
+              }`}
+            >
+              <span
+                className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                  showPhone ? "right-1" : "right-6"
+                }`}
+              />
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={saveProfileDetails}
+            disabled={savingProfileDetails}
+            className={`${buttonClass} mt-4`}
+          >
+            <Save size={18} />
+            {savingProfileDetails
+              ? "جارٍ الحفظ..."
+              : "حفظ معلومات البروفايل"}
+          </button>
+
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <BadgeCheck size={24} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-black text-slate-800">
+                  توثيق الحساب
+                </h3>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  وثّق حسابك لتحصل على شارة التوثيق بعد مراجعة الإدارة.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMessage(
+                  "خدمة توثيق الحساب قيد التجهيز، وستتوفر قريباً."
+                );
+                setError("");
+              }}
+              className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 transition hover:bg-amber-100"
+            >
+              <ShieldCheck size={19} />
+              توثيق الحساب
+            </button>
+          </div>
         </section>
 
         {/* النقاط ودعوة الأصدقاء */}
@@ -878,7 +1153,7 @@ export default function Profile() {
         </section>
 
         <p className="mt-6 text-center text-xs text-slate-400">
-          سوق سوريا · حسابك بأمان
+          Sooq Sy · حسابك بأمان
         </p>
       </div>
     </main>

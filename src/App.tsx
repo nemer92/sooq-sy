@@ -157,6 +157,12 @@ type StoreSubscriptionRequest = {
   store_phone?: string;
   whatsapp?: string;
   owner_name?: string;
+  ordinary_used: number;
+  featured_used: number;
+
+  ordinary_remaining: number;
+
+  featured_remaining: number;
 };
 type NamedItem = {
   name_ar: string;
@@ -1115,6 +1121,8 @@ const loadCampaignRequests = useCallback(async () => {
   }
 }, []);
 
+
+
 const loadStoreRequests = useCallback(async () => {
   setStoreRequestsLoading(true);
   setStoreRequestsError("");
@@ -1128,30 +1136,53 @@ const loadStoreRequests = useCallback(async () => {
     if (error) throw error;
 
     const requests = data ?? [];
-    const storeIds = [...new Set(requests.map((r) => r.store_id))];
-    const userIds = [...new Set(requests.map((r) => r.user_id))];
 
-    const [storesResult, profilesResult] = await Promise.all([
-      storeIds.length
-        ? supabase
-            .from("stores")
-            .select("id,name,business_type,governorate,city,phone,whatsapp")
-            .in("id", storeIds)
-        : Promise.resolve({ data: [], error: null }),
+    const storeIds = [
+      ...new Set(requests.map((r) => r.store_id)),
+    ];
 
-      userIds.length
-        ? supabase
-            .from("profiles")
-            .select("id,display_name")
-            .in("id", userIds)
-        : Promise.resolve({ data: [], error: null }),
-    ]);
+    const userIds = [
+      ...new Set(requests.map((r) => r.user_id)),
+    ];
+
+    const [storesResult, profilesResult, subscriptionsResult] =
+      await Promise.all([
+        storeIds.length
+          ? supabase
+              .from("stores")
+              .select(
+                "id,name,business_type,governorate,city,phone,whatsapp"
+              )
+              .in("id", storeIds)
+          : Promise.resolve({ data: [], error: null }),
+
+        userIds.length
+          ? supabase
+              .from("profiles")
+              .select("id,display_name")
+              .in("id", userIds)
+          : Promise.resolve({ data: [], error: null }),
+
+        storeIds.length
+          ? supabase
+              .from("store_subscriptions")
+              .select(
+                "id,store_id,status,start_at,end_at,created_at,ordinary_ads_limit,featured_ads_limit"
+              )
+              .in("store_id", storeIds)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
     if (storesResult.error) throw storesResult.error;
     if (profilesResult.error) throw profilesResult.error;
+    if (subscriptionsResult.error) throw subscriptionsResult.error;
 
     const storesMap = new Map(
-      (storesResult.data ?? []).map((store) => [store.id, store])
+      (storesResult.data ?? []).map((store) => [
+        store.id,
+        store,
+      ])
     );
 
     const profilesMap = new Map(
@@ -1161,9 +1192,88 @@ const loadStoreRequests = useCallback(async () => {
       ])
     );
 
+    // آخر اشتراك لكل متجر
+    const subscriptionsMap = new Map<
+      string,
+      {
+        id: string;
+        ordinary_ads_limit: number;
+        featured_ads_limit: number;
+      }
+    >();
+
+    (subscriptionsResult.data ?? []).forEach((subscription) => {
+      if (!subscriptionsMap.has(subscription.store_id)) {
+        subscriptionsMap.set(subscription.store_id, {
+          id: subscription.id,
+          ordinary_ads_limit: subscription.ordinary_ads_limit,
+          featured_ads_limit: subscription.featured_ads_limit,
+        });
+      }
+    });
+
+    // جلب استخدام الإعلانات للاشتراكات الحالية
+    const subscriptionIds = [
+      ...subscriptionsMap.values(),
+    ].map((subscription) => subscription.id);
+
+    const usageResult = subscriptionIds.length
+      ? await supabase
+          .from("store_ad_usage")
+          .select("store_id,subscription_id,ad_type")
+          .in("subscription_id", subscriptionIds)
+      : { data: [], error: null };
+
+    if (usageResult.error) throw usageResult.error;
+
+    const usageMap = new Map<
+      string,
+      { ordinary: number; featured: number }
+    >();
+
+    (usageResult.data ?? []).forEach((usage) => {
+      const key = usage.subscription_id;
+
+      const current = usageMap.get(key) ?? {
+        ordinary: 0,
+        featured: 0,
+      };
+
+      const type = (usage.ad_type ?? "").toLowerCase();
+
+      if (["ordinary", "regular", "normal"].includes(type)) {
+        current.ordinary += 1;
+      } else if (["featured", "premium"].includes(type)) {
+        current.featured += 1;
+      }
+
+      usageMap.set(key, current);
+    });
+
     setStoreRequests(
       requests.map((request) => {
         const store = storesMap.get(request.store_id);
+        const subscription = subscriptionsMap.get(request.store_id);
+
+        const usage = subscription
+          ? usageMap.get(subscription.id) ?? {
+              ordinary: 0,
+              featured: 0,
+            }
+          : {
+              ordinary: 0,
+              featured: 0,
+            };
+
+        const ordinaryLimit =
+          subscription?.ordinary_ads_limit ??
+          request.ordinary_ads_limit ??
+          100;
+
+        const featuredLimit =
+          subscription?.featured_ads_limit ??
+          request.featured_ads_limit ??
+          20;
 
         return {
           ...request,
@@ -1173,17 +1283,33 @@ const loadStoreRequests = useCallback(async () => {
           city: store?.city ?? "",
           store_phone: store?.phone ?? "",
           whatsapp: store?.whatsapp ?? "",
-          owner_name: profilesMap.get(request.user_id) ?? "غير معروف",
+          owner_name:
+            profilesMap.get(request.user_id) ?? "غير معروف",
+
+          ordinary_used: usage.ordinary,
+          ordinary_remaining: Math.max(
+            0,
+            ordinaryLimit - usage.ordinary
+          ),
+
+          featured_used: usage.featured,
+          featured_remaining: Math.max(
+            0,
+            featuredLimit - usage.featured
+          ),
         };
       })
     );
   } catch (error) {
     console.error("Error loading store requests:", error);
-    setStoreRequestsError("تعذر تحميل طلبات المتاجر. حاول تحديث الصفحة.");
+    setStoreRequestsError(
+      "تعذر تحميل طلبات المتاجر. حاول تحديث الصفحة."
+    );
   } finally {
     setStoreRequestsLoading(false);
   }
 }, []);
+
 
 const approveSubscriptionRequest = async (requestId: string) => {
   const confirmed = await window.sooqConfirm(
@@ -3400,167 +3526,262 @@ function getSubCategories(categoryId: number) {
         </p>
       </div>
     ) : (
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        {storeRequests.map((request) => (
-          <div
-            key={request.id}
-            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+
+<div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+  {storeRequests.map((request) => {
+    const ordinaryLimit = Number(request.ordinary_ads_limit) || 100;
+    const featuredLimit = Number(request.featured_ads_limit) || 20;
+
+    const ordinaryUsed = Number(request.ordinary_used) || 0;
+    const featuredUsed = Number(request.featured_used) || 0;
+
+    const ordinaryRemaining = Math.max(0, ordinaryLimit - ordinaryUsed);
+    const featuredRemaining = Math.max(0, featuredLimit - featuredUsed);
+
+    const ordinaryPercent = ordinaryLimit
+      ? Math.min(100, (ordinaryUsed / ordinaryLimit) * 100)
+      : 0;
+
+    const featuredPercent = featuredLimit
+      ? Math.min(100, (featuredUsed / featuredLimit) * 100)
+      : 0;
+
+    return (
+      <div
+        key={request.id}
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50 p-4">
+          <div>
+            <h3 className="text-lg font-black text-slate-800">
+              {request.store_name}
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {request.business_type || "نوع النشاط غير محدد"}
+            </p>
+          </div>
+
+          <span
+            className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
+              request.status === "pending"
+                ? "bg-amber-100 text-amber-700"
+                : request.status === "approved"
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-red-100 text-red-700"
+            }`}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50 p-4">
+            {request.status === "pending"
+              ? "قيد المراجعة"
+              : request.status === "approved"
+                ? "تمت الموافقة"
+                : "مرفوض"}
+          </span>
+        </div>
+
+        <div className="space-y-4 p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-slate-500">صاحب المتجر</p>
+              <p className="mt-1 font-bold text-slate-800">
+                {request.owner_name}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500">هاتف مقدم الطلب</p>
+              <p className="mt-1 font-bold text-slate-800" dir="ltr">
+                {request.phone}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500">المحافظة والمدينة</p>
+              <p className="mt-1 font-bold text-slate-800">
+                {[request.governorate, request.city]
+                  .filter(Boolean)
+                  .join(" - ") || "غير محدد"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500">هاتف المتجر</p>
+              <p className="mt-1 font-bold text-slate-800" dir="ltr">
+                {request.store_phone || "غير محدد"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500">واتساب المتجر</p>
+              <p className="mt-1 font-bold text-slate-800" dir="ltr">
+                {request.whatsapp || "غير محدد"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500">مدة الاشتراك</p>
+              <p className="mt-1 font-bold text-slate-800">
+                {request.duration_months} شهر
+              </p>
+            </div>
+          </div>
+
+          {/* حصص الاشتراك */}
+          <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
+            <p className="mb-3 text-sm font-bold text-sky-800">
+              حصص الإعلانات المضمنة
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <h3 className="text-lg font-black text-slate-800">
-                  {request.store_name}
-                </h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  {request.business_type || "نوع النشاط غير محدد"}
+                <p className="text-xs text-sky-700">إعلانات عادية</p>
+                <p className="text-xl font-black text-sky-900">
+                  {ordinaryLimit}
                 </p>
               </div>
 
-              <span
-                className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
-                  request.status === "pending"
-                    ? "bg-amber-100 text-amber-700"
-                    : request.status === "approved"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-red-100 text-red-700"
-                }`}
-              >
-                {request.status === "pending"
-                  ? "قيد المراجعة"
-                  : request.status === "approved"
-                    ? "تمت الموافقة"
-                    : "مرفوض"}
+              <div>
+                <p className="text-xs text-sky-700">إعلانات مميزة</p>
+                <p className="text-xl font-black text-sky-900">
+                  {featuredLimit}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* استهلاك الإعلانات */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h4 className="font-black text-slate-800">
+                استهلاك إعلانات المتجر
+              </h4>
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">
+                إحصائيات الاستخدام
               </span>
             </div>
 
-            <div className="space-y-4 p-4">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs text-slate-500">صاحب المتجر</p>
-                  <p className="mt-1 font-bold text-slate-800">
-                    {request.owner_name}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">هاتف مقدم الطلب</p>
-                  <p className="mt-1 font-bold text-slate-800" dir="ltr">
-                    {request.phone}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">المحافظة والمدينة</p>
-                  <p className="mt-1 font-bold text-slate-800">
-                    {[request.governorate, request.city]
-                      .filter(Boolean)
-                      .join(" - ") || "غير محدد"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">هاتف المتجر</p>
-                  <p className="mt-1 font-bold text-slate-800" dir="ltr">
-                    {request.store_phone || "غير محدد"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">واتساب المتجر</p>
-                  <p className="mt-1 font-bold text-slate-800" dir="ltr">
-                    {request.whatsapp || "غير محدد"}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">مدة الاشتراك</p>
-                  <p className="mt-1 font-bold text-slate-800">
-                    {request.duration_months} شهر
-                  </p>
-                </div>
+            {/* الإعلانات العادية */}
+            <div className="mb-5">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-slate-700">
+                  الإعلانات العادية المنشورة
+                </span>
+                <span className="text-xs font-black text-emerald-700">
+                  {ordinaryUsed} / {ordinaryLimit}
+                </span>
               </div>
 
-              <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
-                <p className="mb-2 text-sm font-bold text-sky-800">
-                  حصص الإعلانات المضمنة
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-sky-700">إعلانات عادية</p>
-                    <p className="text-xl font-black text-sky-900">
-                      {request.ordinary_ads_limit}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-sky-700">إعلانات مميزة</p>
-                    <p className="text-xl font-black text-sky-900">
-                      {request.featured_ads_limit}
-                    </p>
-                  </div>
-                </div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all"
+                  style={{ width: `${ordinaryPercent}%` }}
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-                  <p className="text-xs text-emerald-700">السعر بالدولار</p>
-                  <p className="mt-1 text-xl font-black text-emerald-800">
-                    ${Number(request.price_usd).toFixed(2)}
-                  </p>
-                </div>
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <span className="font-medium text-slate-500">
+                  المستخدم: {ordinaryUsed}
+                </span>
+                <span className="font-bold text-emerald-700">
+                  المتبقي: {ordinaryRemaining}
+                </span>
+              </div>
+            </div>
 
-                <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
-                  <p className="text-xs text-sky-700">المبلغ بالليرة السورية</p>
-                  <p className="mt-1 text-lg font-black text-sky-800">
-                    {Number(request.amount_syp).toLocaleString("en-US")} ل.س
-                  </p>
-                </div>
+            <div className="mb-4 border-t border-slate-100" />
+
+            {/* الإعلانات المميزة */}
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-slate-700">
+                  الإعلانات المميزة
+                </span>
+                <span className="text-xs font-black text-amber-700">
+                  {featuredUsed} / {featuredLimit}
+                </span>
               </div>
 
-              <div className="border-t border-slate-100 pt-3">
-                <p className="text-xs text-slate-500">تاريخ تقديم الطلب</p>
-                <p className="mt-1 text-sm font-medium text-slate-700">
-                  {formatDate(request.created_at)}
-                </p>
+              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-amber-500 transition-all"
+                  style={{ width: `${featuredPercent}%` }}
+                />
               </div>
 
-              {request.admin_note && (
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-xs font-bold text-slate-500">
-                    ملاحظة الإدارة
-                  </p>
-                  <p className="mt-1 text-sm text-slate-700">
-                    {request.admin_note}
-                  </p>
-                </div>
-              )}
-
-              {request.status === "pending" && (
-                <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    disabled={storeRequestsLoading}
-                    onClick={() => approveStoreRequest(request.id)}
-                    className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <CheckCircle size={18} className="ml-2" />
-                    موافقة وتفعيل المتجر
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={storeRequestsLoading}
-                    onClick={() => rejectStoreRequest(request.id)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <XCircle size={18} className="ml-2" />
-                    رفض الطلب
-                  </button>
-                </div>
-              )}
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <span className="font-medium text-slate-500">
+                  المستخدم: {featuredUsed}
+                </span>
+                <span className="font-bold text-amber-700">
+                  المتبقي: {featuredRemaining}
+                </span>
+              </div>
             </div>
           </div>
-        ))}
+
+          {/* الأسعار */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+              <p className="text-xs text-emerald-700">السعر بالدولار</p>
+              <p className="mt-1 text-xl font-black text-emerald-800">
+                ${Number(request.price_usd).toFixed(2)}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
+              <p className="text-xs text-sky-700">المبلغ بالليرة السورية</p>
+              <p className="mt-1 text-lg font-black text-sky-800">
+                {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-100 pt-3">
+            <p className="text-xs text-slate-500">تاريخ تقديم الطلب</p>
+            <p className="mt-1 text-sm font-medium text-slate-700">
+              {formatDate(request.created_at)}
+            </p>
+          </div>
+
+          {request.admin_note && (
+            <div className="rounded-xl bg-slate-50 p-3">
+              <p className="text-xs font-bold text-slate-500">
+                ملاحظة الإدارة
+              </p>
+              <p className="mt-1 text-sm text-slate-700">
+                {request.admin_note}
+              </p>
+            </div>
+          )}
+
+          {request.status === "pending" && (
+            <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={storeRequestsLoading}
+                onClick={() => approveStoreRequest(request.id)}
+                className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <CheckCircle size={18} className="ml-2" />
+                موافقة وتفعيل المتجر
+              </button>
+
+              <button
+                type="button"
+                disabled={storeRequestsLoading}
+                onClick={() => rejectStoreRequest(request.id)}
+                className="flex min-h-12 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <XCircle size={18} className="ml-2" />
+                رفض الطلب
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+    );
+  })}
+</div>
+
     )}
   </>
 )}

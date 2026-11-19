@@ -262,6 +262,28 @@ className={`rounded-2xl border-2 p-4 text-right transition-all ${
         )}
       </section>
 
+      <section className="relative overflow-hidden rounded-2xl border border-amber-200 bg-gradient-to-l from-amber-50 via-white to-orange-50 p-5 shadow-sm">
+        <div className="flex items-start gap-3">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+            <CheckCircle2 size={25} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-black text-slate-800">
+                تمييز إعلان واحد لمدة 10 أيام
+              </h2>
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800">
+                خدمة مستقلة
+              </span>
+            </div>
+            <p className="mt-2 text-sm leading-7 text-slate-600">
+              يمكنك تمييز إعلان واحد من إعلاناتك ليظهر بشكل بارز لمدة 10 أيام، دون الحاجة إلى الاشتراك بإحدى الباقات.
+              لطلب هذه الخدمة، انتقل إلى قسم «إعلاناتي» واضغط على زر التمييز الموجود بجانب الإعلان المطلوب.
+            </p>
+          </div>
+        </div>
+      </section>
+
 {selectedPackage && (
   <section className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
     <div className="border-b border-slate-100 pb-4">

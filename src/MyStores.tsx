@@ -222,7 +222,7 @@ export default function MyStores() {
           <div>
             <button
               type="button"
-              onClick={() => navigate(-1)}
+              onClick={() => navigate("/", { replace: true })}
               className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-emerald-700"
             >
               <ArrowRight size={17} />
@@ -483,16 +483,17 @@ export default function MyStores() {
                         </p>
                       )}
                     </div>
-<button
-  type="button"
-  onClick={() => navigate(`/manage-store/${store.id}`)}
-  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
->
-  تعديل بيانات المتجر
-</button>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/manage-store/${store.id}`)}
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                    >
+                      تعديل بيانات المتجر
+                    </button>
+
                     <div className="mt-4 flex flex-wrap gap-2">
                       {store.status === "active" && (
-                        
                         <button
                           type="button"
                           onClick={() => navigate(`/store/${store.id}`)}

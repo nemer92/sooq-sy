@@ -1806,3 +1806,136 @@ button {
   margin: 2px 0 !important;
 }
 
+
+/* تحسين قسم البلاغات على الموبايل فقط */
+@media (max-width: 768px) {
+  .report-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 16px 0;
+  }
+
+  .report-stat-card {
+    min-width: 0;
+    padding: 13px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    text-align: center;
+    border-radius: 12px;
+  }
+
+  .report-stat-card:first-child {
+    grid-column: span 2;
+  }
+
+  .report-stat-card span {
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .report-stat-card strong {
+    font-size: 21px;
+  }
+
+  .report-card {
+    width: 100%;
+    min-width: 0;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    box-sizing: border-box;
+    border-radius: 14px;
+  }
+
+  .report-card .user-info {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .report-card .user-info h3 {
+    font-size: 16px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .report-card .user-info p {
+    font-size: 13px;
+    line-height: 1.8;
+    margin: 8px 0;
+    overflow-wrap: anywhere;
+  }
+
+  .report-card .report-details {
+    padding: 10px;
+    margin-top: 12px;
+    border-radius: 9px;
+    background: rgba(128, 128, 128, 0.08);
+  }
+
+  .report-card .user-info > span,
+  .report-card .user-info > small {
+    display: block;
+    margin-top: 9px;
+    font-size: 11px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+
+  .report-card .category-card-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .report-card .category-card-actions select {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    box-sizing: border-box;
+  }
+
+  .report-card .category-card-actions button {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 9px 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    white-space: normal;
+    box-sizing: border-box;
+  }
+
+  .report-card .category-card-actions button:first-of-type {
+    grid-column: 1 / -1;
+  }
+
+  .report-card .category-card-actions button svg {
+    flex-shrink: 0;
+  }
+
+  .report-card .category-card-actions button:last-child:nth-of-type(2) {
+    grid-column: 1 / -1;
+  }
+
+  .users-search {
+    margin-bottom: 12px;
+  }
+
+  .users-search input {
+    min-width: 0;
+    width: 100%;
+  }
+}
+

@@ -1293,17 +1293,6 @@ const matchesCondition = selectedConditions.includes(
           </button>
         )}
 
-        <button
-          onClick={() => {
-            setIsMobileMenuOpen(false);
-            navigate("/stores");
-          }}
-          className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
-        >
-          <StoreIcon size={18} className="ml-2 inline" />
-          المتاجر
-        </button>
-
         {allowNewAds && (
           <>
             <button
@@ -2438,40 +2427,41 @@ const matchesCondition = selectedConditions.includes(
       </main>
 
 
-<footer className="relative mt-12 overflow-hidden bg-slate-950 px-5 pb-6 pt-12 text-white">
+
+<footer className="relative mt-8 overflow-hidden bg-slate-950 px-4 pb-4 pt-7 text-white md:mt-12 md:px-5 md:pb-6 md:pt-12">
   {/* لمسات جمالية */}
   <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
   <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl" />
 
   <div className="relative mx-auto max-w-6xl">
-    <div className="grid gap-8 text-center md:grid-cols-3 md:text-right">
+    <div className="grid gap-5 text-center md:grid-cols-3 md:gap-8 md:text-right">
 
       {/* هوية الموقع */}
       <div>
-        <h2 className="text-2xl font-black tracking-wide text-white">
+        <h2 className="text-xl font-black tracking-wide text-white md:text-2xl">
           {siteName}
         </h2>
-        <div className="mx-auto mt-3 h-1 w-14 rounded-full bg-emerald-500 md:mx-0" />
-        <p className="mt-4 text-sm leading-7 text-slate-400">
+        <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-emerald-500 md:mt-3 md:md:mx-0" />
+        <p className="mt-2 text-xs leading-6 text-slate-400 md:mt-4 md:text-sm md:leading-7">
           السوق السوري للإعلانات المبوبة
           <br />
-          مكانك الأمثل للبيع والشراء والتبرع.
+          مكانك للبيع والشراء والتبرع.
         </p>
       </div>
 
       {/* التواصل */}
       <div>
-        <h3 className="mb-4 text-base font-black text-white">
+        <h3 className="mb-2 text-sm font-black text-white md:mb-4 md:text-base">
           تواصل معنا
         </h3>
 
-        <div className="flex flex-col items-center gap-3 md:items-start">
+        <div className="flex flex-wrap items-center justify-center gap-3 md:flex-col md:items-start">
           {contactEmail && (
             <a
               href={`mailto:${contactEmail}`}
-              className="flex items-center gap-2 text-sm text-slate-400 transition hover:text-emerald-400"
+              className="flex items-center gap-2 text-xs text-slate-400 transition hover:text-emerald-400 md:text-sm"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-emerald-400">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-emerald-400">
                 ✉
               </span>
               <span dir="ltr">{contactEmail}</span>
@@ -2481,9 +2471,9 @@ const matchesCondition = selectedConditions.includes(
           {contactPhone && (
             <a
               href={`tel:${contactPhone}`}
-              className="flex items-center gap-2 text-sm text-slate-400 transition hover:text-emerald-400"
+              className="flex items-center gap-2 text-xs text-slate-400 transition hover:text-emerald-400 md:text-sm"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-emerald-400">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-emerald-400">
                 ☎
               </span>
               <span dir="ltr">{contactPhone}</span>
@@ -2492,52 +2482,51 @@ const matchesCondition = selectedConditions.includes(
         </div>
       </div>
 
-{/* تحميل التطبيق */}
-<div>
-  <h3 className="mb-3 text-base font-black text-white">
-    حمّل تطبيق سوق سوريا
-  </h3>
+      {/* تحميل التطبيق */}
+      <div>
+        <h3 className="mb-2 text-sm font-black text-white md:mb-3 md:text-base">
+          حمّل تطبيق سوق سوريا
+        </h3>
 
-  <p className="text-sm leading-7 text-slate-400">
-    خلي سوق سوريا معك وين ما كنت، وتابع إعلاناتك بسهولة من موبايلك.
-  </p>
+        <p className="text-xs leading-6 text-slate-400 md:text-sm md:leading-7">
+          تابع إعلاناتك بسهولة من موبايلك.
+        </p>
 
-  <a
-    href="https://sooq-sy.pages.dev/app.apk"
-    download="Sooq-SY.apk"
-    className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-sm font-bold text-emerald-400 shadow-sm transition hover:bg-emerald-500/20 hover:text-emerald-300"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      className="h-5 w-5"
-    >
-      <path d="M17.6 9.48 19.44 6.3a.5.5 0 0 0-.86-.5l-1.86 3.22a11.3 11.3 0 0 0-9.44 0L5.42 5.8a.5.5 0 1 0-.86.5L6.4 9.48A10.2 10.2 0 0 0 2 17h20a10.2 10.2 0 0 0-4.4-7.52ZM7.5 13.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
-      <path d="M4 18h16v1a2 2 0 0 1-2 2h-1v2h-2v-2H9v2H7v-2H6a2 2 0 0 1-2-2v-1Z" />
-    </svg>
-    تحميل التطبيق
-    <span>↓</span>
-  </a>
+        <a
+          href="https://sooq-sy.pages.dev/app.apk"
+          download="Sooq-SY.apk"
+          className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-400 shadow-sm transition hover:bg-emerald-500/20 hover:text-emerald-300 md:mt-4 md:px-5 md:py-2.5 md:text-sm"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className="h-5 w-5"
+          >
+            <path d="M17.6 9.48 19.44 6.3a.5.5 0 0 0-.86-.5l-1.86 3.22a11.3 11.3 0 0 0-9.44 0L5.42 5.8a.5.5 0 1 0-.86.5L6.4 9.48A10.2 10.2 0 0 0 2 17h20a10.2 10.2 0 0 0-4.4-7.52ZM7.5 13.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
+            <path d="M4 18h16v1a2 2 0 0 1-2 2h-1v2h-2v-2H9v2H7v-2H6a2 2 0 0 1-2-2v-1Z" />
+          </svg>
+          تحميل التطبيق ↓
+        </a>
 
-  <p className="mt-2 text-[10px] text-slate-500">
-    متوفر لأجهزة Android بصيغة APK
-  </p>
-</div>
-
+        <p className="mt-1 text-[10px] text-slate-500">
+          متوفر لأجهزة Android بصيغة APK
+        </p>
+      </div>
     </div>
 
     {/* الحقوق */}
-    <div className="mt-10 border-t border-white/10 pt-5 text-center">
-      <p className="text-xs text-slate-500">
+    <div className="mt-6 border-t border-white/10 pt-3 text-center md:mt-10 md:pt-5">
+      <p className="text-[10px] text-slate-500 md:text-xs">
         © {new Date().getFullYear()} {siteName} - جميع الحقوق محفوظة
       </p>
-      <p className="mt-2 text-[11px] font-medium text-slate-600">
+      <p className="mt-1 text-[10px] font-medium text-slate-600 md:mt-2 md:text-[11px]">
         صنع بكل محبة لخدمة المجتمع السوري
       </p>
     </div>
   </div>
 </footer>
+
 
     </div>
   );

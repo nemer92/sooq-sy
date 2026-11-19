@@ -51,13 +51,13 @@ export default function StoreDetails() {
   const [category, setCategory] = useState("all");
 
   // الرجوع للصفحة السابقة، أو للرئيسية عند عدم وجود صفحة سابقة
-  const goBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate("/", { replace: true });
-    }
-  };
+const goBack = () => {
+  if (window.history.length > 1) {
+    navigate(-1);
+  } else {
+    navigate("/", { replace: true });
+  }
+};
 
   useEffect(() => {
     let active = true;

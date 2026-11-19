@@ -9,6 +9,7 @@ import {
   Save,
   ArrowRight,
   LoaderCircle,
+  Store,
 } from "lucide-react";
 
 export default function Profile() {
@@ -296,7 +297,21 @@ setPointsBalance(pointsData.balance);
           <ArrowRight size={20} />
           العودة إلى السوق
         </Link>
-
+<Link
+  to="/my-stores"
+  className="mb-6 flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 transition hover:bg-emerald-100"
+>
+  <span className="flex items-center gap-3">
+    <Store size={23} />
+    <span>
+      <strong className="block font-black">إدارة متاجري</strong>
+      <span className="mt-1 block text-xs text-emerald-700">
+        عرض المتاجر والاشتراكات وأرصدة الإعلانات
+      </span>
+    </span>
+  </span>
+  <ArrowRight size={20} />
+</Link>
         <div className="mb-6">
           <h1 className="text-3xl font-black text-slate-800">
             الملف الشخصي

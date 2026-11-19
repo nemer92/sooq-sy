@@ -231,33 +231,64 @@ data: {
     }
   }
 
-  return (
-    <main
-      dir="rtl"
-      className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10"
-    >
-      <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-7 shadow-sm">
+
+return (
+  <main
+    dir="rtl"
+    className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-slate-100 px-4 py-8 sm:py-12"
+  >
+    {/* خلفية جمالية */}
+    <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
+    <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-teal-200/30 blur-3xl" />
+
+    <div className="relative w-full max-w-md">
+
+      {/* الشعار */}
+      <div className="mb-6 text-center">
         <Link
           to="/"
-          className="mb-8 block text-center text-3xl font-black text-emerald-700"
+          className="inline-flex flex-col items-center"
         >
-          Sooq.Sy
+<div className="h-16 w-16 overflow-hidden rounded-2xl bg-white shadow-lg shadow-emerald-600/20 ring-1 ring-emerald-100">
+  <img
+    src="/favicon.png"
+    alt="شعار سوق سوريا"
+    className="h-full w-full object-cover"
+  />
+</div>
+          <span className="mt-3 text-2xl font-black tracking-wide text-emerald-800">
+            Sooq.Sy
+          </span>
         </Link>
-
-        <h1 className="mb-2 text-center text-2xl font-black text-slate-800">
-          {isRegister ? "إنشاء حساب جديد" : "تسجيل الدخول"}
-        </h1>
-
-        <p className="mb-7 text-center text-sm text-slate-500">
-          {isRegister
-            ? "أنشئ حسابك وابدأ بنشر إعلاناتك"
-            : "سجّل دخولك للمتابعة إلى سوق سوريا"}
+        <p className="mt-1 text-xs font-medium text-slate-500">
+          السوق السوري للإعلانات المبوبة
         </p>
+      </div>
+
+      {/* البطاقة الرئيسية */}
+      <div className="rounded-[28px] border border-white bg-white/95 p-5 shadow-xl shadow-slate-200/60 sm:p-8">
+
+        <div className="mb-7 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-2xl">
+            {isRegister ? "✨" : "👋"}
+          </div>
+
+          <h1 className="text-2xl font-black text-slate-800">
+            {isRegister ? "إنشاء حساب جديد" : "أهلاً بعودتك"}
+          </h1>
+
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            {isRegister
+              ? "أنشئ حسابك وابدأ رحلتك في سوق سوريا"
+              : "سجّل دخولك وتابع إعلاناتك بسهولة"}
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+
           {isRegister && (
             <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
+              <label className="mb-2 block text-sm font-bold text-slate-700">
                 الاسم
               </label>
               <input
@@ -266,14 +297,15 @@ data: {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="أدخل اسمك"
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
               />
             </div>
           )}
+
           {isRegister && (
             <div>
-              <label className="mb-2 block text-sm font-semibold text-slate-700">
-                رمز الإحالة (اختياري)
+              <label className="mb-2 block text-sm font-bold text-slate-700">
+                رمز الإحالة <span className="font-normal text-slate-400">(اختياري)</span>
               </label>
               <input
                 type="text"
@@ -283,21 +315,21 @@ data: {
                 }
                 placeholder="أدخل رمز الدعوة"
                 maxLength={8}
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left uppercase outline-none focus:border-emerald-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-left uppercase outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 dir="ltr"
               />
-              <p className="mt-1 text-xs text-slate-400">
-                إذا دعـاك أحد أصدقائك، أدخل رمز الإحالة الخاص به.
+              <p className="mt-1.5 text-xs text-slate-400">
+                إذا دعاك أحد أصدقائك، أدخل رمز الإحالة الخاص به.
               </p>
             </div>
           )}
-                    {isRegister && (
+
+          {isRegister && (
             <>
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="mb-2 block text-sm font-bold text-slate-700">
                   المحافظة
                 </label>
-
                 <select
                   required
                   value={selectedGovernorate}
@@ -306,17 +338,13 @@ data: {
                     setSelectedCity("");
                   }}
                   disabled={locationsLoading}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500 disabled:bg-slate-100"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 disabled:bg-slate-100"
                 >
                   <option value="">
                     {locationsLoading ? "جارٍ تحميل المحافظات..." : "اختر المحافظة"}
                   </option>
-
                   {governorates.map((governorate) => (
-                    <option
-                      key={governorate.id}
-                      value={String(governorate.id)}
-                    >
+                    <option key={governorate.id} value={String(governorate.id)}>
                       {governorate.name_ar}
                     </option>
                   ))}
@@ -324,19 +352,17 @@ data: {
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                <label className="mb-2 block text-sm font-bold text-slate-700">
                   المدينة
                 </label>
-
                 <select
                   required
                   value={selectedCity}
                   onChange={(e) => setSelectedCity(e.target.value)}
                   disabled={!selectedGovernorate || locationsLoading}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500 disabled:bg-slate-100"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 disabled:bg-slate-100"
                 >
                   <option value="">اختر المدينة</option>
-
                   {cities
                     .filter(
                       (city) =>
@@ -353,7 +379,7 @@ data: {
           )}
 
           <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
+            <label className="mb-2 block text-sm font-bold text-slate-700">
               رقم الموبايل
             </label>
             <input
@@ -366,78 +392,74 @@ data: {
                 setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
               }
               placeholder="09XXXXXXXX"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 text-left outline-none focus:border-emerald-500"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-left text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
               dir="ltr"
             />
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1.5 text-xs text-slate-400">
               أدخل رقمك المؤلف من 10 أرقام ويبدأ بـ 09
             </p>
           </div>
 
-<div>
-  <label className="mb-2 block text-sm font-semibold text-slate-700">
-    كلمة المرور
-  </label>
-
-  <div className="relative">
-    <input
-      type={showPassword ? "text" : "password"}
-      required
-      minLength={6}
-      value={password}
-      onChange={(e) => setPassword(e.target.value)}
-      placeholder="ستة أحرف على الأقل"
-      className="w-full rounded-xl border border-slate-200 px-4 py-3 pl-12 outline-none focus:border-emerald-500"
-    />
-
-    <button
-      type="button"
-      onClick={() => setShowPassword(!showPassword)}
-      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-700"
-      aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
-    >
-      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-    </button>
-  </div>
-</div>
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-700">
+              كلمة المرور
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="ستة أحرف على الأقل"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 pl-12 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-emerald-700"
+                aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+              >
+                {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+              </button>
+            </div>
+          </div>
 
           {isRegister && (
-<div>
-  <label className="mb-2 block text-sm font-semibold text-slate-700">
-    تأكيد كلمة المرور
-  </label>
-
-  <div className="relative">
-    <input
-      type={showConfirmPassword ? "text" : "password"}
-      required
-      minLength={6}
-      value={confirmPassword}
-      onChange={(e) => setConfirmPassword(e.target.value)}
-      placeholder="أعد إدخال كلمة المرور"
-      className="w-full rounded-xl border border-slate-200 px-4 py-3 pl-12 outline-none focus:border-emerald-500"
-    />
-
-    <button
-      type="button"
-      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-emerald-700"
-      aria-label={showConfirmPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
-    >
-      {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-    </button>
-  </div>
-</div>
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-700">
+                تأكيد كلمة المرور
+              </label>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  minLength={6}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="أعد إدخال كلمة المرور"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 pl-12 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-emerald-700"
+                  aria-label={showConfirmPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                >
+                  {showConfirmPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                </button>
+              </div>
+            </div>
           )}
 
           {error && (
-            <p className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
+            <p className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm leading-6 text-red-600">
               {error}
             </p>
           )}
 
           {message && (
-            <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">
+            <p className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm leading-6 text-emerald-700">
               {message}
             </p>
           )}
@@ -445,7 +467,7 @@ data: {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-emerald-600 py-3.5 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+            className="w-full rounded-xl bg-gradient-to-l from-emerald-700 to-emerald-500 py-3.5 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loading
               ? "يرجى الانتظار..."
@@ -455,7 +477,7 @@ data: {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-sm text-slate-600">
+        <div className="mt-6 rounded-xl bg-slate-50 px-3 py-4 text-center text-sm text-slate-600">
           {isRegister ? "لديك حساب بالفعل؟" : "ليس لديك حساب؟"}
           <button
             type="button"
@@ -466,19 +488,25 @@ data: {
               setPassword("");
               setConfirmPassword("");
             }}
-            className="mr-2 font-bold text-emerald-700 hover:underline"
+            className="mr-2 font-black text-emerald-700 transition hover:text-emerald-900 hover:underline"
           >
             {isRegister ? "تسجيل الدخول" : "إنشاء حساب"}
           </button>
         </div>
-
-        <Link
-          to="/"
-          className="mt-6 block text-center text-sm text-slate-400 hover:text-emerald-700"
-        >
-          العودة إلى الصفحة الرئيسية
-        </Link>
       </div>
-    </main>
-  );
+
+      <Link
+        to="/"
+        className="mt-6 block text-center text-sm font-semibold text-slate-400 transition hover:text-emerald-700"
+      >
+        ← العودة إلى الصفحة الرئيسية
+      </Link>
+
+      <p className="mt-4 text-center text-[11px] text-slate-400">
+        © {new Date().getFullYear()} Sooq.Sy
+      </p>
+    </div>
+  </main>
+);
+
 }

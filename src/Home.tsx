@@ -23,7 +23,8 @@ import {
   SlidersHorizontal,
   ChevronDown,
   X,
-  MessageCircle
+  MessageCircle,
+  Store as StoreIcon
 } from "lucide-react";
 
 type Category = {
@@ -61,6 +62,11 @@ const categoryIconMap = {
   "متفرقات": Menu,
 };
 
+type StorePreview = {
+  id: string; name: string; business_type: string; description: string | null;
+  governorate: string; city: string; logo_url: string | null; cover_url: string | null;
+};
+
 type Ad = {
   id: string;
   category_id: number;
@@ -87,6 +93,8 @@ export default function Home() {
     const [, setCitiesLoading] = useState(true);
     const [ads, setAds] = useState<Ad[]>([]);
     const [featuredAds, setFeaturedAds] = useState<Ad[]>([]);
+    const [featuredStores, setFeaturedStores] = useState<StorePreview[]>([]);
+    const [featuredStoresLoading, setFeaturedStoresLoading] = useState(true);
     const [featuredAdsLoading, setFeaturedAdsLoading] = useState(true);
     const [donations, setDonations] = useState<Ad[]>([]);
     const [donationsLoading, setDonationsLoading] = useState(true);
@@ -518,6 +526,25 @@ if (user) {
   loadAds();
 }, []);
 useEffect(() => {
+  let active = true;
+  async function loadFeaturedStores() {
+    const { data, error } = await supabase
+      .from("stores")
+      .select("id,name,business_type,description,governorate,city,logo_url,cover_url")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(8);
+    if (error) console.error("تعذر تحميل المتاجر:", error);
+    if (active) {
+      setFeaturedStores((data ?? []) as StorePreview[]);
+      setFeaturedStoresLoading(false);
+    }
+  }
+  loadFeaturedStores();
+  return () => { active = false; };
+}, []);
+
+useEffect(() => {
   async function loadFeaturedAds() {
     const { data, error } = await supabase
       .from("ads")
@@ -802,34 +829,41 @@ const matchesCondition = selectedConditions.includes(
         className="text-xl font-bold text-slate-400 hover:text-red-500"
         aria-label="إغلاق الإشعار"
       >
-        ×
+        
       </button>
     </div>
   </div>
 )}
 
-      <header className="sticky top-0 z-50 border-b border-slate-100 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-5 px-5 py-4">
-<a href="/" className="flex items-center gap-2">
-  <img
-    src={siteIcon}
-    alt="Sooq.Sy"
-    className="h-11 w-11 rounded-xl object-contain"
-  />
 
-  <div>
-    <h1 className="text-2xl font-black tracking-tight text-slate-900">
-      {siteName}
-    </h1>
-    <p className="text-[10px] text-slate-400">
-      السوق السوري للإعلانات المبوبة
-    </p>
-  </div>
-</a>
+<header className="sticky top-0 z-50 border-b border-slate-100 bg-white">
+  <div className="mx-auto grid max-w-7xl grid-cols-[auto_1fr] items-center gap-x-6 gap-y-4 px-5 py-4 md:grid-cols-[auto_minmax(0,1fr)]">
 
+    {/* الشعار */}
+    <a
+      href="/"
+      className="flex items-center gap-2 md:col-start-1 md:row-start-1"
+    >
+      <img
+        src={siteIcon}
+        alt="Sooq.Sy"
+        className="h-11 w-11 rounded-xl object-contain"
+      />
+      <div>
+        <h1 className="text-2xl font-black tracking-tight text-slate-900">
+          {siteName}
+        </h1>
+        <p className="text-[10px] text-slate-400">
+          السوق السوري للإعلانات المبوبة
+        </p>
+      </div>
+    </a>
 
-<div className="hidden min-w-0 flex-1 flex-col gap-2.5 md:flex">
-  <div className="flex h-12 items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm transition focus-within:border-emerald-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-50">
+{/* البحث والفلاتر - الكمبيوتر */}
+<div className="hidden min-w-0 items-center gap-3 md:flex md:col-span-2 md:row-start-2">
+
+  {/* خانة البحث - اليمين */}
+  <div className="flex h-12 min-w-0 flex-1 items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm transition focus-within:border-emerald-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-50">
     <Search size={20} className="mr-4 shrink-0 text-emerald-600" />
 
     <input
@@ -855,592 +889,19 @@ const matchesCondition = selectedConditions.includes(
         مسح
       </button>
     )}
-
-    <button
-      type="button"
-      onClick={() => {
-        document.getElementById("ads-section")?.scrollIntoView({
-          behavior: "smooth",
-        });
-      }}
-      className="m-1.5 flex h-9 shrink-0 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700"
-    >
-      <Search size={16} />
-      بحث
-    </button>
   </div>
 
+  {/* المحافظات والمدن - اليسار */}
+  <div className="flex w-[390px] shrink-0 items-center gap-2 rounded-xl border border-slate-100 bg-white p-2 shadow-sm">
 
-<div className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white p-1.5 shadow-sm sm:gap-3 sm:rounded-2xl sm:p-2">
-
-  <span className="hidden shrink-0 items-center gap-1.5 text-xs font-bold text-slate-400 sm:flex">
-    <SlidersHorizontal size={15} />
-    تصفية حسب:
-  </span>
-
-  <div className="relative min-w-0 flex-1">
-    <select
-      value={selectedGovernorate}
-      onChange={(e) => {
-        setSelectedGovernorate(e.target.value);
-        setSelectedCity("");
-      }}
-      className="h-9 w-full appearance-none rounded-lg border border-slate-100 bg-slate-50 px-2 pl-7 text-[11px] font-bold text-slate-700 outline-none transition hover:border-emerald-200 focus:border-emerald-400 focus:bg-white sm:h-10 sm:rounded-xl sm:px-3 sm:pl-8 sm:text-xs"
-    >
-      <option value="">كل المحافظات</option>
-      {governorates.map((governorate) => (
-        <option key={governorate.id} value={String(governorate.id)}>
-          {governorate.name_ar}
-        </option>
-      ))}
-    </select>
-    <ChevronDown
-      size={14}
-      className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
-    />
-  </div>
-
-  <div className="relative min-w-0 flex-1">
-    <select
-      value={selectedCity}
-      onChange={(e) => setSelectedCity(e.target.value)}
-      className="h-9 w-full appearance-none rounded-lg border border-slate-100 bg-slate-50 px-2 pl-7 text-[11px] font-bold text-slate-700 outline-none transition hover:border-emerald-200 focus:border-emerald-400 focus:bg-white sm:h-10 sm:rounded-xl sm:px-3 sm:pl-8 sm:text-xs"
-    >
-      <option value="">كل المدن</option>
-      {cities
-        .filter(
-          (city) =>
-            selectedGovernorate === "" ||
-            String(city.governorate_id) === selectedGovernorate
-        )
-        .map((city) => (
-          <option key={city.id} value={String(city.id)}>
-            {city.name_ar}
-          </option>
-        ))}
-    </select>
-    <ChevronDown
-      size={14}
-      className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
-    />
-  </div>
-
-  {(searchQuery || selectedGovernorate || selectedCity) && (
-    <button
-      type="button"
-      onClick={() => {
-        setSearchQuery("");
-        setSelectedGovernorate("");
-        setSelectedCity("");
-      }}
-      title="مسح البحث والفلاتر"
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 text-rose-500 transition hover:bg-rose-100 sm:h-10 sm:w-10 sm:rounded-xl"
-    >
-      <X size={16} />
-    </button>
-  )}
-</div>
-
-</div>
-
-
-<div className="hidden items-center gap-4 md:flex">
-  {isLoggedIn ? (
-    <>
-      <button
-        onClick={() => navigate("/my-ads")}
-        className="flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-      >
-        <UserRound size={18} />
-        إعلاناتي
-      </button>
-
-      <button
-        onClick={() => navigate("/profile")}
-        className="flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-emerald-800"
-      >
-        <UserRound size={18} />
-        الملف الشخصي
-      </button>
-
-<button
-  onClick={() => {
-    setIsMobileMenuOpen(false);
-    navigate("/messages");
-  }}
-  className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
->
-  <MessageCircle size={18} className="ml-2 inline" />
-  رسائلي
-  {unreadMessagesCount > 0 && (
-    <span className="mr-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-      {unreadMessagesCount}
-    </span>
-  )}
-</button>
-
-<div className="relative">
-  <button
-    onClick={() => setShowNotifications(!showNotifications)}
-    className="relative flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-  >
-    <Bell size={20} />
-    <span>الإشعارات</span>
-    {unreadNotificationsCount > 0 && (
-      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-        {unreadNotificationsCount}
-      </span>
-    )}
-  </button>
-
-  {showNotifications && (
-    <div className="absolute left-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-      <div className="border-b border-slate-100 px-4 py-3">
-        <h3 className="font-bold text-slate-800">الإشعارات</h3>
-      </div>
-
-      <div className="max-h-96 overflow-y-auto">
-        {notifications.length === 0 ? (
-          <p className="p-5 text-center text-sm text-slate-500">
-            لا توجد إشعارات حالياً
-          </p>
-        ) : (
-          notifications.map((item: any) => {
-            const notification = Array.isArray(item.notifications)
-              ? item.notifications[0]
-              : item.notifications;
-
-
-return (
-  <div
-    key={item.id}
-    onClick={async () => {
-      if (!item.read_at) {
-        await markNotificationAsRead(item.id);
-      }
-
-      setShowNotifications(false);
-
-      const link = notification?.link;
-
-      if (!link) return;
-
-      try {
-        if (/^https?:\/\//i.test(link)) {
-          const url = new URL(link);
-
-          if (
-            url.hostname === "nemer92.github.io" &&
-            url.pathname.startsWith("/sooq-sy/ad/")
-          ) {
-            const adId = url.pathname
-              .replace("/sooq-sy/ad/", "")
-              .replace(/\/$/, "");
-
-            navigate(`/ad/${encodeURIComponent(adId)}`);
-          } else {
-            window.open(link, "_blank", "noopener,noreferrer");
-          }
-        } else {
-          navigate(link.startsWith("/") ? link : `/${link}`);
-        }
-      } catch (error) {
-        console.error("Invalid notification link:", error);
-      }
-    }}
-    className={`cursor-pointer border-b border-slate-100 p-4 ${
-      !item.read_at ? "bg-emerald-50" : "bg-white"
-    }`}
-  >
-    <p className="font-bold text-slate-800">
-      {notification?.title}
-    </p>
-
-    <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
-      {notification?.body}
-    </p>
-
-    <p className="mt-2 text-xs text-slate-400">
-      {new Date(item.created_at).toLocaleString("ar")}
-    </p>
-  </div>
-);
-
-          })
-        )}
-      </div>
-    </div>
-  )}
-</div>
-
-      <button
-        onClick={() => navigate("/favorites")}
-        className="flex items-center gap-2 text-sm font-semibold text-rose-600 hover:text-rose-700"
-      >
-        <Heart size={18} />
-        <span>مفضلتي</span>
-        {favoriteAdIds.length > 0 && (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">
-            {favoriteAdIds.length}
-          </span>
-        )}
-      </button>
-
-      <button
-
-onClick={async () => {
-  const confirmed = await window.sooqConfirm(
-    "هل أنت متأكد أنك تريد تسجيل الخروج؟"
-  );
-
-  if (!confirmed) return;
-
-  const { error } = await supabase.auth.signOut();
-
-  if (error) {
-    alert("تعذر تسجيل الخروج، حاول مرة أخرى.");
-    return;
-  }
-
-  navigate("/");
-}}
-        className="flex items-center gap-2 text-sm font-semibold text-red-600 hover:text-red-700"
-      >
-
-        <LogOut size={18} />
-        تسجيل الخروج
-      </button>
-    </>
-  ) : (
-    <button
-      onClick={() => navigate("/auth")}
-      className="flex items-center gap-2 text-sm font-semibold text-slate-600"
-    >
-      <UserRound size={18} />
-      تسجيل الدخول
-    </button>
-  )}
-
-{allowNewAds && (
-  <div className="flex items-center gap-2">
-    <button
-      onClick={() => navigate("/add-ad?type=donation")}
-      className="flex items-center gap-2 rounded-xl bg-rose-500 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-rose-600"
-    >
-      <Heart size={19} />
-      تبرع الآن
-    </button>
-
-    <button
-      onClick={() => navigate("/add-ad")}
-      className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
-    >
-      <Plus size={19} />
-      أضف إعلانك
-    </button>
-  </div>
-)}
-
-
-
-
-</div>
-<button
-  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-  aria-label="فتح القائمة"
-  className="relative rounded-lg p-2 text-slate-600 md:hidden"
->
-  <Menu size={24} />
-
-{(unreadMessagesCount > 0 || unreadNotificationsCount > 0) && (
-  <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
-)}
-</button>
-</div>
-
-
-{isMobileMenuOpen && (
-  <div className="border-t border-slate-100 bg-white px-5 py-4 shadow-md md:hidden">
-    <div className="flex flex-col gap-2">
-      {isLoggedIn ? (
-        <>
-          <button
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              navigate("/my-ads");
-            }}
-            className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
-          >
-            <UserRound size={18} className="ml-2 inline" />
-            إعلاناتي
-          </button>
-
-          <button
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              navigate("/profile");
-            }}
-            className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
-          >
-            <UserRound size={18} className="ml-2 inline" />
-            الملف الشخصي
-          </button>
-
-<button
-  onClick={() => {
-    setIsMobileMenuOpen(false);
-    navigate("/messages");
-  }}
-  className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
->
-  <MessageCircle size={18} className="ml-2 inline" />
-  رسائلي
-  {unreadMessagesCount > 0 && (
-    <span className="mr-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-      {unreadMessagesCount}
-    </span>
-  )}
-</button>
-
-<button
-  onClick={() => {
-    setIsMobileMenuOpen(false);
-    setShowNotifications(true);
-  }}
-  className="flex items-center justify-between rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
->
-  <span className="flex items-center gap-2">
-    <Bell size={18} />
-    الإشعارات
-  </span>
-  {unreadNotificationsCount > 0 && (
-    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-      {unreadNotificationsCount}
-    </span>
-  )}
-</button>
-
-          <button
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              navigate("/favorites");
-            }}
-            className="rounded-xl px-4 py-3 text-right text-sm font-bold text-rose-600 hover:bg-rose-50"
-          >
-            <Heart size={18} className="ml-2 inline" />
-            مفضلتي
-          </button>
-
-
-<button
-  onClick={async () => {
-    const confirmed = await window.sooqConfirm(
-      "هل أنت متأكد أنك تريد تسجيل الخروج؟"
-    );
-
-    if (!confirmed) return;
-
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-      alert("تعذر تسجيل الخروج، حاول مرة أخرى.");
-      return;
-    }
-
-    setIsMobileMenuOpen(false);
-    navigate("/");
-  }}
-  className="rounded-xl px-4 py-3 text-right text-sm font-semibold text-red-600 hover:bg-red-50"
->
-  تسجيل الخروج
-</button>
-
-        </>
-      ) : (
-        <button
-          onClick={() => {
-            setIsMobileMenuOpen(false);
-            navigate("/auth");
-          }}
-          className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
-        >
-          <UserRound size={18} className="ml-2 inline" />
-          تسجيل الدخول
-        </button>
-      )}
-
-      {allowNewAds && (
-        <>
-          <button
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              navigate("/add-ad?type=donation");
-            }}
-            className="rounded-xl bg-rose-500 px-4 py-3 text-right text-sm font-bold text-white hover:bg-rose-600"
-          >
-            <Heart size={18} className="ml-2 inline" />
-            تبرع الآن
-          </button>
-          <button
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              navigate("/add-ad");
-            }}
-            className="rounded-xl bg-emerald-600 px-4 py-3 text-right text-sm font-bold text-white hover:bg-emerald-700"
-          >
-            <Plus size={18} className="ml-2 inline" />
-            أضف إعلانك
-          </button>
-        </>
-      )}
-    </div>
-  </div>
-)}
-
-{showNotifications && (
-  <div
-    className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 px-4 pt-20 md:hidden"
-    onClick={() => setShowNotifications(false)}
-  >
-    <div
-      className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
-        <h3 className="font-bold text-slate-800">الإشعارات</h3>
-        <button
-          type="button"
-          onClick={() => setShowNotifications(false)}
-          className="rounded-lg px-3 py-1 text-sm font-bold text-red-600 hover:bg-red-50"
-        >
-          إغلاق
-        </button>
-      </div>
-
-      <div className="max-h-[70vh] overflow-y-auto">
-        {notifications.length === 0 ? (
-          <p className="p-6 text-center text-sm text-slate-500">
-            لا توجد إشعارات حالياً
-          </p>
-        ) : (
-          notifications.map((item: any) => {
-            const notification = Array.isArray(item.notifications)
-              ? item.notifications[0]
-              : item.notifications;
-
-            return (
-              <div
-                key={item.id}
-                onClick={async () => {
-                  if (!item.read_at) {
-                    await markNotificationAsRead(item.id);
-                  }
-
-                  setShowNotifications(false);
-
-                  const link = notification?.link;
-                  if (!link) return;
-
-                  try {
-                    if (/^https?:\/\//i.test(link)) {
-                      const url = new URL(link);
-
-                      if (
-                        url.hostname === "nemer92.github.io" &&
-                        url.pathname.startsWith("/sooq-sy/ad/")
-                      ) {
-                        const adId = url.pathname
-                          .replace("/sooq-sy/ad/", "")
-                          .replace(/\/$/, "");
-                        navigate(`/ad/${encodeURIComponent(adId)}`);
-                      } else {
-                        window.open(link, "_blank", "noopener,noreferrer");
-                      }
-                    } else {
-                      navigate(link.startsWith("/") ? link : `/${link}`);
-                    }
-                  } catch (error) {
-                    console.error("Invalid notification link:", error);
-                  }
-                }}
-                className={`cursor-pointer border-b border-slate-100 p-4 ${
-                  !item.read_at ? "bg-emerald-50" : "bg-white"
-                }`}
-              >
-                <p className="font-bold text-slate-800">
-                  {notification?.title}
-                </p>
-                <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
-                  {notification?.body}
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  {new Date(item.created_at).toLocaleString("ar")}
-                </p>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  </div>
-)}
-
-
-<div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4 md:hidden">
-  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm focus-within:border-emerald-400">
-    <div className="flex h-12 items-center px-3">
-      <Search size={19} className="shrink-0 text-emerald-600" />
-
-      <input
-        value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            document.getElementById("ads-section")?.scrollIntoView({
-              behavior: "smooth",
-            });
-          }
-        }}
-        className="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:text-slate-400"
-        placeholder="ابحث عن أي شيء في السوق..."
-      />
-
-      {searchQuery && (
-        <button
-          type="button"
-          onClick={() => setSearchQuery("")}
-          className="shrink-0 px-2 text-xs font-bold text-rose-500"
-        >
-          مسح
-        </button>
-      )}
-
-      <button
-        type="button"
-        onClick={() => {
-          document.getElementById("ads-section")?.scrollIntoView({
-            behavior: "smooth",
-          });
-        }}
-        className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white"
-      >
-        بحث
-      </button>
-    </div>
-  </div>
-
-  <div className="mt-3 grid grid-cols-2 gap-2">
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-      <span className="mb-1 block text-[10px] font-bold text-slate-400">
-        المحافظة
-      </span>
+    <div className="relative min-w-0 flex-1">
       <select
         value={selectedGovernorate}
         onChange={(e) => {
           setSelectedGovernorate(e.target.value);
           setSelectedCity("");
         }}
-        className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
+        className="h-10 w-full appearance-none rounded-xl border border-slate-100 bg-slate-50 px-3 pl-8 text-xs font-bold text-slate-700 outline-none hover:border-emerald-200 focus:border-emerald-400"
       >
         <option value="">كل المحافظات</option>
         {governorates.map((governorate) => (
@@ -1449,16 +910,18 @@ onClick={async () => {
           </option>
         ))}
       </select>
+
+      <ChevronDown
+        size={14}
+        className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+      />
     </div>
 
-    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-      <span className="mb-1 block text-[10px] font-bold text-slate-400">
-        المدينة
-      </span>
+    <div className="relative min-w-0 flex-1">
       <select
         value={selectedCity}
         onChange={(e) => setSelectedCity(e.target.value)}
-        className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
+        className="h-10 w-full appearance-none rounded-xl border border-slate-100 bg-slate-50 px-3 pl-8 text-xs font-bold text-slate-700 outline-none hover:border-emerald-200 focus:border-emerald-400"
       >
         <option value="">كل المدن</option>
         {cities
@@ -1473,25 +936,595 @@ onClick={async () => {
             </option>
           ))}
       </select>
-    </div>
-  </div>
 
-  {(searchQuery || selectedGovernorate || selectedCity) && (
-    <button
-      type="button"
-      onClick={() => {
-        setSearchQuery("");
-        setSelectedGovernorate("");
-        setSelectedCity("");
-      }}
-      className="mt-3 w-full rounded-xl border border-rose-200 bg-white py-2.5 text-xs font-bold text-rose-600 transition hover:bg-rose-50"
-    >
-      مسح البحث والفلاتر
-    </button>
-  )}
+      <ChevronDown
+        size={14}
+        className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
+      />
+    </div>
+
+    {(searchQuery || selectedGovernorate || selectedCity) && (
+      <button
+        type="button"
+        onClick={() => {
+          setSearchQuery("");
+          setSelectedGovernorate("");
+          setSelectedCity("");
+        }}
+        title="مسح البحث والفلاتر"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition hover:bg-rose-100"
+      >
+        <X size={16} />
+      </button>
+    )}
+  </div>
 </div>
 
+    {/* روابط الحساب - الكمبيوتر */}
+    <div className="hidden min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-2 md:col-start-2 md:row-start-1 md:flex">
+      {isLoggedIn ? (
+        <>
+          <button
+            onClick={() => navigate("/my-ads")}
+            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+          >
+            <UserRound size={18} />
+            إعلاناتي
+          </button>
+
+          <button
+            onClick={() => navigate("/profile")}
+            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-slate-700 hover:text-emerald-800"
+          >
+            <UserRound size={18} />
+            الملف الشخصي
+          </button>
+
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              navigate("/messages");
+            }}
+            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-slate-700 hover:text-emerald-800"
+          >
+            <MessageCircle size={18} />
+            رسائلي
+            {unreadMessagesCount > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                {unreadMessagesCount}
+              </span>
+            )}
+          </button>
+
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="relative flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+            >
+              <Bell size={20} />
+              <span>الإشعارات</span>
+              {unreadNotificationsCount > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute left-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <h3 className="font-bold text-slate-800">الإشعارات</h3>
+                </div>
+
+                <div className="max-h-96 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="p-5 text-center text-sm text-slate-500">
+                      لا توجد إشعارات حالياً
+                    </p>
+                  ) : (
+                    notifications.map((item: any) => {
+                      const notification = Array.isArray(item.notifications)
+                        ? item.notifications[0]
+                        : item.notifications;
+
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={async () => {
+                            if (!item.read_at) {
+                              await markNotificationAsRead(item.id);
+                            }
+
+                            setShowNotifications(false);
+
+                            const link = notification?.link;
+                            if (!link) return;
+
+                            try {
+                              if (/^https?:\/\//i.test(link)) {
+                                const url = new URL(link);
+
+                                if (
+                                  url.hostname === "nemer92.github.io" &&
+                                  url.pathname.startsWith("/sooq-sy/ad/")
+                                ) {
+                                  const adId = url.pathname
+                                    .replace("/sooq-sy/ad/", "")
+                                    .replace(/\/$/, "");
+
+                                  navigate(`/ad/${encodeURIComponent(adId)}`);
+                                } else {
+                                  window.open(link, "_blank", "noopener,noreferrer");
+                                }
+                              } else {
+                                navigate(link.startsWith("/") ? link : `/${link}`);
+                              }
+                            } catch (error) {
+                              console.error("Invalid notification link:", error);
+                            }
+                          }}
+                          className={`cursor-pointer border-b border-slate-100 p-4 ${
+                            !item.read_at ? "bg-emerald-50" : "bg-white"
+                          }`}
+                        >
+                          <p className="font-bold text-slate-800">
+                            {notification?.title}
+                          </p>
+                          <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
+                            {notification?.body}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-400">
+                            {new Date(item.created_at).toLocaleString("ar")}
+                          </p>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={() => navigate("/favorites")}
+            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-rose-600 hover:text-rose-700"
+          >
+            <Heart size={18} />
+            <span>مفضلتي</span>
+            {favoriteAdIds.length > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">
+                {favoriteAdIds.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={async () => {
+              const confirmed = await window.sooqConfirm(
+                "هل أنت متأكد أنك تريد تسجيل الخروج؟"
+              );
+
+              if (!confirmed) return;
+
+              const { error } = await supabase.auth.signOut();
+
+              if (error) {
+                alert("تعذر تسجيل الخروج، حاول مرة أخرى.");
+                return;
+              }
+
+              navigate("/");
+            }}
+            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-red-600 hover:text-red-700"
+          >
+            <LogOut size={18} />
+            تسجيل الخروج
+          </button>
+        </>
+      ) : (
+        <>
+          <button
+            onClick={() => navigate("/auth")}
+            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-slate-600"
+          >
+            <UserRound size={18} />
+            تسجيل الدخول
+          </button>
+
+          <a
+            href="https://sooq-sy.pages.dev/app.apk"
+            download="Sooq-SY.apk"
+            className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="h-5 w-5"
+            >
+              <path d="M17.6 9.48 19.44 6.3a.5.5 0 0 0-.86-.5l-1.86 3.22a11.3 11.3 0 0 0-9.44 0L5.42 5.8a.5.5 0 1 0-.86.5L6.4 9.48A10.2 10.2 0 0 0 2 17h20a10.2 10.2 0 0 0-4.4-7.52ZM7.5 13.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
+            </svg>
+            تحميل تطبيق Sooq.Sy
+            <span className="mr-auto">↓</span>
+          </a>
+        </>
+      )}
+
+      {allowNewAds && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate("/add-ad?type=donation")}
+            className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-rose-500 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-rose-600"
+          >
+            <Heart size={19} />
+            تبرع الآن
+          </button>
+
+          <button
+            onClick={() => navigate("/add-ad")}
+            className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
+          >
+            <Plus size={19} />
+            أضف إعلانك
+          </button>
+        </div>
+      )}
+    </div>
+
+    {/* زر قائمة الموبايل */}
+    <button
+      onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+      aria-label="فتح القائمة"
+      className="relative rounded-lg p-2 text-slate-600 md:hidden"
+    >
+      <Menu size={24} />
+      {(unreadMessagesCount > 0 || unreadNotificationsCount > 0) && (
+        <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+      )}
+    </button>
+  </div>
+
+  {/* قائمة الموبايل */}
+  {isMobileMenuOpen && (
+    <div className="border-t border-slate-100 bg-white px-5 py-4 shadow-md md:hidden">
+      <div className="flex flex-col gap-2">
+        {isLoggedIn ? (
+          <>
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                navigate("/my-ads");
+              }}
+              className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+            >
+              <UserRound size={18} className="ml-2 inline" />
+              إعلاناتي
+            </button>
+
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                navigate("/profile");
+              }}
+              className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              <UserRound size={18} className="ml-2 inline" />
+              الملف الشخصي
+            </button>
+
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                navigate("/messages");
+              }}
+              className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+            >
+              <MessageCircle size={18} className="ml-2 inline" />
+              رسائلي
+              {unreadMessagesCount > 0 && (
+                <span className="mr-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                  {unreadMessagesCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                setShowNotifications(true);
+              }}
+              className="flex items-center justify-between rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+            >
+              <span className="flex items-center gap-2">
+                <Bell size={18} />
+                الإشعارات
+              </span>
+              {unreadNotificationsCount > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                navigate("/favorites");
+              }}
+              className="rounded-xl px-4 py-3 text-right text-sm font-bold text-rose-600 hover:bg-rose-50"
+            >
+              <Heart size={18} className="ml-2 inline" />
+              مفضلتي
+            </button>
+
+            <button
+              onClick={async () => {
+                const confirmed = await window.sooqConfirm(
+                  "هل أنت متأكد أنك تريد تسجيل الخروج؟"
+                );
+
+                if (!confirmed) return;
+
+                const { error } = await supabase.auth.signOut();
+
+                if (error) {
+                  alert("تعذر تسجيل الخروج، حاول مرة أخرى.");
+                  return;
+                }
+
+                setIsMobileMenuOpen(false);
+                navigate("/");
+              }}
+              className="rounded-xl px-4 py-3 text-right text-sm font-semibold text-red-600 hover:bg-red-50"
+            >
+              تسجيل الخروج
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => {
+              setIsMobileMenuOpen(false);
+              navigate("/auth");
+            }}
+            className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
+          >
+            <UserRound size={18} className="ml-2 inline" />
+            تسجيل الدخول
+          </button>
+        )}
+
+        <button
+          onClick={() => {
+            setIsMobileMenuOpen(false);
+            navigate("/stores");
+          }}
+          className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+        >
+          <StoreIcon size={18} className="ml-2 inline" />
+          المتاجر
+        </button>
+
+        {allowNewAds && (
+          <>
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                navigate("/add-ad?type=donation");
+              }}
+              className="rounded-xl bg-rose-500 px-4 py-3 text-right text-sm font-bold text-white hover:bg-rose-600"
+            >
+              <Heart size={18} className="ml-2 inline" />
+              تبرع الآن
+            </button>
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                navigate("/add-ad");
+              }}
+              className="rounded-xl bg-emerald-600 px-4 py-3 text-right text-sm font-bold text-white hover:bg-emerald-700"
+            >
+              <Plus size={18} className="ml-2 inline" />
+              أضف إعلانك
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )}
+
+  {/* إشعارات الموبايل */}
+  {showNotifications && (
+    <div
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 px-4 pt-20 md:hidden"
+      onClick={() => setShowNotifications(false)}
+    >
+      <div
+        className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
+          <h3 className="font-bold text-slate-800">الإشعارات</h3>
+          <button
+            type="button"
+            onClick={() => setShowNotifications(false)}
+            className="rounded-lg px-3 py-1 text-sm font-bold text-red-600 hover:bg-red-50"
+          >
+            إغلاق
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto">
+          {notifications.length === 0 ? (
+            <p className="p-6 text-center text-sm text-slate-500">
+              لا توجد إشعارات حالياً
+            </p>
+          ) : (
+            notifications.map((item: any) => {
+              const notification = Array.isArray(item.notifications)
+                ? item.notifications[0]
+                : item.notifications;
+
+              return (
+                <div
+                  key={item.id}
+                  onClick={async () => {
+                    if (!item.read_at) {
+                      await markNotificationAsRead(item.id);
+                    }
+
+                    setShowNotifications(false);
+
+                    const link = notification?.link;
+                    if (!link) return;
+
+                    try {
+                      if (/^https?:\/\//i.test(link)) {
+                        const url = new URL(link);
+
+                        if (
+                          url.hostname === "nemer92.github.io" &&
+                          url.pathname.startsWith("/sooq-sy/ad/")
+                        ) {
+                          const adId = url.pathname
+                            .replace("/sooq-sy/ad/", "")
+                            .replace(/\/$/, "");
+                          navigate(`/ad/${encodeURIComponent(adId)}`);
+                        } else {
+                          window.open(link, "_blank", "noopener,noreferrer");
+                        }
+                      } else {
+                        navigate(link.startsWith("/") ? link : `/${link}`);
+                      }
+                    } catch (error) {
+                      console.error("Invalid notification link:", error);
+                    }
+                  }}
+                  className={`cursor-pointer border-b border-slate-100 p-4 ${
+                    !item.read_at ? "bg-emerald-50" : "bg-white"
+                  }`}
+                >
+                  <p className="font-bold text-slate-800">
+                    {notification?.title}
+                  </p>
+                  <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
+                    {notification?.body}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-400">
+                    {new Date(item.created_at).toLocaleString("ar")}
+                  </p>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* البحث والفلاتر - الموبايل، بدون تغيير */}
+  <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4 md:hidden">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm focus-within:border-emerald-400">
+      <div className="flex h-12 items-center px-3">
+        <Search size={19} className="shrink-0 text-emerald-600" />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              document.getElementById("ads-section")?.scrollIntoView({
+                behavior: "smooth",
+              });
+            }
+          }}
+          className="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:text-slate-400"
+          placeholder="ابحث عن أي شيء في السوق..."
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery("")}
+            className="shrink-0 px-2 text-xs font-bold text-rose-500"
+          >
+            مسح
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            document.getElementById("ads-section")?.scrollIntoView({
+              behavior: "smooth",
+            });
+          }}
+          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white"
+        >
+          بحث
+        </button>
+      </div>
+    </div>
+
+    <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+        <span className="mb-1 block text-[10px] font-bold text-slate-400">
+          المحافظة
+        </span>
+        <select
+          value={selectedGovernorate}
+          onChange={(e) => {
+            setSelectedGovernorate(e.target.value);
+            setSelectedCity("");
+          }}
+          className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
+        >
+          <option value="">كل المحافظات</option>
+          {governorates.map((governorate) => (
+            <option key={governorate.id} value={String(governorate.id)}>
+              {governorate.name_ar}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+        <span className="mb-1 block text-[10px] font-bold text-slate-400">
+          المدينة
+        </span>
+        <select
+          value={selectedCity}
+          onChange={(e) => setSelectedCity(e.target.value)}
+          className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
+        >
+          <option value="">كل المدن</option>
+          {cities
+            .filter(
+              (city) =>
+                selectedGovernorate === "" ||
+                String(city.governorate_id) === selectedGovernorate
+            )
+            .map((city) => (
+              <option key={city.id} value={String(city.id)}>
+                {city.name_ar}
+              </option>
+            ))}
+        </select>
+      </div>
+    </div>
+
+    {(searchQuery || selectedGovernorate || selectedCity) && (
+      <button
+        type="button"
+        onClick={() => {
+          setSearchQuery("");
+          setSelectedGovernorate("");
+          setSelectedCity("");
+        }}
+        className="mt-3 w-full rounded-xl border border-rose-200 bg-white py-2.5 text-xs font-bold text-rose-600 transition hover:bg-rose-50"
+      >
+        مسح البحث والفلاتر
+      </button>
+    )}
+  </div>
 </header>
+
 
 
       <main className="mx-auto max-w-7xl px-5 pb-16">
@@ -1682,90 +1715,147 @@ onClick={async () => {
       )}
     </div>
 
-    {/* نسخة الكمبيوتر */}
-    <div className="hidden grid-cols-4 gap-3 sm:grid md:grid-cols-5 lg:grid-cols-9">
+{/* نسخة الكمبيوتر - سكرول أفقي */}
+<div className="hidden sm:block mt-1">
+  <div className="flex gap-3 overflow-x-auto overflow-y-hidden pb-3 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
 
-      <button
-        onClick={() => {
-          setSelectedCategory(null);
-          setSelectedSubCategory(null);
-        }}
-        className={`rounded-2xl border px-4 py-3 text-sm font-bold transition ${
-          selectedCategory === null
-            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-            : "border-slate-100 bg-slate-50 text-slate-600 hover:border-emerald-200"
-        }`}
-      >
+    {/* كل الإعلانات */}
+    <button
+      onClick={() => {
+        setSelectedCategory(null);
+        setSelectedSubCategory(null);
+      }}
+      className={`flex min-w-[180px] shrink-0 items-center gap-3 rounded-2xl border p-3 text-right transition-all hover:-translate-y-0.5 hover:shadow-md ${
+        selectedCategory === null
+          ? "border-emerald-400 bg-emerald-50 shadow-sm"
+          : "border-slate-100 bg-white hover:border-emerald-200"
+      }`}
+    >
+      <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+        selectedCategory === null
+          ? "bg-emerald-600 text-white"
+          : "bg-slate-100 text-slate-600"
+      }`}>
+        <Menu size={23} />
+      </span>
+      <span className={`whitespace-nowrap text-sm font-black ${
+        selectedCategory === null ? "text-emerald-800" : "text-slate-800"
+      }`}>
         كل الإعلانات
-      </button>
+      </span>
+    </button>
 
-      {categories
-        .filter((category) => category.parent_id === null)
-        .map((category) => {
-          const Icon =
-            categoryIconMap[
-              category.name_ar as keyof typeof categoryIconMap
-            ] ?? Menu;
+    {categories
+      .filter((category) => category.parent_id === null)
+      .map((category) => {
+        const Icon =
+          categoryIconMap[
+            category.name_ar as keyof typeof categoryIconMap
+          ] ?? Menu;
 
-          const subCategories = categories.filter(
-            (sub) => sub.parent_id === category.id
-          );
+        const isActive = selectedCategory === category.id;
 
-          return (
-            <div key={category.id} className="flex flex-col gap-3">
-              <button
-                onClick={() => {
-                  setSelectedCategory(category.id);
-                  setSelectedSubCategory(null);
-                }}
-                className={`group flex flex-col items-center justify-center gap-3 rounded-2xl border p-4 text-center transition hover:-translate-y-1 hover:shadow-md ${
-                  selectedCategory === category.id
-                    ? "border-emerald-500 bg-emerald-50"
-                    : "border-slate-100 bg-slate-50 hover:border-emerald-200"
-                }`}
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-600 group-hover:text-white">
-                  <Icon size={23} />
-                </span>
+        const colorStyles = [
+          "bg-blue-50 text-blue-600",
+          "bg-purple-50 text-purple-600",
+          "bg-rose-50 text-rose-600",
+          "bg-amber-50 text-amber-600",
+          "bg-cyan-50 text-cyan-600",
+          "bg-emerald-50 text-emerald-600",
+          "bg-orange-50 text-orange-600",
+          "bg-indigo-50 text-indigo-600",
+        ];
 
-                <span className="text-xs font-bold text-slate-700">
-                  {category.name_ar}
-                </span>
-              </button>
+        const colorIndex =
+          Math.abs(
+            category.name_ar
+              .split("")
+              .reduce((sum, char) => sum + char.charCodeAt(0), 0)
+          ) % colorStyles.length;
 
-              {selectedCategory === category.id &&
-                subCategories.length > 0 && (
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <button
-                      onClick={() => setSelectedSubCategory(null)}
-                      className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                        selectedSubCategory === null
-                          ? "border-emerald-500 bg-emerald-600 text-white"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-emerald-400"
-                      }`}
-                    >
-                      كل إعلانات التصنيف
-                    </button>
+        const subCategories = categories.filter(
+          (sub) => sub.parent_id === category.id
+        );
 
-                    {subCategories.map((sub) => (
-                      <button
-                        key={sub.id}
-                        onClick={() => setSelectedSubCategory(sub.id)}
-                        className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                          selectedSubCategory === sub.id
-                            ? "border-emerald-500 bg-emerald-600 text-white"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-emerald-400"
-                        }`}
-                      >
-                        {sub.name_ar}
-                      </button>
-                    ))}
-                  </div>
-                )}
-            </div>
-          );
-        })}
+        return (
+          <button
+            key={category.id}
+            onClick={() => {
+              setSelectedCategory(category.id);
+              setSelectedSubCategory(null);
+            }}
+            className={`group flex min-w-[170px] shrink-0 items-center gap-3 rounded-2xl border p-3 text-right transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+              isActive
+                ? "border-emerald-400 bg-emerald-50 shadow-sm"
+                : "border-slate-100 bg-white hover:border-emerald-200"
+            }`}
+          >
+            <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
+              isActive
+                ? "bg-emerald-600 text-white"
+                : colorStyles[colorIndex]
+            }`}>
+              <Icon size={23} />
+            </span>
+
+            <span className="min-w-0 flex-1">
+              <span className={`block whitespace-nowrap text-sm font-black ${
+                isActive ? "text-emerald-800" : "text-slate-800"
+              }`}>
+                {category.name_ar}
+              </span>
+
+              <span className="mt-1 block whitespace-nowrap text-[10px] font-medium text-slate-400">
+                {subCategories.length > 0
+                  ? `${subCategories.length} تصنيف فرعي`
+                  : "تصفح الإعلانات"}
+              </span>
+            </span>
+          </button>
+        );
+      })}
+  </div>
+
+  {/* التصنيفات الفرعية */}
+  {selectedCategory && (
+    <div className="mt-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-3">
+      <div className="mb-2 text-xs font-black text-slate-600">
+        التصنيفات الفرعية
+      </div>
+
+      <div className="flex gap-2 overflow-x-auto pb-2 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300">
+
+        <button
+          onClick={() => setSelectedSubCategory(null)}
+          className={`shrink-0 whitespace-nowrap rounded-xl border px-4 py-2.5 text-xs font-bold transition ${
+            selectedSubCategory === null
+              ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+              : "border-white bg-white text-slate-600 hover:border-emerald-300"
+          }`}
+        >
+          كل إعلانات التصنيف
+        </button>
+
+        {categories
+          .filter((sub) => sub.parent_id === selectedCategory)
+          .map((sub) => (
+            <button
+              key={sub.id}
+              onClick={() => setSelectedSubCategory(sub.id)}
+              className={`shrink-0 whitespace-nowrap rounded-xl border px-4 py-2.5 text-xs font-bold transition ${
+                selectedSubCategory === sub.id
+                  ? "border-emerald-600 bg-emerald-600 text-white shadow-sm"
+                  : "border-white bg-white text-slate-600 hover:border-emerald-300"
+              }`}
+            >
+              {sub.name_ar}
+            </button>
+          ))}
+      </div>
     </div>
+  )}
+</div>
+
 
   </div>
 </section>
@@ -1830,7 +1920,12 @@ onClick={async () => {
   <div className="mb-6 flex items-center justify-between gap-3">
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-2xl">⭐</span>
+        <span
+  className="inline-block text-2xl"
+  style={{ animation: "spin 3s linear infinite" }}
+>
+  ⭐
+</span>
         <h2 className="text-xl font-black text-amber-950">
           إعلانات مميزة
         </h2>
@@ -1985,6 +2080,90 @@ onClick={async () => {
 
 
 <section
+  dir="rtl"
+  className="mt-10 overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-bl from-emerald-100 via-white to-teal-100 p-4 shadow-md shadow-emerald-100/70 sm:p-6"
+>
+  <div className="mb-6 flex items-center justify-between gap-3">
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm"><StoreIcon size={22} /></span>
+        <h2 className="text-xl font-black text-emerald-950">متاجر مميزة</h2>
+        <span className="rounded-md border border-emerald-200 bg-white/80 px-2 py-1 text-[10px] font-bold text-emerald-800">تسوق من المتجر مباشرة</span>
+      </div>
+      <p className="mt-2 text-sm text-emerald-800">اكتشف المتاجر المحلية وتصفح منتجاتها من مكان واحد</p>
+    </div>
+    <button type="button" onClick={() => navigate("/stores")} className="shrink-0 rounded-xl border border-emerald-300 bg-white/90 px-3 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-200 sm:px-4 sm:text-sm">كل المتاجر ←</button>
+  </div>
+  {featuredStoresLoading && <p className="py-8 text-center text-sm text-emerald-800">جارٍ تحميل المتاجر...</p>}
+  {!featuredStoresLoading && featuredStores.length === 0 && <div className="rounded-2xl border border-dashed border-emerald-300 bg-white/60 py-8 text-center text-sm text-emerald-800">ستظهر المتاجر هنا بعد تفعيلها</div>}
+  {!featuredStoresLoading && featuredStores.length > 0 && (
+
+<div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3">
+  {featuredStores.map((store) => (
+    <button
+      key={store.id}
+      type="button"
+      onClick={() => navigate(`/store/${store.id}`)}
+      className="group w-[245px] shrink-0 snap-start overflow-hidden rounded-2xl border border-emerald-200 bg-white text-right shadow-sm transition hover:-translate-y-1 hover:shadow-lg sm:w-[275px]"
+    >
+      {/* غلاف المتجر */}
+      <div
+        className="relative z-0 h-28 bg-gradient-to-l from-emerald-200 via-teal-100 to-slate-100"
+        style={
+          store.cover_url
+            ? {
+                backgroundImage: `url(${store.cover_url})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }
+            : undefined
+        }
+      >
+        <span className="absolute left-3 top-3 rounded-lg bg-white/90 px-2 py-1 text-[10px] font-black text-emerald-800 shadow-sm">
+          متجر
+        </span>
+      </div>
+
+      <div className="relative z-10 px-4 pb-4">
+        {/* شعار المتجر */}
+        <div className="relative z-20 -mt-8 mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-lg">
+          {store.logo_url ? (
+            <img
+              src={store.logo_url}
+              alt={store.name}
+              className="relative z-10 h-full w-full object-cover"
+            />
+          ) : (
+            <StoreIcon size={27} className="text-emerald-600" />
+          )}
+        </div>
+
+        <h3 className="truncate text-base font-black text-slate-900">
+          {store.name}
+        </h3>
+
+        <p className="mt-1 truncate text-sm font-bold text-emerald-700">
+          {store.business_type}
+        </p>
+
+        <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
+          <MapPin size={13} />
+          {[store.governorate, store.city].filter(Boolean).join(" - ") ||
+            "الموقع غير محدد"}
+        </p>
+
+        <span className="mt-4 inline-flex rounded-lg bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 transition group-hover:bg-emerald-600 group-hover:text-white">
+          تصفح المتجر ←
+        </span>
+      </div>
+    </button>
+  ))}
+</div>
+
+  )}
+</section>
+
+<section
   className="mt-14 rounded-3xl border border-emerald-200 bg-gradient-to-bl from-emerald-50 via-white to-teal-50 p-4 shadow-sm sm:p-6"
   id="ads-section"
   dir="rtl"
@@ -2111,7 +2290,14 @@ onClick={async () => {
   <div className="mb-6 flex items-center justify-between gap-3">
     <div>
       <div className="flex items-center gap-2">
-        <Heart className="text-rose-500" size={23} />
+        <Heart
+  className="text-rose-500"
+  size={23}
+  style={{
+    animation: "heartbeat 3s ease-in-out infinite",
+    transformOrigin: "center",
+  }}
+/>
         <h2 className="text-xl font-black text-rose-950">
           أغراض مجانية للتبرع
         </h2>
@@ -2251,35 +2437,108 @@ onClick={async () => {
 
       </main>
 
-<footer className="border-t border-slate-200 bg-white px-5 py-8 text-center">
-  <h2 className="text-xl font-black text-slate-900">{siteName}</h2>
 
-  <p className="mt-2 text-xs text-slate-500">
-    السوق السوري للإعلانات المبوبة
+<footer className="relative mt-12 overflow-hidden bg-slate-950 px-5 pb-6 pt-12 text-white">
+  {/* لمسات جمالية */}
+  <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
+  <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl" />
+
+  <div className="relative mx-auto max-w-6xl">
+    <div className="grid gap-8 text-center md:grid-cols-3 md:text-right">
+
+      {/* هوية الموقع */}
+      <div>
+        <h2 className="text-2xl font-black tracking-wide text-white">
+          {siteName}
+        </h2>
+        <div className="mx-auto mt-3 h-1 w-14 rounded-full bg-emerald-500 md:mx-0" />
+        <p className="mt-4 text-sm leading-7 text-slate-400">
+          السوق السوري للإعلانات المبوبة
+          <br />
+          مكانك الأمثل للبيع والشراء والتبرع.
+        </p>
+      </div>
+
+      {/* التواصل */}
+      <div>
+        <h3 className="mb-4 text-base font-black text-white">
+          تواصل معنا
+        </h3>
+
+        <div className="flex flex-col items-center gap-3 md:items-start">
+          {contactEmail && (
+            <a
+              href={`mailto:${contactEmail}`}
+              className="flex items-center gap-2 text-sm text-slate-400 transition hover:text-emerald-400"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-emerald-400">
+                ✉
+              </span>
+              <span dir="ltr">{contactEmail}</span>
+            </a>
+          )}
+
+          {contactPhone && (
+            <a
+              href={`tel:${contactPhone}`}
+              className="flex items-center gap-2 text-sm text-slate-400 transition hover:text-emerald-400"
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-emerald-400">
+                ☎
+              </span>
+              <span dir="ltr">{contactPhone}</span>
+            </a>
+          )}
+        </div>
+      </div>
+
+{/* تحميل التطبيق */}
+<div>
+  <h3 className="mb-3 text-base font-black text-white">
+    حمّل تطبيق سوق سوريا
+  </h3>
+
+  <p className="text-sm leading-7 text-slate-400">
+    خلي سوق سوريا معك وين ما كنت، وتابع إعلاناتك بسهولة من موبايلك.
   </p>
 
-  {contactEmail && (
-    <p className="mt-3 text-xs text-slate-500">
-      البريد الإلكتروني:{" "}
-      <a href={`mailto:${contactEmail}`} className="text-emerald-600">
-        {contactEmail}
-      </a>
-    </p>
-  )}
+  <a
+    href="https://sooq-sy.pages.dev/app.apk"
+    download="Sooq-SY.apk"
+    className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-sm font-bold text-emerald-400 shadow-sm transition hover:bg-emerald-500/20 hover:text-emerald-300"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className="h-5 w-5"
+    >
+      <path d="M17.6 9.48 19.44 6.3a.5.5 0 0 0-.86-.5l-1.86 3.22a11.3 11.3 0 0 0-9.44 0L5.42 5.8a.5.5 0 1 0-.86.5L6.4 9.48A10.2 10.2 0 0 0 2 17h20a10.2 10.2 0 0 0-4.4-7.52ZM7.5 13.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
+      <path d="M4 18h16v1a2 2 0 0 1-2 2h-1v2h-2v-2H9v2H7v-2H6a2 2 0 0 1-2-2v-1Z" />
+    </svg>
+    تحميل التطبيق
+    <span>↓</span>
+  </a>
 
-  {contactPhone && (
-    <p className="mt-2 text-xs text-slate-500">
-      الهاتف:{" "}
-      <a href={`tel:${contactPhone}`} className="text-emerald-600">
-        {contactPhone}
-      </a>
-    </p>
-  )}
-
-  <p className="mt-4 text-xs text-slate-400">
-    © {new Date().getFullYear()} {siteName} - جميع الحقوق محفوظة
+  <p className="mt-2 text-[10px] text-slate-500">
+    متوفر لأجهزة Android بصيغة APK
   </p>
+</div>
+
+    </div>
+
+    {/* الحقوق */}
+    <div className="mt-10 border-t border-white/10 pt-5 text-center">
+      <p className="text-xs text-slate-500">
+        © {new Date().getFullYear()} {siteName} - جميع الحقوق محفوظة
+      </p>
+      <p className="mt-2 text-[11px] font-medium text-slate-600">
+        صنع بكل محبة لخدمة المجتمع السوري
+      </p>
+    </div>
+  </div>
 </footer>
+
     </div>
   );
 }

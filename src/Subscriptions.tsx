@@ -13,6 +13,22 @@ type Package = {
   featured_ads_limit: number;
 };
 
+type Store = {
+  id: string;
+  name: string;
+  status: "pending" | "active" | "rejected" | "suspended";
+};
+
+type Governorate = {
+  id: number;
+  name_ar: string;
+};
+
+type City = {
+  id: number;
+  governorate_id: number;
+  name_ar: string;
+};
 
 export default function Subscriptions() {
   const navigate = useNavigate();
@@ -29,6 +45,20 @@ export default function Subscriptions() {
 const [submitting, setSubmitting] = useState(false);
 const [requestSent, setRequestSent] = useState(false);
 const [requestError, setRequestError] = useState("");
+const [stores, setStores] = useState<Store[]>([]);
+const [selectedStoreId, setSelectedStoreId] = useState("");
+const [storeName, setStoreName] = useState("");
+const [businessType, setBusinessType] = useState("");
+const [storeDescription, setStoreDescription] = useState("");
+const [storePhone, setStorePhone] = useState("");
+const [storeWhatsapp, setStoreWhatsapp] = useState("");
+const [storeSubmitting, setStoreSubmitting] = useState(false);
+const [storeRequestSent, setStoreRequestSent] = useState(false);
+const [storeRequestError, setStoreRequestError] = useState("");
+const [governorates, setGovernorates] = useState<Governorate[]>([]);
+const [cities, setCities] = useState<City[]>([]);
+const [selectedGovernorate, setSelectedGovernorate] = useState("");
+const [selectedCity, setSelectedCity] = useState("");
 
 useEffect(() => {
   async function loadPaymentData() {
@@ -81,6 +111,38 @@ useEffect(() => {
       if (!profileData.phone || !/^09[0-9]{8}$/.test(profileData.phone)) {
         throw new Error("رقم الهاتف المسجل في حسابك غير صالح.");
       }
+
+      const { data: storesData, error: storesError } = await supabase
+  .from("stores")
+  .select("id, name, status")
+  .eq("owner_id", user.id)
+  .order("created_at", { ascending: false });
+
+if (storesError) throw storesError;
+
+setStores((storesData ?? []) as Store[]);
+const [
+  { data: governoratesData, error: governoratesError },
+  { data: citiesData, error: citiesError },
+] = await Promise.all([
+  supabase
+    .from("governorates")
+    .select("id,name_ar")
+    .eq("is_active", true)
+    .order("name_ar"),
+  supabase
+    .from("cities")
+    .select("id,governorate_id,name_ar")
+    .eq("is_active", true)
+    .order("name_ar"),
+]);
+
+if (governoratesError) throw governoratesError;
+if (citiesError) throw citiesError;
+
+setGovernorates(governoratesData ?? []);
+setCities(citiesData ?? []);
+setStorePhone(profileData.phone);
 
       setPhone(profileData.phone);
       setQrUrl(settingsData.sham_cash_qr_url ?? "");
@@ -139,6 +201,92 @@ const submitSubscriptionRequest = async () => {
     );
   } finally {
     setSubmitting(false);
+  }
+};
+
+const submitStoreSubscriptionRequest = async () => {
+  if (storeSubmitting || storeRequestSent || !subscriptionsEnabled) return;
+
+  setStoreRequestError("");
+
+  if (!selectedStoreId && !storeName.trim()) {
+    setStoreRequestError("يرجى إدخال اسم المتجر.");
+    return;
+  }
+
+  setStoreSubmitting(true);
+
+  try {
+    let storeId = selectedStoreId;
+
+    // إنشاء متجر جديد عند عدم اختيار متجر موجود
+    if (!storeId) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+
+      if (!user) {
+        navigate("/auth", {
+          state: { from: "/subscriptions" },
+        });
+        return;
+      }
+
+      const { data: newStore, error: createError } = await supabase
+        .from("stores")
+        .insert({
+          owner_id: user.id,
+          name: storeName.trim(),
+          business_type: businessType.trim() || null,
+          description: storeDescription.trim() || null,
+          governorate:
+            governorates.find(
+              (g) => g.id === Number(selectedGovernorate)
+            )?.name_ar ?? "",
+          city:
+            cities.find(
+              (c) => c.id === Number(selectedCity)
+            )?.name_ar ?? "",
+          phone: storePhone.trim(),
+          whatsapp: storeWhatsapp.trim() || null,
+          status: "pending",
+        })
+        .select("id, name, status")
+        .single();
+      if (createError) throw createError;
+
+      storeId = newStore.id;
+
+      setStores((previous) => [
+        newStore as Store,
+        ...previous,
+      ]);
+
+      setSelectedStoreId(storeId);
+    }
+
+    // إرسال طلب الاشتراك إلى الإدارة
+    const { data, error } = await supabase.rpc(
+      "create_store_subscription_request",
+      {
+        p_store_id: storeId,
+      }
+    );
+
+    if (error) throw error;
+
+    if (!data) {
+      throw new Error("لم يتم استلام رقم طلب الاشتراك.");
+    }
+
+    setStoreRequestSent(true);
+  } catch (err) {
+    setStoreRequestError(
+      err instanceof Error
+        ? err.message
+        : "تعذر إرسال طلب اشتراك المتجر."
+    );
+  } finally {
+    setStoreSubmitting(false);
   }
 };
 
@@ -215,50 +363,145 @@ const submitSubscriptionRequest = async () => {
             لا توجد باقات اشتراك متاحة حالياً.
           </p>
         ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {packages.map((item) => (
-              <button
-                key={item.number}
-                type="button"
-                onClick={() => setSelectedPackage(item)}
-className={`rounded-2xl border-2 p-4 text-right transition-all ${
-  selectedPackage?.number === item.number
-    ? "border-emerald-600 bg-emerald-50 shadow-md"
-    : "border-slate-200 bg-white hover:border-emerald-300"
-}`}
->
-  <span className="font-black text-slate-800">{item.name}</span>
+<div className="mt-5 grid gap-4 sm:grid-cols-3">
+  {packages.map((item) => {
+const packageName = item.name.trim();
 
-  <p className="mt-2 text-sm text-slate-500">
-    مدة الاشتراك: {item.duration_months} شهر
-  </p>
+const isGold = packageName.includes("احترافية") ||
+               packageName.includes("احتراف");
 
-  <div className="mt-4 space-y-2 text-sm">
-    <p className="flex justify-between">
-      <span>الإعلانات العادية</span>
-      <strong>{item.ordinary_ads_limit} إعلان</strong>
-    </p>
+const isSilver = packageName.includes("متقدمة") ||
+                 packageName.includes("متقدم");
 
-    <p className="flex justify-between">
-      <span>الإعلانات المميزة</span>
-      <strong className="text-amber-600">
-        {item.featured_ads_limit} إعلان
-      </strong>
-    </p>
-  </div>
+const isSelected = selectedPackage?.number === item.number;
 
-  <p className="mt-4 text-2xl font-black text-emerald-700">
-    ${item.price}
-  </p>
+const displayedName = isGold
+  ? "الباقة الذهبية"
+  : isSilver
+  ? "الباقة الفضية"
+  : "الباقة العادية";
 
-  {selectedPackage?.number === item.number && (
-    <p className="mt-2 text-center text-sm font-bold text-emerald-700">
-      <CheckCircle2 size={16} className="inline ml-1" /> تم اختيار هذه الباقة
-    </p>
-  )}
-              </button>
-            ))}
+const theme = isGold
+  ? {
+      border: "border-amber-400",
+      selected: "ring-2 ring-amber-400 shadow-xl",
+      background: "bg-gradient-to-br from-yellow-100 via-amber-50 to-yellow-200",
+      accent: "bg-gradient-to-l from-yellow-500 via-amber-300 to-yellow-600",
+      badge: "bg-amber-200 text-amber-950",
+      price: "text-amber-800",
+      title: "text-amber-950",
+      icon: "👑",
+      label: "الأعلى تميزاً",
+      details: "bg-yellow-50/90 border border-amber-200",
+      button: "bg-amber-500 text-white",
+    }
+  : isSilver
+  ? {
+      border: "border-slate-400",
+      selected: "ring-2 ring-slate-400 shadow-xl",
+      background: "bg-gradient-to-br from-slate-100 via-white to-slate-300",
+      accent: "bg-gradient-to-l from-slate-400 via-slate-200 to-slate-500",
+      badge: "bg-slate-300 text-slate-800",
+      price: "text-slate-700",
+      title: "text-slate-800",
+      icon: "🥈",
+      label: "اختيار مميز",
+      details: "bg-white/90 border border-slate-300",
+      button: "bg-slate-600 text-white",
+    }
+  : {
+      border: "border-gray-300",
+      selected: "ring-2 ring-gray-400 shadow-lg",
+      background: "bg-gradient-to-br from-gray-50 via-white to-gray-100",
+      accent: "bg-gray-400",
+      badge: "bg-gray-200 text-gray-700",
+      price: "text-gray-700",
+      title: "text-gray-800",
+      icon: "✓",
+      label: "البداية المناسبة",
+      details: "bg-white/90 border border-gray-200",
+      button: "bg-gray-600 text-white",
+    };
+
+    return (
+      <button
+        key={item.number}
+        type="button"
+        onClick={() => setSelectedPackage(item)}
+        className={`relative overflow-hidden rounded-2xl border-2 ${theme.border} ${theme.background} p-4 text-right transition-all duration-200 hover:-translate-y-1 hover:shadow-xl ${
+          isSelected ? theme.selected : "shadow-sm"
+        }`}
+      >
+        <div className={`absolute inset-x-0 top-0 h-2 ${theme.accent}`} />
+
+        <div className="pt-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-3xl" aria-hidden="true">
+              {theme.icon}
+            </span>
+
+            <span className={`rounded-full px-3 py-1 text-xs font-black ${theme.badge}`}>
+              {theme.label}
+            </span>
           </div>
+
+          <h3 className={`mt-3 text-xl font-black ${theme.title}`}>
+            {displayedName}
+          </h3>
+
+          <p className="mt-2 text-sm font-medium text-slate-600">
+            مدة الاشتراك: {item.duration_months} شهر
+          </p>
+        </div>
+
+        <div className={`my-5 space-y-3 rounded-xl p-3 text-sm ${theme.details}`}>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-600">الإعلانات العادية</span>
+            <strong className={theme.title}>
+              {item.ordinary_ads_limit} إعلان
+            </strong>
+          </div>
+
+          <div className="h-px bg-slate-300/50" />
+
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-600">الإعلانات المميزة</span>
+            <strong className={theme.title}>
+              {item.featured_ads_limit} إعلان
+            </strong>
+          </div>
+        </div>
+
+        <div className="flex items-end justify-between gap-2">
+          <span className={`text-3xl font-black ${theme.price}`}>
+            ${item.price}
+          </span>
+
+          <span className="text-xs font-medium text-slate-500">
+            سعر الاشتراك
+          </span>
+        </div>
+
+        <div
+          className={`mt-5 rounded-xl px-3 py-3 text-center text-sm font-black transition-all ${
+            isSelected
+              ? theme.button
+              : "border border-slate-300 bg-white/80 text-slate-700"
+          }`}
+        >
+          {isSelected ? (
+            <>
+              <CheckCircle2 size={17} className="ml-1 inline" />
+              تم اختيار هذه الباقة
+            </>
+          ) : (
+            "اختيار هذه الباقة"
+          )}
+        </div>
+      </button>
+    );
+  })}
+</div>
         )}
       </section>
 
@@ -283,6 +526,215 @@ className={`rounded-2xl border-2 p-4 text-right transition-all ${
           </div>
         </div>
       </section>
+
+      <section className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
+  <div className="bg-gradient-to-l from-emerald-800 to-emerald-600 p-5 text-white">
+    <span className="text-3xl">🏪</span>
+
+    <h2 className="mt-2 text-xl font-black">
+      اشتراك المتاجر
+    </h2>
+
+    <p className="mt-2 text-sm leading-7 text-emerald-50">
+      افتح متجرك الخاص على Sooq.Sy واعرض منتجاتك في صفحة متجرك
+      وفي الأقسام الرئيسية للسوق أيضاً.
+    </p>
+  </div>
+
+  <div className="space-y-5 p-5">
+    <div className="grid grid-cols-2 gap-3">
+      <div className="rounded-xl bg-emerald-50 p-4 text-center">
+        <strong className="block text-2xl font-black text-emerald-700">
+          100
+        </strong>
+        <span className="text-sm text-slate-600">إعلان عادي</span>
+      </div>
+
+      <div className="rounded-xl bg-amber-50 p-4 text-center">
+        <strong className="block text-2xl font-black text-amber-700">
+          20
+        </strong>
+        <span className="text-sm text-slate-600">إعلان مميز</span>
+      </div>
+    </div>
+
+    <div className="flex items-center justify-between rounded-xl bg-slate-50 p-4">
+      <div>
+        <p className="font-bold text-slate-800">مدة الاشتراك</p>
+        <p className="mt-1 text-sm text-slate-500">شهر واحد</p>
+      </div>
+
+      <strong className="text-3xl font-black text-emerald-700">
+        $20
+      </strong>
+    </div>
+
+    {stores.length > 0 && (
+      <div>
+        <label className="mb-2 block text-sm font-bold text-slate-700">
+          اختر متجراً موجوداً أو أنشئ متجراً جديداً
+        </label>
+
+        <select
+          value={selectedStoreId}
+          onChange={(e) => {
+            setSelectedStoreId(e.target.value);
+            setStoreRequestSent(false);
+            setStoreRequestError("");
+          }}
+          className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm"
+        >
+          <option value="">إنشاء متجر جديد</option>
+
+          {stores.map((store) => (
+            <option key={store.id} value={store.id}>
+              {store.name}
+              {store.status === "active"
+                ? " - نشط"
+                : store.status === "pending"
+                ? " - بانتظار المراجعة"
+                : store.status === "rejected"
+                ? " - مرفوض"
+                : " - موقوف"}
+            </option>
+          ))}
+        </select>
+      </div>
+    )}
+
+    {!selectedStoreId && (
+      <div className="space-y-3">
+        <h3 className="font-bold text-slate-800">
+          معلومات المتجر الجديد
+        </h3>
+
+        <input
+          value={storeName}
+          onChange={(e) => setStoreName(e.target.value)}
+          placeholder="اسم المتجر *"
+          className="w-full rounded-xl border border-slate-300 p-3 text-sm"
+          maxLength={100}
+        />
+
+        <input
+          value={businessType}
+          onChange={(e) => setBusinessType(e.target.value)}
+          placeholder="اختصاص المتجر، مثال: ألبسة أو إلكترونيات"
+          className="w-full rounded-xl border border-slate-300 p-3 text-sm"
+          maxLength={100}
+        />
+
+        <textarea
+          value={storeDescription}
+          onChange={(e) => setStoreDescription(e.target.value)}
+          placeholder="وصف مختصر عن المتجر"
+          className="w-full rounded-xl border border-slate-300 p-3 text-sm"
+          rows={3}
+          maxLength={500}
+        />
+
+<div>
+  <label className="mb-2 block text-sm font-bold text-slate-700">
+    المحافظة *
+  </label>
+  <select
+    value={selectedGovernorate}
+    onChange={(e) => {
+      setSelectedGovernorate(e.target.value);
+      setSelectedCity("");
+    }}
+    required
+    className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+  >
+    <option value="">اختر المحافظة</option>
+    {governorates.map((governorate) => (
+      <option key={governorate.id} value={String(governorate.id)}>
+        {governorate.name_ar}
+      </option>
+    ))}
+  </select>
+</div>
+
+<div>
+  <label className="mb-2 block text-sm font-bold text-slate-700">
+    المدينة *
+  </label>
+  <select
+    value={selectedCity}
+    onChange={(e) => setSelectedCity(e.target.value)}
+    required
+    disabled={!selectedGovernorate}
+    className="w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+  >
+    <option value="">اختر المدينة</option>
+    {cities
+      .filter(
+        (city) => city.governorate_id === Number(selectedGovernorate)
+      )
+      .map((city) => (
+        <option key={city.id} value={String(city.id)}>
+          {city.name_ar}
+        </option>
+      ))}
+  </select>
+</div>
+
+        <input
+          value={storePhone}
+          onChange={(e) => setStorePhone(e.target.value)}
+          placeholder="رقم هاتف المتجر"
+          dir="ltr"
+          className="w-full rounded-xl border border-slate-300 p-3 text-sm"
+        />
+
+        <input
+          value={storeWhatsapp}
+          onChange={(e) => setStoreWhatsapp(e.target.value)}
+          placeholder="رقم واتساب (اختياري)"
+          dir="ltr"
+          className="w-full rounded-xl border border-slate-300 p-3 text-sm"
+        />
+      </div>
+    )}
+
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <p className="text-sm font-bold text-amber-900">
+        آلية تفعيل المتجر
+      </p>
+
+      <p className="mt-2 text-sm leading-7 text-amber-900">
+        بعد إرسال الطلب وتحويل قيمة الاشتراك، ستقوم الإدارة بمراجعة
+        الطلب وتفعيله بعد التأكد من الحوالة. يمكنك امتلاك أكثر من متجر
+        ضمن حسابك.
+      </p>
+    </div>
+
+    {storeRequestSent ? (
+      <div className="rounded-xl bg-emerald-50 p-4 text-center text-sm font-bold text-emerald-700">
+        تم إرسال طلب اشتراك المتجر بنجاح، وهو الآن بانتظار مراجعة الإدارة.
+      </div>
+    ) : (
+      <>
+        {storeRequestError && (
+          <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {storeRequestError}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={submitStoreSubscriptionRequest}
+          disabled={!subscriptionsEnabled || storeSubmitting}
+          className="w-full rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {storeSubmitting
+            ? "جارٍ إرسال الطلب..."
+            : "إرسال طلب اشتراك المتجر"}
+        </button>
+      </>
+    )}
+  </div>
+</section>
 
 {selectedPackage && (
   <section className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
@@ -404,10 +856,6 @@ className={`rounded-2xl border-2 p-4 text-right transition-all ${
 
         <p className="mt-4" dir="ltr">
           {phone}
-        </p>
-
-        <p className="mt-3 text-sm leading-7 text-slate-600">
-          حوّل المبلغ الموضح أعلاه، واكتب رقم هاتفك المسجل في Sooq.Sy ضمن ملاحظة الحوالة.
         </p>
 
         <div className="mt-4 rounded-xl border-2 border-red-500 bg-yellow-50 p-4 shadow-sm">

@@ -16,7 +16,8 @@ type Ad = {
   categories: { name_ar: string } | null;
   cities: { name_ar: string } | null;
   listing_type: string;
-is_featured: boolean;
+  is_featured: boolean;
+  store_id: string | null;
 };
 
 const statusInfo: Record<string, { label: string; color: string }> = {
@@ -35,47 +36,53 @@ export default function MyAds() {
   const [error, setError] = useState("");
   const [featuringAdId, setFeaturingAdId] = useState<string | null>(null);
 
+  async function featureAd(ad: Ad) {
+    const isStoreAd = Boolean(ad.store_id);
 
-
-
-async function featureAdWithPoints(adId: string) {
-const confirmed = await window.sooqConfirm(
-  "هل تريد تمييز هذا الإعلان مقابل 5 نقاط؟"
-);
-
-if (!confirmed) return;
-
-  setFeaturingAdId(adId);
-
-  try {
-    const { error } = await supabase.rpc(
-      "feature_ad_with_points",
-      { p_ad_id: adId }
+    const confirmed = await window.sooqConfirm(
+      isStoreAd
+        ? "هل تريد تمييز هذا الإعلان باستخدام حصة الإعلانات المميزة في اشتراك المتجر؟"
+        : "هل تريد تمييز هذا الإعلان مقابل 5 نقاط؟"
     );
 
-    if (error) throw error;
+    if (!confirmed) return;
 
-    setAds((currentAds) =>
-      currentAds.map((ad) =>
-        ad.id === adId ? { ...ad, is_featured: true } : ad
-      )
-    );
+    setFeaturingAdId(ad.id);
 
-    window.alert("تم تمييز إعلانك بنجاح مقابل 5 نقاط.");
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "";
+    try {
+      const { error } = isStoreAd
+        ? await supabase.rpc("feature_ad_with_subscription", {
+            p_ad_id: ad.id,
+          })
+        : await supabase.rpc("feature_ad_with_points", {
+            p_ad_id: ad.id,
+          });
 
-    if (message.includes("لا توجد نقاط كافية")) {
-      window.alert("لا توجد نقاط كافية");
-    } else {
-      window.alert(message || "تعذر تمييز الإعلان.");
+      if (error) throw error;
+
+      setAds((currentAds) =>
+        currentAds.map((item) =>
+          item.id === ad.id ? { ...item, is_featured: true } : item
+        )
+      );
+
+      window.alert(
+        isStoreAd
+          ? "تم تمييز الإعلان باستخدام حصة المتجر بنجاح."
+          : "تم تمييز إعلانك بنجاح مقابل 5 نقاط."
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
+
+      if (message.includes("لا توجد نقاط كافية")) {
+        window.alert("لا توجد نقاط كافية.");
+      } else {
+        window.alert(message || "تعذر تمييز الإعلان.");
+      }
+    } finally {
+      setFeaturingAdId(null);
     }
-  } finally {
-    setFeaturingAdId(null);
   }
-}
-
 
   useEffect(() => {
     async function loadMyAds() {
@@ -104,7 +111,8 @@ if (!confirmed) return;
           categories(name_ar),
           cities(name_ar),
           listing_type,
-is_featured
+          is_featured,
+          store_id
         `)
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
@@ -122,7 +130,7 @@ is_featured
     loadMyAds();
   }, [navigate]);
 
-    async function deleteAd(adId: string) {
+  async function deleteAd(adId: string) {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData.session?.user;
@@ -132,7 +140,6 @@ is_featured
         return;
       }
 
-      // جلب مسارات صور الإعلان
       const { data: imagesData, error: imagesError } = await supabase
         .from("ad_images")
         .select("image_path")
@@ -140,7 +147,6 @@ is_featured
 
       if (imagesError) throw imagesError;
 
-      // حذف ملفات الصور من Storage
       const imagePaths = (imagesData || []).map(
         (image) => image.image_path
       );
@@ -153,7 +159,6 @@ is_featured
         if (storageError) throw storageError;
       }
 
-      // حذف الإعلان وسجلات صوره التابعة له
       const { error: deleteError } = await supabase
         .from("ads")
         .delete()
@@ -188,9 +193,7 @@ is_featured
 
       setAds((previousAds) =>
         previousAds.map((ad) =>
-          ad.id === adId
-            ? { ...ad, status: newStatus }
-            : ad
+          ad.id === adId ? { ...ad, status: newStatus } : ad
         )
       );
 
@@ -206,44 +209,49 @@ is_featured
   }
 
   async function republishAd(adId: string) {
-  try {
-    const { error } = await supabase.rpc("republish_own_ad", {
-      p_ad_id: adId,
-    });
+    try {
+      const { error } = await supabase.rpc("republish_own_ad", {
+        p_ad_id: adId,
+      });
 
-    if (error) throw error;
+      if (error) throw error;
 
-    setAds((previousAds) =>
-      previousAds.map((ad) =>
-        ad.id === adId
-          ? { ...ad, status: "pending" }
-          : ad
-      )
-    );
+      setAds((previousAds) =>
+        previousAds.map((ad) =>
+          ad.id === adId ? { ...ad, status: "pending" } : ad
+        )
+      );
 
-    alert("تمت إعادة الإعلان إلى قائمة المراجعة بنجاح.");
-  } catch (error) {
-    console.error("خطأ إعادة نشر الإعلان:", error);
-    alert("تعذرت إعادة نشر الإعلان. حاول مرة أخرى.");
+      alert("تمت إعادة الإعلان إلى قائمة المراجعة بنجاح.");
+    } catch (error) {
+      console.error("خطأ إعادة نشر الإعلان:", error);
+      alert("تعذرت إعادة نشر الإعلان. حاول مرة أخرى.");
+    }
   }
-}
 
   return (
     <main dir="rtl" className="min-h-screen bg-slate-50">
       <header className="border-b bg-white px-5 py-4">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-bold text-emerald-700">
+          <Link
+            to="/"
+            className="flex items-center gap-2 font-bold text-emerald-700"
+          >
             <ArrowRight size={20} />
             العودة للرئيسية
           </Link>
-          <span className="text-xl font-black text-emerald-700">Sooq.sy</span>
+          <span className="text-xl font-black text-emerald-700">
+            Sooq.sy
+          </span>
         </div>
       </header>
 
       <div className="mx-auto max-w-5xl px-4 py-8">
         <div className="mb-7 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black text-slate-800">إعلاناتي</h1>
+            <h1 className="text-2xl font-black text-slate-800">
+              إعلاناتي
+            </h1>
             <p className="mt-2 text-sm text-slate-500">
               تابع إعلاناتك وحالات مراجعتها
             </p>
@@ -302,12 +310,19 @@ is_featured
                   <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div className="min-w-0">
                       <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <span className={`rounded-lg px-3 py-1.5 text-xs font-bold ${status.color}`}>
+                        <span
+                          className={`rounded-lg px-3 py-1.5 text-xs font-bold ${status.color}`}
+                        >
                           {status.label}
                         </span>
                         <span className="text-xs text-slate-400">
                           {ad.categories?.name_ar ?? "غير محدد"}
                         </span>
+                        {ad.store_id && (
+                          <span className="rounded-lg bg-violet-100 px-3 py-1.5 text-xs font-bold text-violet-700">
+                            إعلان متجر
+                          </span>
+                        )}
                       </div>
 
                       <h2 className="text-lg font-black text-slate-800">
@@ -317,7 +332,13 @@ is_featured
                       <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-500">
                         <span>
                           {ad.price !== null
-                            ? `${ad.price.toLocaleString("en-US")} ${ad.currency === "USD" ? "دولار" : ad.currency === "SYP" ? "ليرة سورية" : ad.currency}`
+                            ? `${ad.price.toLocaleString("en-US")} ${
+                                ad.currency === "USD"
+                                  ? "دولار"
+                                  : ad.currency === "SYP"
+                                    ? "ليرة سورية"
+                                    : ad.currency
+                              }`
                             : "السعر عند التواصل"}
                         </span>
 
@@ -339,122 +360,127 @@ is_featured
                       )}
                     </div>
 
-                {ad.status === "approved" && (
-  <div className="flex flex-wrap gap-2">
-    <Link
-      to={`/ad/${ad.id}`}
-      className="shrink-0 rounded-xl border border-emerald-200 px-4 py-2.5 text-center text-sm font-bold text-emerald-700 hover:bg-emerald-50"
-    >
-      عرض الإعلان
-    </Link>
+                    {ad.status === "approved" && (
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          to={`/ad/${ad.id}`}
+                          className="shrink-0 rounded-xl border border-emerald-200 px-4 py-2.5 text-center text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+                        >
+                          عرض الإعلان
+                        </Link>
 
-    <button
-      type="button"
-onClick={async () => {
-  const confirmed = await window.sooqConfirm(
-    "هل تؤكد أن هذا الإعلان تم بيعه؟"
-  );
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const confirmed = await window.sooqConfirm(
+                              "هل تؤكد أن هذا الإعلان تم بيعه؟"
+                            );
 
-  if (confirmed) {
-    updateAdStatus(ad.id, "sold");
-  }
-}}
-      className="shrink-0 rounded-xl border border-blue-200 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50"
-    >
-      تم البيع
-    </button>
+                            if (confirmed) {
+                              updateAdStatus(ad.id, "sold");
+                            }
+                          }}
+                          className="shrink-0 rounded-xl border border-blue-200 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-50"
+                        >
+                          تم البيع
+                        </button>
 
-    <button
-      type="button"
-onClick={async () => {
-  const confirmed = await window.sooqConfirm(
-    "هل تريد إغلاق الإعلان وأرشفته؟"
-  );
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const confirmed = await window.sooqConfirm(
+                              "هل تريد إغلاق الإعلان وأرشفته؟"
+                            );
 
-  if (confirmed) {
-    updateAdStatus(ad.id, "archived");
-  }
-}}
-      className="shrink-0 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
-    >
-      إغلاق الإعلان
-    </button>
+                            if (confirmed) {
+                              updateAdStatus(ad.id, "archived");
+                            }
+                          }}
+                          className="shrink-0 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                        >
+                          إغلاق الإعلان
+                        </button>
 
-{ad.listing_type === "sale" && !ad.is_featured && (
-  <div className="flex flex-wrap gap-2">
+                        {ad.listing_type === "sale" && !ad.is_featured && (
+                          <button
+                            type="button"
+                            onClick={() => featureAd(ad)}
+                            disabled={featuringAdId === ad.id}
+                            className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-50"
+                          >
+                            {featuringAdId === ad.id
+                              ? "جارٍ التمييز..."
+                              : ad.store_id
+                                ? "تمييز من حصة المتجر"
+                                : "تمييز مقابل 5 نقاط"}
+                          </button>
+                        )}
 
+                        {ad.published_at &&
+                          !ad.is_featured &&
+                          !ad.store_id && (
+                            <Link
+                              to={`/featured-campaign/${ad.id}`}
+                              className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-amber-600"
+                            >
+                              تمييز الإعلان
+                            </Link>
+                          )}
 
-    <button
-      type="button"
-      onClick={() => featureAdWithPoints(ad.id)}
-      disabled={featuringAdId === ad.id}
-      className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-600 disabled:opacity-50"
-    >
-      {featuringAdId === ad.id
-        ? "جارٍ التمييز..."
-        : "تمييز مقابل 5 نقاط"}
-    </button>
-  </div>
-)}
-{ad.published_at && !ad.is_featured && (
-  <Link
-    to={`/featured-campaign/${ad.id}`}
-    className="shrink-0 rounded-xl bg-amber-500 px-4 py-2.5 text-center text-sm font-bold text-white hover:bg-amber-600"
-  >
-    تمييز الإعلان
-  </Link>
-)}
+                        {ad.is_featured && (
+                          <span className="shrink-0 rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-bold text-amber-700">
+                            ⭐ إعلان مميز
+                          </span>
+                        )}
+                      </div>
+                    )}
 
-{ad.is_featured && (
-  <span className="shrink-0 rounded-xl bg-amber-100 px-4 py-2.5 text-sm font-bold text-amber-700">
-    ⭐ إعلان مميز
-  </span>
-)}
-  </div>
-)}
-                    
                     {(ad.status === "sold" || ad.status === "archived") && (
-  <button
-    type="button"
-onClick={async () => {
-  const confirmed = await window.sooqConfirm(
-    "هل تريد إعادة هذا الإعلان إلى قائمة المراجعة؟"
-  );
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const confirmed = await window.sooqConfirm(
+                            "هل تريد إعادة هذا الإعلان إلى قائمة المراجعة؟"
+                          );
 
-  if (confirmed) {
-    republishAd(ad.id);
-  }
-}}
-    className="shrink-0 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-50"
-  >
-    إعادة نشر الإعلان
-  </button>
-)}
+                          if (confirmed) {
+                            republishAd(ad.id);
+                          }
+                        }}
+                        className="shrink-0 rounded-xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+                      >
+                        إعادة نشر الإعلان
+                      </button>
+                    )}
 
-                    {(ad.status === "pending" || ad.status === "rejected" || ad.status === "approved") && (
-  <Link
-    to={`/edit-ad/${ad.id}`}
-    className="shrink-0 rounded-xl border border-blue-200 px-4 py-2.5 text-center text-sm font-bold text-blue-700 hover:bg-blue-50"
-  >
-    تعديل الإعلان
-  </Link>
-)}
-{(ad.status === "pending" || ad.status === "rejected") && (
-  <button
-onClick={async () => {
-  const confirmed = await window.sooqConfirm(
-    "هل أنت متأكد من حذف هذا الإعلان نهائياً؟ لا يمكن التراجع عن الحذف."
-  );
+                    {(ad.status === "pending" ||
+                      ad.status === "rejected" ||
+                      ad.status === "approved") && (
+                      <Link
+                        to={`/edit-ad/${ad.id}`}
+                        className="shrink-0 rounded-xl border border-blue-200 px-4 py-2.5 text-center text-sm font-bold text-blue-700 hover:bg-blue-50"
+                      >
+                        تعديل الإعلان
+                      </Link>
+                    )}
 
-  if (confirmed) {
-    deleteAd(ad.id);
-  }
-}}
-    className="shrink-0 rounded-xl border border-red-200 px-4 py-2.5 text-center text-sm font-bold text-red-700 hover:bg-red-50"
-  >
-    حذف الإعلان
-  </button>
-)}
+                    {(ad.status === "pending" || ad.status === "rejected") && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const confirmed = await window.sooqConfirm(
+                            "هل أنت متأكد من حذف هذا الإعلان نهائياً؟ لا يمكن التراجع عن الحذف."
+                          );
+
+                          if (confirmed) {
+                            deleteAd(ad.id);
+                          }
+                        }}
+                        className="shrink-0 rounded-xl border border-red-200 px-4 py-2.5 text-center text-sm font-bold text-red-700 hover:bg-red-50"
+                      >
+                        حذف الإعلان
+                      </button>
+                    )}
                   </div>
                 </article>
               );

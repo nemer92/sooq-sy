@@ -32,6 +32,7 @@ import {
   Plus,
   Image as ImageIcon,
   Hash,
+    Store,
 } from "lucide-react";
 
 import { supabase } from "./lib/supabase";
@@ -135,6 +136,28 @@ type SubscriptionPaymentRequest = {
   duration_months?: number;
   user_name?: string;
 };
+type StoreSubscriptionRequest = {
+  id: string;
+  store_id: string;
+  user_id: string;
+  phone: string;
+  price_usd: number;
+  duration_months: number;
+  ordinary_ads_limit: number;
+  featured_ads_limit: number;
+  exchange_rate: number;
+  amount_syp: number;
+  status: "pending" | "approved" | "rejected";
+  admin_note: string | null;
+  created_at: string;
+  store_name?: string;
+  business_type?: string;
+  governorate?: string;
+  city?: string;
+  store_phone?: string;
+  whatsapp?: string;
+  owner_name?: string;
+};
 type NamedItem = {
   name_ar: string;
 };
@@ -234,6 +257,9 @@ const [subscriptionRequestsError, setSubscriptionRequestsError] = useState("");
 const [campaignRequests, setCampaignRequests] = useState<SubscriptionPaymentRequest[]>([]);
 const [campaignRequestsLoading, setCampaignRequestsLoading] = useState(false);
 const [campaignRequestsError, setCampaignRequestsError] = useState("");
+const [storeRequests, setStoreRequests] = useState<StoreSubscriptionRequest[]>([]);
+const [storeRequestsLoading, setStoreRequestsLoading] = useState(false);
+const [storeRequestsError, setStoreRequestsError] = useState("");
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportsError, setReportsError] = useState("");
   const [reportSearch, setReportSearch] = useState("");
@@ -1089,6 +1115,76 @@ const loadCampaignRequests = useCallback(async () => {
   }
 }, []);
 
+const loadStoreRequests = useCallback(async () => {
+  setStoreRequestsLoading(true);
+  setStoreRequestsError("");
+
+  try {
+    const { data, error } = await supabase
+      .from("store_subscription_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    const requests = data ?? [];
+    const storeIds = [...new Set(requests.map((r) => r.store_id))];
+    const userIds = [...new Set(requests.map((r) => r.user_id))];
+
+    const [storesResult, profilesResult] = await Promise.all([
+      storeIds.length
+        ? supabase
+            .from("stores")
+            .select("id,name,business_type,governorate,city,phone,whatsapp")
+            .in("id", storeIds)
+        : Promise.resolve({ data: [], error: null }),
+
+      userIds.length
+        ? supabase
+            .from("profiles")
+            .select("id,display_name")
+            .in("id", userIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (storesResult.error) throw storesResult.error;
+    if (profilesResult.error) throw profilesResult.error;
+
+    const storesMap = new Map(
+      (storesResult.data ?? []).map((store) => [store.id, store])
+    );
+
+    const profilesMap = new Map(
+      (profilesResult.data ?? []).map((profile) => [
+        profile.id,
+        profile.display_name,
+      ])
+    );
+
+    setStoreRequests(
+      requests.map((request) => {
+        const store = storesMap.get(request.store_id);
+
+        return {
+          ...request,
+          store_name: store?.name ?? "متجر غير معروف",
+          business_type: store?.business_type ?? "",
+          governorate: store?.governorate ?? "",
+          city: store?.city ?? "",
+          store_phone: store?.phone ?? "",
+          whatsapp: store?.whatsapp ?? "",
+          owner_name: profilesMap.get(request.user_id) ?? "غير معروف",
+        };
+      })
+    );
+  } catch (error) {
+    console.error("Error loading store requests:", error);
+    setStoreRequestsError("تعذر تحميل طلبات المتاجر. حاول تحديث الصفحة.");
+  } finally {
+    setStoreRequestsLoading(false);
+  }
+}, []);
+
 const approveSubscriptionRequest = async (requestId: string) => {
   const confirmed = await window.sooqConfirm(
     "هل تأكدت من وصول الحوالة وصحة المبلغ ورقم الهاتف؟ سيتم تفعيل الاشتراك أو جدولته."
@@ -1234,6 +1330,61 @@ const rejectSubscriptionRequest = async (requestId: string) => {
   }
 };
 
+const approveStoreRequest = async (requestId: string) => {
+  const confirmed = await window.sooqConfirm(
+    "هل تريد الموافقة على طلب المتجر وتفعيل اشتراكه؟"
+  );
+
+  if (!confirmed) return;
+
+  setStoreRequestsLoading(true);
+
+  try {
+    const { error } = await supabase.rpc(
+      "approve_store_subscription_request",
+      { p_request_id: requestId }
+    );
+
+    if (error) throw error;
+
+    await loadStoreRequests();
+  } catch (error) {
+    console.error("Error approving store request:", error);
+    window.alert("تعذرت الموافقة على الطلب.");
+  } finally {
+    setStoreRequestsLoading(false);
+  }
+};
+
+const rejectStoreRequest = async (requestId: string) => {
+  const adminNote = await window.sooqPrompt(
+    "اكتب سبب رفض طلب المتجر:"
+  );
+
+  if (adminNote === null) return;
+
+  setStoreRequestsLoading(true);
+
+  try {
+    const { error } = await supabase.rpc(
+      "reject_store_subscription_request",
+      {
+        p_request_id: requestId,
+        p_admin_note: adminNote.trim(),
+      }
+    );
+
+    if (error) throw error;
+
+    await loadStoreRequests();
+  } catch (error) {
+    console.error("Error rejecting store request:", error);
+    window.alert("تعذر رفض الطلب.");
+  } finally {
+    setStoreRequestsLoading(false);
+  }
+};
+
 useEffect(() => {
   if (activeMenu === "طلبات الاشتراك") {
     loadSubscriptionRequests();
@@ -1244,6 +1395,12 @@ useEffect(() => {
   loadSubscriptionRequests,
   loadCampaignRequests,
 ]);
+
+useEffect(() => {
+  if (admin && activeMenu === "طلبات المتاجر") {
+    loadStoreRequests();
+  }
+}, [admin, activeMenu, loadStoreRequests]);
 
 const handleAdminBan = async (
   report: Report,
@@ -2632,6 +2789,10 @@ function getSubCategories(categoryId: number) {
   label: "طلبات الاشتراك",
   icon: Megaphone,
 },
+{
+  label: "طلبات المتاجر",
+  icon: Store,
+},
     {
   label: "الإعلانات المؤرشفة",
   icon: Megaphone,
@@ -3199,6 +3360,209 @@ function getSubCategories(categoryId: number) {
   )}
 </div>
 </>
+)}
+
+{/* طلبات المتاجر */}
+{activeMenu === "طلبات المتاجر" && (
+  <>
+    <div className="section-heading">
+      <div>
+        <h2>طلبات اشتراك المتاجر</h2>
+        <p>مراجعة طلبات إنشاء المتاجر وتفعيل اشتراكاتها</p>
+      </div>
+
+      <button
+        className="refresh-button"
+        onClick={loadStoreRequests}
+        disabled={storeRequestsLoading}
+      >
+        <RefreshCw size={17} />
+        تحديث
+      </button>
+    </div>
+
+    {storeRequestsError && (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {storeRequestsError}
+      </div>
+    )}
+
+    {storeRequestsLoading && storeRequests.length === 0 ? (
+      <div className="py-12 text-center text-slate-500">
+        <LoaderCircle className="mx-auto mb-3 animate-spin" size={30} />
+        جارٍ تحميل طلبات المتاجر...
+      </div>
+    ) : storeRequests.length === 0 ? (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <Store className="mx-auto mb-3 text-slate-400" size={38} />
+        <p className="font-bold text-slate-700">
+          لا توجد طلبات اشتراك متاجر حالياً
+        </p>
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        {storeRequests.map((request) => (
+          <div
+            key={request.id}
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-slate-50 p-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">
+                  {request.store_name}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {request.business_type || "نوع النشاط غير محدد"}
+                </p>
+              </div>
+
+              <span
+                className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
+                  request.status === "pending"
+                    ? "bg-amber-100 text-amber-700"
+                    : request.status === "approved"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-red-100 text-red-700"
+                }`}
+              >
+                {request.status === "pending"
+                  ? "قيد المراجعة"
+                  : request.status === "approved"
+                    ? "تمت الموافقة"
+                    : "مرفوض"}
+              </span>
+            </div>
+
+            <div className="space-y-4 p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-slate-500">صاحب المتجر</p>
+                  <p className="mt-1 font-bold text-slate-800">
+                    {request.owner_name}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500">هاتف مقدم الطلب</p>
+                  <p className="mt-1 font-bold text-slate-800" dir="ltr">
+                    {request.phone}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500">المحافظة والمدينة</p>
+                  <p className="mt-1 font-bold text-slate-800">
+                    {[request.governorate, request.city]
+                      .filter(Boolean)
+                      .join(" - ") || "غير محدد"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500">هاتف المتجر</p>
+                  <p className="mt-1 font-bold text-slate-800" dir="ltr">
+                    {request.store_phone || "غير محدد"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500">واتساب المتجر</p>
+                  <p className="mt-1 font-bold text-slate-800" dir="ltr">
+                    {request.whatsapp || "غير محدد"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-slate-500">مدة الاشتراك</p>
+                  <p className="mt-1 font-bold text-slate-800">
+                    {request.duration_months} شهر
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
+                <p className="mb-2 text-sm font-bold text-sky-800">
+                  حصص الإعلانات المضمنة
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-sky-700">إعلانات عادية</p>
+                    <p className="text-xl font-black text-sky-900">
+                      {request.ordinary_ads_limit}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-sky-700">إعلانات مميزة</p>
+                    <p className="text-xl font-black text-sky-900">
+                      {request.featured_ads_limit}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                  <p className="text-xs text-emerald-700">السعر بالدولار</p>
+                  <p className="mt-1 text-xl font-black text-emerald-800">
+                    ${Number(request.price_usd).toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
+                  <p className="text-xs text-sky-700">المبلغ بالليرة السورية</p>
+                  <p className="mt-1 text-lg font-black text-sky-800">
+                    {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 pt-3">
+                <p className="text-xs text-slate-500">تاريخ تقديم الطلب</p>
+                <p className="mt-1 text-sm font-medium text-slate-700">
+                  {formatDate(request.created_at)}
+                </p>
+              </div>
+
+              {request.admin_note && (
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-xs font-bold text-slate-500">
+                    ملاحظة الإدارة
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {request.admin_note}
+                  </p>
+                </div>
+              )}
+
+              {request.status === "pending" && (
+                <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    disabled={storeRequestsLoading}
+                    onClick={() => approveStoreRequest(request.id)}
+                    className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <CheckCircle size={18} className="ml-2" />
+                    موافقة وتفعيل المتجر
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={storeRequestsLoading}
+                    onClick={() => rejectStoreRequest(request.id)}
+                    className="flex min-h-12 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <XCircle size={18} className="ml-2" />
+                    رفض الطلب
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </>
 )}
 
 {/* قسم إدارة الإعلانات */}

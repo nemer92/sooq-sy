@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import type { FormEvent } from "react";
 import Donations from "./Donations";
+import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Megaphone,
@@ -174,6 +175,7 @@ function getOne<T>(value: Related<T>): T | null {
 }
 
 function App() {
+  const navigate = useNavigate();
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
 const [phone, setPhone] = useState("");
 const [password, setPassword] = useState("");
@@ -3914,12 +3916,9 @@ function getSubCategories(categoryId: number) {
   <button
     type="button"
     className="category-edit-button"
-    onClick={() => {
-window.open(
-  `${import.meta.env.BASE_URL}admin/conversation/${report.conversation_id}`,
-  "_blank"
-);
-    }}
+onClick={() => {
+  navigate(`/admin/conversation/${report.conversation_id}`);
+}}
   >
     <Eye size={15} />
     عرض المحادثة

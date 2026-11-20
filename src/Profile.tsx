@@ -13,6 +13,7 @@ import {
   MapPin,
   Gift,
   Copy,
+  Coins,
   Crown,
   Megaphone,
   Star,
@@ -714,8 +715,28 @@ export default function Profile() {
           العودة إلى السوق
         </Link>
 
+
+
         <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="h-24 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-32" />
+          
+          <div className="relative h-24 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-32">
+
+  {/* رصيد النقاط */}
+  <div className="absolute left-3 top-3 z-10">
+    <div className="flex items-center gap-2 rounded-xl border border-white/30 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm">
+      <Coins size={18} className="text-emerald-700" />
+      <div>
+        <p className="text-[10px] font-semibold text-slate-500">
+          رصيد نقاطك
+        </p>
+        <p className="text-sm font-black text-emerald-900">
+          {pointsBalance.toLocaleString("en-US")}
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div>
 
           <div className="px-5 pb-5 sm:px-7">
             <div className="-mt-12 flex flex-wrap items-end gap-4">
@@ -734,9 +755,9 @@ export default function Profile() {
               </div>
 
               <div className="min-w-0 flex-1 pb-1">
-                <p className="text-xs font-semibold text-emerald-700">
-                  أهلاً بك في Sooq.Sy
-                </p>
+<p className="text-sm font-extrabold text-[#145B50] tracking-wide">
+  أهلاً بك في Sooq.Sy
+</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     <h1 className="truncate text-xl font-black text-slate-900 sm:text-2xl">
                       {name || "الملف الشخصي"}
@@ -785,9 +806,6 @@ export default function Profile() {
               />
             </label>
 
-            <p className="mt-2 text-[11px] text-slate-400">
-              الصورة اختيارية، ويمكنك استخدام الحساب دون صورة شخصية.
-            </p>
           </div>
         </div>
 
@@ -1238,19 +1256,6 @@ export default function Profile() {
                     readOnly
                     dir="ltr"
                     className={`${inputClass} bg-slate-100 text-left`}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold text-slate-600">
-                    مرجع الحوالة <span className="font-normal text-slate-400">(اختياري)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={paymentReference}
-                    onChange={(event) => setPaymentReference(event.target.value)}
-                    className={inputClass}
-                    placeholder="أدخل رقم أو مرجع الحوالة إن وجد"
                   />
                 </div>
 

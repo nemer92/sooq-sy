@@ -197,21 +197,23 @@ const confirmDeleteNotification = async () => {
 
       if (error) throw error;
 
-      setNotifications((current: any[]) =>
-        current.filter(
-          (item: any) => !data?.some((deleted: any) => deleted.id === item.id)
-        )
-      );
 
-      setUnreadNotificationsCount((current: number) => {
-        const deletedIds = new Set(
-          (data || []).map((item: any) => item.id)
-        );
+setNotifications((current: any[]) =>
+  current.filter(
+    (item: any) => !data?.some((deleted: any) => deleted.id === item.id)
+  )
+);
 
-        return notifications.filter(
-          (item: any) => !item.read_at && !deletedIds.has(item.id)
-        ).length;
-      });
+const deletedIds = new Set(
+  (data || []).map((item: any) => item.id)
+);
+
+setUnreadNotificationsCount(
+  notifications.filter(
+    (item: any) => !item.read_at && !deletedIds.has(item.id)
+  ).length
+);
+
 
       if (!data || data.length === 0) {
         throw new Error(

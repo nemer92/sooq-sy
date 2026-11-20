@@ -21,6 +21,7 @@ import {
    Share2,
     Heart,
     Star,
+    Trash2,
   Bell,
   SlidersHorizontal,
   ChevronDown,
@@ -106,10 +107,15 @@ export default function Home() {
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
     const [showNotifications, setShowNotifications] = useState(false);
 
+const [deleteTarget, setDeleteTarget] = useState<{
+  type: "one" | "all";
+  id?: string;
+} | null>(null);
 
-
+const [isDeletingNotification, setIsDeletingNotification] = useState(false);
 
 const loadNotifications = async (userId: string) => {
+
   const { data, error } = await supabase
     .from("user_notifications")
     .select(`
@@ -136,6 +142,95 @@ const loadNotifications = async (userId: string) => {
     (data || []).filter((item: any) => !item.read_at).length
   );
 };
+
+
+const confirmDeleteNotification = async () => {
+  if (!deleteTarget || isDeletingNotification) return;
+
+  setIsDeletingNotification(true);
+
+  try {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) throw sessionError;
+
+    if (!session?.user) {
+      alert("يرجى تسجيل الدخول أولاً.");
+      return;
+    }
+
+    const userId = session.user.id;
+
+    if (deleteTarget.type === "one") {
+      const { data, error } = await supabase
+        .from("user_notifications")
+        .delete()
+        .eq("id", deleteTarget.id)
+        .eq("user_id", userId)
+        .select("id");
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error(
+          "لم يُحذف أي صف. تحقق من ملكية الإشعار وسياسة DELETE في Supabase."
+        );
+      }
+
+      const updated = notifications.filter(
+        (item: any) => item.id !== deleteTarget.id
+      );
+
+      setNotifications(updated);
+      setUnreadNotificationsCount(
+        updated.filter((item: any) => !item.read_at).length
+      );
+    } else if (deleteTarget.type === "all") {
+      const { data, error } = await supabase
+        .from("user_notifications")
+        .delete()
+        .eq("user_id", userId)
+        .select("id");
+
+      if (error) throw error;
+
+      setNotifications((current: any[]) =>
+        current.filter(
+          (item: any) => !data?.some((deleted: any) => deleted.id === item.id)
+        )
+      );
+
+      setUnreadNotificationsCount((current: number) => {
+        const deletedIds = new Set(
+          (data || []).map((item: any) => item.id)
+        );
+
+        return notifications.filter(
+          (item: any) => !item.read_at && !deletedIds.has(item.id)
+        ).length;
+      });
+
+      if (!data || data.length === 0) {
+        throw new Error(
+          "لم يُحذف أي صف. تحقق من سياسة DELETE في Supabase."
+        );
+      }
+    }
+
+    setDeleteTarget(null);
+  } catch (error: any) {
+    console.error("Error deleting notification:", error);
+    alert(`تعذر حذف الإشعار: ${error?.message || "خطأ غير معروف"}`);
+  } finally {
+    setIsDeletingNotification(false);
+  }
+};
+
+
+
 
 const markNotificationAsRead = async (notificationId: string) => {
   const { error } = await supabase
@@ -958,75 +1053,137 @@ const matchesCondition = selectedConditions.includes(
                         ستظهر تحديثاتك الجديدة هنا
                       </p>
                     </div>
-                  ) : (
-                    notifications.map((item: any) => {
-                      const notification = Array.isArray(item.notifications)
-                        ? item.notifications[0]
-                        : item.notifications;
 
-                      return (
-                        <div
-                          key={item.id}
-                          onClick={async () => {
-                            if (!item.read_at) {
-                              await markNotificationAsRead(item.id);
-                            }
+) : (
+  notifications.map((item: any) => {
+    const notification = Array.isArray(item.notifications)
+      ? item.notifications[0]
+      : item.notifications;
 
-                            setShowNotifications(false);
+    return (
+      <div
+        key={item.id}
+        className={`border-b border-slate-100/80 p-4 transition-colors duration-200 ${
+          !item.read_at ? "bg-emerald-50/70" : "bg-white"
+        }`}
+      >
+        <div className="flex items-start gap-2.5">
+          <span
+            className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+              !item.read_at ? "bg-emerald-500" : "bg-transparent"
+            }`}
+          />
 
-                            const link = notification?.link;
-                            if (!link) return;
+          <div
+            role="button"
+            tabIndex={0}
+            className="min-w-0 flex-1 cursor-pointer"
+            onClick={async () => {
+              if (!item.read_at) {
+                await markNotificationAsRead(item.id);
+              }
 
-                            try {
-                              if (/^https?:\/\//i.test(link)) {
-                                const url = new URL(link);
+              setShowNotifications(false);
 
-                                if (
-                                  url.hostname === "nemer92.github.io" &&
-                                  url.pathname.startsWith("/sooq-sy/ad/")
-                                ) {
-                                  const adId = url.pathname
-                                    .replace("/sooq-sy/ad/", "")
-                                    .replace(/\/$/, "");
+              const link = notification?.link;
+              if (!link) return;
 
-                                  navigate(`/ad/${encodeURIComponent(adId)}`);
-                                } else {
-                                  window.open(link, "_blank", "noopener,noreferrer");
-                                }
-                              } else {
-                                navigate(link.startsWith("/") ? link : `/${link}`);
-                              }
-                            } catch (error) {
-                              console.error("Invalid notification link:", error);
-                            }
-                          }}
-                          className={`group cursor-pointer border-b border-slate-100/80 p-4 transition-colors duration-200 hover:bg-emerald-50/60 ${
-                            !item.read_at ? "bg-emerald-50/70" : "bg-white"
-                          }`}
-                        >
-                          <div className="flex items-start gap-2.5">
-                            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                              !item.read_at ? "bg-emerald-500" : "bg-transparent"
-                            }`} />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-bold text-slate-800 transition-colors group-hover:text-emerald-700">
-                                {notification?.title}
-                              </p>
-                              <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
-                                {notification?.body}
-                              </p>
-                              <p className="mt-2 text-[10px] font-medium text-slate-400">
-                                {new Date(item.created_at).toLocaleString("ar")}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
+              try {
+                if (/^https?:\/\//i.test(link)) {
+                  const url = new URL(link);
+
+                  if (
+                    url.hostname === "nemer92.github.io" &&
+                    url.pathname.startsWith("/sooq-sy/ad/")
+                  ) {
+                    const adId = url.pathname
+                      .replace("/sooq-sy/ad/", "")
+                      .replace(/\/$/, "");
+
+                    navigate(`/ad/${encodeURIComponent(adId)}`);
+                  } else {
+                    window.open(link, "_blank", "noopener,noreferrer");
+                  }
+                } else {
+                  navigate(link.startsWith("/") ? link : `/${link}`);
+                }
+              } catch (error) {
+                console.error("Invalid notification link:", error);
+              }
+            }}
+          >
+            <p className="text-sm font-bold text-slate-800">
+              {notification?.title}
+            </p>
+
+            <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
+              {notification?.body}
+            </p>
+
+            <p className="mt-2 text-[10px] font-medium text-slate-400">
+              {new Date(item.created_at).toLocaleString("ar")}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            title="حذف الإشعار"
+            aria-label="حذف الإشعار"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setDeleteTarget({ type: "one", id: item.id });
+            }}
+            className="relative z-20 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm active:scale-90"
+          >
+            <Trash2 size={18} />
+          </button>
+        </div>
+      </div>
+    );
+  })
+)}
+
+                 
                 </div>
               </div>
             )}
+            {deleteTarget && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
+    <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+      <div className="mb-3 flex items-center gap-2 text-rose-600">
+        <Trash2 size={20} />
+        <h3 className="font-bold">تأكيد الحذف</h3>
+      </div>
+
+      <p className="mb-5 text-sm leading-6 text-slate-600">
+        {deleteTarget.type === "all"
+          ? "هل أنت متأكد من حذف جميع الإشعارات؟"
+          : "هل أنت متأكد من حذف هذا الإشعار؟"}
+      </p>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setDeleteTarget(null)}
+          disabled={isDeletingNotification}
+          className="flex-1 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600"
+        >
+          إلغاء
+        </button>
+
+        <button
+          type="button"
+          onClick={confirmDeleteNotification}
+          disabled={isDeletingNotification}
+          className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+        >
+          {isDeletingNotification ? "جارٍ الحذف..." : "تأكيد الحذف"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
           </div>
 
           <button
@@ -1410,16 +1567,17 @@ const matchesCondition = selectedConditions.includes(
 
       const link = `${window.location.origin}${basePath}/auth?ref=${encodeURIComponent(referralData.code)}`;
 
-      if (navigator.share) {
-        await navigator.share({
-          title: "انضم إلى Sooq.Sy",
-          text: "شارك تطبيق سوق سوريا مع أصدقائك وادعهم للانضمام، واربح النقاط!",
-          url: link,
-        });
-      } else {
-        await navigator.clipboard.writeText(link);
-        alert("تم نسخ رابط الدعوة بنجاح، شاركه مع أصدقائك واربح النقاط!");
-      }
+if (navigator.share) {
+  await navigator.share({
+    title: "انضم إلى Sooq.Sy",
+    text: "شارك تطبيق سوق سوريا مع أصدقائك وادعهم للانضمام، واربح النقاط!",
+    url: link,
+  });
+} else {
+  alert(
+    "المشاركة المباشرة غير مدعومة في هذا المتصفح. افتح Sooq.Sy من متصفح الهاتف مثل Chrome أو Safari لتظهر لك تطبيقات المشاركة."
+  );
+}
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
 
@@ -1474,47 +1632,75 @@ const matchesCondition = selectedConditions.includes(
 )}
 
 
-  {/* إشعارات الموبايل */}
-  {showNotifications && (
+
+{/* إشعارات الموبايل */}
+{showNotifications && (
+  <div
+    className="fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/45 px-3 pt-14 backdrop-blur-sm md:hidden sm:px-4 sm:pt-20"
+    onClick={() => setShowNotifications(false)}
+  >
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/40 px-3 pt-16 backdrop-blur-[3px] md:hidden sm:px-4 sm:pt-20"
-      onClick={() => setShowNotifications(false)}
+      className="w-full max-w-md overflow-hidden rounded-[26px] border border-white/80 bg-[#f8faf9] shadow-[0_24px_80px_rgba(15,23,42,0.22)] animate-in fade-in slide-in-from-top-3 duration-200"
+      onClick={(e) => e.stopPropagation()}
     >
-      <div
-        className="w-full max-w-md overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.25)] animate-in fade-in slide-in-from-top-3 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-4">
+      {/* رأس النافذة */}
+      <div className="relative overflow-hidden bg-gradient-to-l from-emerald-800 via-emerald-700 to-green-600 px-5 pb-5 pt-5">
+        <div className="pointer-events-none absolute -left-8 -top-12 h-36 w-36 rounded-full bg-white/10" />
+        <div className="pointer-events-none absolute -bottom-12 right-20 h-28 w-28 rounded-full bg-white/10" />
+
+        <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-emerald-100 p-2.5 text-emerald-700">
-              <Bell size={19} />
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/15 text-white shadow-inner">
+              <Bell size={22} />
             </div>
+
             <div>
-              <h3 className="text-sm font-black text-slate-800">الإشعارات</h3>
-              <p className="mt-0.5 text-[10px] text-slate-400">كل جديد يخص حسابك</p>
+              <h3 className="text-base font-black text-white">
+                الإشعارات
+              </h3>
+              <p className="mt-1 text-[11px] font-medium text-emerald-100">
+                كل جديد يخص حسابك
+              </p>
             </div>
           </div>
+
           <button
             type="button"
             onClick={() => setShowNotifications(false)}
             aria-label="إغلاق الإشعارات"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-500 ring-1 ring-slate-200 transition hover:bg-rose-50 hover:text-rose-600"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/20 active:scale-95"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto">
-          {notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center px-5 py-12 text-center">
-              <div className="mb-3 rounded-2xl bg-slate-100 p-4 text-slate-400">
-                <Bell size={25} />
-              </div>
-              <p className="text-sm font-bold text-slate-600">لا توجد إشعارات حالياً</p>
-              <p className="mt-1 text-xs text-slate-400">ستظهر إشعاراتك الجديدة هنا</p>
+        <div className="relative mt-4 flex items-center justify-between rounded-xl border border-white/15 bg-white/10 px-3 py-2">
+          <span className="text-xs font-medium text-emerald-50">
+            لديك إشعارات لمتابعتها
+          </span>
+          <span className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-black text-emerald-800">
+            {notifications.filter((item: any) => !item.read_at).length} غير مقروء
+          </span>
+        </div>
+      </div>
+
+      {/* محتوى الإشعارات */}
+      <div className="max-h-[65vh] overflow-y-auto px-3 py-3">
+        {notifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-12 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-600">
+              <Bell size={28} strokeWidth={1.7} />
             </div>
-          ) : (
-            notifications.map((item: any) => {
+            <p className="text-sm font-extrabold text-slate-700">
+              لا توجد إشعارات حالياً
+            </p>
+            <p className="mt-1.5 text-xs text-slate-400">
+              ستظهر إشعاراتك الجديدة هنا
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {notifications.map((item: any) => {
               const notification = Array.isArray(item.notifications)
                 ? item.notifications[0]
                 : item.notifications;
@@ -1554,34 +1740,96 @@ const matchesCondition = selectedConditions.includes(
                       console.error("Invalid notification link:", error);
                     }
                   }}
-                  className={`cursor-pointer border-b border-slate-100 p-4 transition-colors hover:bg-emerald-50/60 ${
-                    !item.read_at ? "bg-emerald-50/70" : "bg-white"
+                  className={`group cursor-pointer rounded-2xl border p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                    !item.read_at
+                      ? "border-emerald-100 bg-white shadow-[0_3px_12px_rgba(16,185,129,0.07)] hover:border-emerald-200"
+                      : "border-slate-100 bg-white hover:border-slate-200"
                   }`}
                 >
-                  <div className="flex items-start gap-2.5">
-                    <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${
-                      !item.read_at ? "bg-emerald-500" : "bg-transparent"
-                    }`} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-slate-800">
-                        {notification?.title}
-                      </p>
-                      <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
-                        {notification?.body}
-                      </p>
-                      <p className="mt-2 text-[10px] font-medium text-slate-400">
-                        {new Date(item.created_at).toLocaleString("ar")}
-                      </p>
-                    </div>
-                  </div>
+                  <div className="flex items-start gap-3">
+  <div
+    className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+      !item.read_at
+        ? "bg-emerald-50 text-emerald-700"
+        : "bg-slate-50 text-slate-400"
+    }`}
+  >
+    <Bell size={18} />
+  </div>
+
+  <div className="min-w-0 flex-1">
+    <div className="flex items-start justify-between gap-2">
+      <p className="text-[13px] font-extrabold leading-6 text-slate-800">
+        {notification?.title}
+      </p>
+
+      {!item.read_at && (
+        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500 ring-4 ring-emerald-50" />
+      )}
+    </div>
+
+    <p className="mt-1 whitespace-pre-line text-xs leading-6 text-slate-600">
+      {notification?.body}
+    </p>
+
+    <div className="mt-2.5 flex items-center justify-between">
+      <span className="text-[10px] font-medium text-slate-400">
+        {new Date(item.created_at).toLocaleString("ar")}
+      </span>
+
+      {notification?.link && (
+        <span className="text-[10px] font-bold text-emerald-700">
+          عرض التفاصيل ←
+        </span>
+      )}
+    </div>
+  </div>
+
+<button
+  type="button"
+  title="حذف الإشعار"
+  aria-label="حذف الإشعار"
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeleteTarget({ type: "one", id: item.id });
+  }}
+  className="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-100 active:scale-90"
+>
+  <Trash2 size={17} />
+</button>
+</div>
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
-    </div>
+
+{/* أسفل النافذة */}
+<div className="space-y-2 border-t border-slate-100 bg-white px-4 py-3">
+  {notifications.length > 0 && (
+    <button
+      type="button"
+      onClick={() => setDeleteTarget({ type: "all" })}
+      className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50 py-2.5 text-xs font-extrabold text-rose-600 transition hover:bg-rose-100 active:scale-[0.99]"
+    >
+      <Trash2 size={15} />
+      حذف جميع الإشعارات
+    </button>
   )}
+
+  <button
+    type="button"
+    onClick={() => setShowNotifications(false)}
+    className="w-full rounded-xl bg-slate-50 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700"
+  >
+    إغلاق الإشعارات
+  </button>
+</div>
+    </div>
+  </div>
+)}
 
   {/* البحث والفلاتر - الموبايل */}
 
@@ -1753,13 +2001,15 @@ const matchesCondition = selectedConditions.includes(
   </p>
 
   {allowNewAds && (
-    <button
-      onClick={() => navigate("/add-ad")}
-      className="mt-2 flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-[10px] font-bold text-emerald-800 transition hover:bg-emerald-50 sm:text-xs"
-    >
-      <Plus size={14} />
-      أضف إعلانك الآن
-    </button>
+<button
+  onClick={() => navigate("/add-ad")}
+  className="mt-2 flex items-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-green-500 px-4 py-2 text-[11px] font-extrabold text-white shadow-md shadow-emerald-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-emerald-700 hover:to-green-600 hover:shadow-lg hover:shadow-emerald-600/25 active:translate-y-0 active:scale-95 sm:text-xs"
+>
+  <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/20">
+    <Plus size={15} strokeWidth={2.5} />
+  </span>
+  أضف إعلانك الآن
+</button>
   )}
 </div>
 

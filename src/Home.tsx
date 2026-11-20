@@ -17,11 +17,14 @@ import {
   Wrench,
   PawPrint,
   LogOut,
+  Gift,
+   Share2,
     Heart,
     Star,
   Bell,
   SlidersHorizontal,
   ChevronDown,
+  Megaphone,
   X,
   MessageCircle,
   Store as StoreIcon
@@ -102,6 +105,10 @@ export default function Home() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
     const [showNotifications, setShowNotifications] = useState(false);
+
+
+
+
 const loadNotifications = async (userId: string) => {
   const { data, error } = await supabase
     .from("user_notifications")
@@ -1215,14 +1222,34 @@ const matchesCondition = selectedConditions.includes(
   </div>
 
   {/* قائمة الموبايل */}
-  {isMobileMenuOpen && (
-    <div className="border-t border-slate-100 bg-white px-3 py-4 shadow-[0_12px_25px_rgba(15,23,42,0.07)] md:hidden sm:px-5">
+
+{isMobileMenuOpen && (
+  <>
+    <style>{`
+      @keyframes mobileMenuDrop {
+        from {
+          opacity: 0;
+          transform: translateY(-14px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    `}</style>
+
+    <div
+      className="border-t border-slate-100 bg-white px-3 py-4 shadow-[0_12px_25px_rgba(15,23,42,0.07)] md:hidden sm:px-5"
+      style={{ animation: "mobileMenuDrop 260ms cubic-bezier(0.16, 1, 0.3, 1)" }}
+    >
       <div className="mx-auto max-w-7xl">
         {isLoggedIn ? (
           <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-1.5">
             <div className="mb-1 border-b border-slate-100 px-3 py-3">
               <p className="text-sm font-bold text-slate-800">حسابك</p>
-              <p className="mt-0.5 text-[11px] text-slate-400">إدارة حسابك ومتابعة نشاطك</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">
+                إدارة حسابك ومتابعة نشاطك
+              </p>
             </div>
 
             <button
@@ -1232,7 +1259,9 @@ const matchesCondition = selectedConditions.includes(
               }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
             >
-              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><UserRound size={18} /></span>
+              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+                <Megaphone size={18} />
+              </span>
               <span className="flex-1">إعلاناتي</span>
             </button>
 
@@ -1241,9 +1270,11 @@ const matchesCondition = selectedConditions.includes(
                 setIsMobileMenuOpen(false);
                 navigate("/profile");
               }}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
             >
-              <span className="rounded-xl bg-slate-100 p-2 text-slate-600"><UserRound size={18} /></span>
+              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+                <UserRound size={18} />
+              </span>
               <span className="flex-1">الملف الشخصي</span>
             </button>
 
@@ -1254,10 +1285,14 @@ const matchesCondition = selectedConditions.includes(
               }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
             >
-              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><MessageCircle size={18} /></span>
+              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+                <MessageCircle size={18} />
+              </span>
               <span className="flex-1">رسائلي</span>
               {unreadMessagesCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{unreadMessagesCount}</span>
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                  {unreadMessagesCount}
+                </span>
               )}
             </button>
 
@@ -1268,10 +1303,14 @@ const matchesCondition = selectedConditions.includes(
               }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
             >
-              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><Bell size={18} /></span>
+              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+                <Bell size={18} />
+              </span>
               <span className="flex-1">الإشعارات</span>
               {unreadNotificationsCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{unreadNotificationsCount}</span>
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                  {unreadNotificationsCount}
+                </span>
               )}
             </button>
 
@@ -1282,10 +1321,14 @@ const matchesCondition = selectedConditions.includes(
               }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-rose-50 hover:text-rose-700"
             >
-              <span className="rounded-xl bg-rose-50 p-2 text-rose-600"><Heart size={18} /></span>
+              <span className="rounded-xl bg-rose-50 p-2 text-rose-600">
+                <Heart size={18} />
+              </span>
               <span className="flex-1">مفضلتي</span>
               {favoriteAdIds.length > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{favoriteAdIds.length}</span>
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                  {favoriteAdIds.length}
+                </span>
               )}
             </button>
 
@@ -1311,7 +1354,9 @@ const matchesCondition = selectedConditions.includes(
               }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
             >
-              <span className="rounded-xl bg-rose-50 p-2"><LogOut size={18} /></span>
+              <span className="rounded-xl bg-rose-50 p-2">
+                <LogOut size={18} />
+              </span>
               تسجيل الخروج
             </button>
           </div>
@@ -1322,22 +1367,81 @@ const matchesCondition = selectedConditions.includes(
                 setIsMobileMenuOpen(false);
                 navigate("/auth");
               }}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
             >
-              <span className="rounded-xl bg-slate-100 p-2 text-slate-600"><UserRound size={18} /></span>
+              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+                <UserRound size={18} />
+              </span>
               تسجيل الدخول
             </button>
-            <a
-              href="https://sooq-sy.pages.dev/app.apk"
-              download="Sooq-SY.apk"
-              className="mt-1 flex w-full items-center gap-3 rounded-xl bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
-            >
-              <span className="rounded-xl bg-white p-2"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5"><path d="M17.6 9.48 19.44 6.3a.5.5 0 0 0-.86-.5l-1.86 3.22a11.3 11.3 0 0 0-9.44 0L5.42 5.8a.5.5 0 1 0-.86.5L6.4 9.48A10.2 10.2 0 0 0 2 17h20a10.2 10.2 0 0 0-4.4-7.52ZM7.5 13.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" /></svg></span>
-              تحميل تطبيق Sooq.Sy
-              <span className="mr-auto">↓</span>
-            </a>
           </div>
         )}
+
+{/* مشاركة التطبيق وربح النقاط */}
+
+<button
+  onClick={async () => {
+    setIsMobileMenuOpen(false);
+
+    try {
+      const { data: { user }, error: userError } =
+        await supabase.auth.getUser();
+
+      if (userError || !user) {
+        alert("يرجى تسجيل الدخول أولاً.");
+        return;
+      }
+
+      const { data: referralData, error: referralError } =
+        await supabase
+          .from("referral_codes")
+          .select("code")
+          .eq("user_id", user.id)
+          .single();
+
+      if (referralError || !referralData?.code) {
+        alert("تعذر تحميل رابط الدعوة، حاول مرة أخرى.");
+        return;
+      }
+
+      const basePath = window.location.pathname.startsWith("/sooq-sy")
+        ? "/sooq-sy"
+        : "";
+
+      const link = `${window.location.origin}${basePath}/auth?ref=${encodeURIComponent(referralData.code)}`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: "انضم إلى Sooq.Sy",
+          text: "شارك تطبيق سوق سوريا مع أصدقائك وادعهم للانضمام، واربح النقاط!",
+          url: link,
+        });
+      } else {
+        await navigator.clipboard.writeText(link);
+        alert("تم نسخ رابط الدعوة بنجاح، شاركه مع أصدقائك واربح النقاط!");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+
+      alert("تعذرت مشاركة الرابط، حاول مرة أخرى.");
+    }
+  }}
+  className="mt-1 flex w-full items-center gap-3 rounded-xl border border-emerald-100 bg-gradient-to-l from-emerald-50 to-white px-3 py-3 text-right text-sm font-bold text-emerald-800 transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
+>
+  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+    <Gift size={19} />
+  </span>
+
+  <span className="flex-1">
+    <span className="block">شارك التطبيق واربح نقاط</span>
+    <span className="mt-0.5 block text-[10px] font-medium text-emerald-600">
+      ادعُ أصدقاءك واكسب المكافآت
+    </span>
+  </span>
+
+  <Share2 size={17} className="text-emerald-600" />
+</button>
+
 
         {allowNewAds && (
           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -1351,6 +1455,7 @@ const matchesCondition = selectedConditions.includes(
               <Heart size={17} />
               تبرع الآن
             </button>
+
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
@@ -1365,7 +1470,9 @@ const matchesCondition = selectedConditions.includes(
         )}
       </div>
     </div>
-  )}
+  </>
+)}
+
 
   {/* إشعارات الموبايل */}
   {showNotifications && (
@@ -1748,20 +1855,20 @@ const matchesCondition = selectedConditions.includes(
   <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-gradient-to-b from-white to-slate-50/70 p-3 shadow-sm sm:rounded-3xl sm:p-6">
 
     {/* رأس القسم */}
-    <div className="mb-4 flex items-center justify-between sm:mb-6">
-      <div>
-        <h2 className="text-base font-black tracking-tight text-slate-900 sm:text-xl">
-          تصفح حسب التصنيف
-        </h2>
-        <p className="mt-1 text-[11px] text-slate-500 sm:text-sm">
-          اختر القسم المناسب للعثور على ما تبحث عنه
-        </p>
-      </div>
+<div className="relative mb-4 flex items-center sm:mb-6">
+  <div className="w-full text-right">
+    <h2 className="text-base font-black tracking-tight text-slate-900 sm:text-xl">
+      تصفح حسب التصنيف
+    </h2>
+    <p className="mt-1 text-[11px] text-slate-500 sm:text-sm">
+      اختر القسم المناسب للعثور على ما تبحث عنه
+    </p>
+  </div>
 
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm sm:h-12 sm:w-12 sm:rounded-2xl">
-        <Menu size={22} />
-      </span>
-    </div>
+  <span className="absolute left-0 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 shadow-sm sm:h-12 sm:w-12 sm:rounded-2xl">
+    <Menu size={22} />
+  </span>
+</div>
 
     {/* ألوان التصنيفات */}
     {/*

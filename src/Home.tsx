@@ -1148,42 +1148,9 @@ const matchesCondition = selectedConditions.includes(
                 </div>
               </div>
             )}
-            {deleteTarget && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4">
-    <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
-      <div className="mb-3 flex items-center gap-2 text-rose-600">
-        <Trash2 size={20} />
-        <h3 className="font-bold">تأكيد الحذف</h3>
-      </div>
 
-      <p className="mb-5 text-sm leading-6 text-slate-600">
-        {deleteTarget.type === "all"
-          ? "هل أنت متأكد من حذف جميع الإشعارات؟"
-          : "هل أنت متأكد من حذف هذا الإشعار؟"}
-      </p>
 
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => setDeleteTarget(null)}
-          disabled={isDeletingNotification}
-          className="flex-1 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-600"
-        >
-          إلغاء
-        </button>
 
-        <button
-          type="button"
-          onClick={confirmDeleteNotification}
-          disabled={isDeletingNotification}
-          className="flex-1 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50"
-        >
-          {isDeletingNotification ? "جارٍ الحذف..." : "تأكيد الحذف"}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
           </div>
 
           <button
@@ -1634,6 +1601,7 @@ if (navigator.share) {
 
 
 {/* إشعارات الموبايل */}
+
 {showNotifications && (
   <div
     className="fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/45 px-3 pt-14 backdrop-blur-sm md:hidden sm:px-4 sm:pt-20"
@@ -1705,100 +1673,117 @@ if (navigator.share) {
                 ? item.notifications[0]
                 : item.notifications;
 
+              const openNotification = async () => {
+                if (!item.read_at) {
+                  await markNotificationAsRead(item.id);
+                }
+
+                setShowNotifications(false);
+
+                const link = notification?.link;
+                if (!link) return;
+
+                try {
+                  if (/^https?:\/\//i.test(link)) {
+                    const url = new URL(link);
+
+                    if (
+                      url.hostname === "nemer92.github.io" &&
+                      url.pathname.startsWith("/sooq-sy/ad/")
+                    ) {
+                      const adId = url.pathname
+                        .replace("/sooq-sy/ad/", "")
+                        .replace(/\/$/, "");
+
+                      navigate(`/ad/${encodeURIComponent(adId)}`);
+                    } else {
+                      window.open(link, "_blank", "noopener,noreferrer");
+                    }
+                  } else {
+                    navigate(link.startsWith("/") ? link : `/${link}`);
+                  }
+                } catch (error) {
+                  console.error("Invalid notification link:", error);
+                }
+              };
+
               return (
                 <div
                   key={item.id}
-                  onClick={async () => {
-                    if (!item.read_at) {
-                      await markNotificationAsRead(item.id);
-                    }
-
-                    setShowNotifications(false);
-
-                    const link = notification?.link;
-                    if (!link) return;
-
-                    try {
-                      if (/^https?:\/\//i.test(link)) {
-                        const url = new URL(link);
-
-                        if (
-                          url.hostname === "nemer92.github.io" &&
-                          url.pathname.startsWith("/sooq-sy/ad/")
-                        ) {
-                          const adId = url.pathname
-                            .replace("/sooq-sy/ad/", "")
-                            .replace(/\/$/, "");
-                          navigate(`/ad/${encodeURIComponent(adId)}`);
-                        } else {
-                          window.open(link, "_blank", "noopener,noreferrer");
-                        }
-                      } else {
-                        navigate(link.startsWith("/") ? link : `/${link}`);
-                      }
-                    } catch (error) {
-                      console.error("Invalid notification link:", error);
-                    }
-                  }}
-                  className={`group cursor-pointer rounded-2xl border p-3.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                  className={`rounded-2xl border p-3.5 transition-all duration-200 ${
                     !item.read_at
-                      ? "border-emerald-100 bg-white shadow-[0_3px_12px_rgba(16,185,129,0.07)] hover:border-emerald-200"
-                      : "border-slate-100 bg-white hover:border-slate-200"
+                      ? "border-emerald-100 bg-white shadow-[0_3px_12px_rgba(16,185,129,0.07)]"
+                      : "border-slate-100 bg-white"
                   }`}
                 >
                   <div className="flex items-start gap-3">
-  <div
-    className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-      !item.read_at
-        ? "bg-emerald-50 text-emerald-700"
-        : "bg-slate-50 text-slate-400"
-    }`}
-  >
-    <Bell size={18} />
-  </div>
+                    <div
+                      className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                        !item.read_at
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-slate-50 text-slate-400"
+                      }`}
+                    >
+                      <Bell size={18} />
+                    </div>
 
-  <div className="min-w-0 flex-1">
-    <div className="flex items-start justify-between gap-2">
-      <p className="text-[13px] font-extrabold leading-6 text-slate-800">
-        {notification?.title}
-      </p>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className="min-w-0 flex-1 cursor-pointer"
+                      onClick={openNotification}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openNotification();
+                        }
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[13px] font-extrabold leading-6 text-slate-800">
+                          {notification?.title}
+                        </p>
 
-      {!item.read_at && (
-        <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500 ring-4 ring-emerald-50" />
-      )}
-    </div>
+                        {!item.read_at && (
+                          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500 ring-4 ring-emerald-50" />
+                        )}
+                      </div>
 
-    <p className="mt-1 whitespace-pre-line text-xs leading-6 text-slate-600">
-      {notification?.body}
-    </p>
+                      <p className="mt-1 whitespace-pre-line text-xs leading-6 text-slate-600">
+                        {notification?.body}
+                      </p>
 
-    <div className="mt-2.5 flex items-center justify-between">
-      <span className="text-[10px] font-medium text-slate-400">
-        {new Date(item.created_at).toLocaleString("ar")}
-      </span>
+                      <div className="mt-2.5 flex items-center justify-between">
+                        <span className="text-[10px] font-medium text-slate-400">
+                          {new Date(item.created_at).toLocaleString("ar")}
+                        </span>
 
-      {notification?.link && (
-        <span className="text-[10px] font-bold text-emerald-700">
-          عرض التفاصيل ←
-        </span>
-      )}
-    </div>
-  </div>
+                        {notification?.link && (
+                          <span className="text-[10px] font-bold text-emerald-700">
+                            عرض التفاصيل ←
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-<button
-  type="button"
-  title="حذف الإشعار"
-  aria-label="حذف الإشعار"
-  onClick={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDeleteTarget({ type: "one", id: item.id });
-  }}
-  className="relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-100 active:scale-90"
->
-  <Trash2 size={17} />
-</button>
-</div>
+                    <button
+                      type="button"
+                      title="حذف الإشعار"
+                      aria-label="حذف الإشعار"
+
+onClick={(e) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  
+  setDeleteTarget({ type: "one", id: item.id });
+}}
+
+                      className="relative z-20 pointer-events-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-200 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-100 active:scale-90"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -1806,30 +1791,79 @@ if (navigator.share) {
         )}
       </div>
 
-{/* أسفل النافذة */}
-<div className="space-y-2 border-t border-slate-100 bg-white px-4 py-3">
-  {notifications.length > 0 && (
-    <button
-      type="button"
-      onClick={() => setDeleteTarget({ type: "all" })}
-      className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50 py-2.5 text-xs font-extrabold text-rose-600 transition hover:bg-rose-100 active:scale-[0.99]"
-    >
-      <Trash2 size={15} />
-      حذف جميع الإشعارات
-    </button>
-  )}
+      {/* أسفل النافذة */}
+      <div className="space-y-2 border-t border-slate-100 bg-white px-4 py-3">
+        {notifications.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setDeleteTarget({ type: "all" })}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50 py-2.5 text-xs font-extrabold text-rose-600 transition hover:bg-rose-100 active:scale-[0.99]"
+          >
+            <Trash2 size={15} />
+            حذف جميع الإشعارات
+          </button>
+        )}
 
-  <button
-    type="button"
-    onClick={() => setShowNotifications(false)}
-    className="w-full rounded-xl bg-slate-50 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700"
-  >
-    إغلاق الإشعارات
-  </button>
-</div>
+        <button
+          type="button"
+          onClick={() => setShowNotifications(false)}
+          className="w-full rounded-xl bg-slate-50 py-2.5 text-xs font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700"
+        >
+          إغلاق الإشعارات
+        </button>
+      </div>
     </div>
   </div>
 )}
+
+{deleteTarget && (
+  <div
+    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+    onClick={() => {
+      if (!isDeletingNotification) {
+        setDeleteTarget(null);
+      }
+    }}
+  >
+    <div
+      className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="mb-3 flex items-center gap-2 text-rose-600">
+        <Trash2 size={20} />
+        <h3 className="font-bold">تأكيد الحذف</h3>
+      </div>
+
+      <p className="mb-5 text-sm leading-6 text-slate-600">
+        {deleteTarget.type === "all"
+          ? "هل أنت متأكد من حذف جميع الإشعارات؟"
+          : "هل أنت متأكد من حذف هذا الإشعار؟"}
+      </p>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setDeleteTarget(null)}
+          disabled={isDeletingNotification}
+          className="flex-1 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600 disabled:opacity-50"
+        >
+          إلغاء
+        </button>
+
+        <button
+          type="button"
+          onClick={confirmDeleteNotification}
+          disabled={isDeletingNotification}
+          className="flex-1 rounded-xl bg-rose-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+        >
+          {isDeletingNotification ? "جارٍ الحذف..." : "تأكيد الحذف"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
 
   {/* البحث والفلاتر - الموبايل */}
 

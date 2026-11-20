@@ -719,7 +719,8 @@ export default function Profile() {
 
         <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           
-          <div className="relative h-24 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-32">
+         {/* <div className="h-24 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-32" /> */}
+          <div className="relative h-20 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-300 sm:h-32">
 
   {/* رصيد النقاط */}
   <div className="absolute left-3 top-3 z-10">

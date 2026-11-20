@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 
@@ -23,6 +23,7 @@ type City = {
 
 export default function StoreSubscription() {
   const navigate = useNavigate();
+  const { id: routeStoreId } = useParams();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -33,7 +34,7 @@ export default function StoreSubscription() {
   const [exchangeRate, setExchangeRate] = useState(0);
 
   const [stores, setStores] = useState<Store[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState("");
+  const [selectedStoreId, setSelectedStoreId] = useState(routeStoreId ?? "");
 
   const [storeName, setStoreName] = useState("");
   const [businessType, setBusinessType] = useState("");
@@ -58,7 +59,11 @@ export default function StoreSubscription() {
 
         if (!user) {
           navigate("/auth", {
-            state: { from: "/store-subscription" },
+            state: {
+              from: routeStoreId
+                ? `/store-subscription/${routeStoreId}`
+                : "/store-subscription",
+            },
           });
           return;
         }
@@ -111,13 +116,24 @@ export default function StoreSubscription() {
           throw new Error("رقم الهاتف المسجل في حسابك غير صالح.");
         }
 
+        const ownedStores = (storesData ?? []) as Store[];
+
+        if (
+          routeStoreId &&
+          !ownedStores.some((store) => store.id === routeStoreId)
+        ) {
+          throw new Error("المتجر المطلوب غير موجود ضمن متاجرك.");
+        }
+
         setSubscriptionsEnabled(Boolean(settingsData.subscriptions_enabled));
         setPhone(profileData.phone);
         setStorePhone(profileData.phone);
         setQrUrl(settingsData.sham_cash_qr_url ?? "");
         setExchangeRate(Number(settingsData.usd_syp_rate ?? 0));
 
-        setStores((storesData ?? []) as Store[]);
+        setStores(ownedStores);
+        setSelectedStoreId(routeStoreId ?? "");
+
         setGovernorates(governoratesData ?? []);
         setCities(citiesData ?? []);
       } catch (err) {
@@ -132,7 +148,7 @@ export default function StoreSubscription() {
     }
 
     loadPageData();
-  }, [navigate]);
+  }, [navigate, routeStoreId]);
 
   const amountSyp = Math.floor(20 * exchangeRate);
 
@@ -153,7 +169,9 @@ export default function StoreSubscription() {
       }
 
       if (!/^09[0-9]{8}$/.test(storePhone.trim())) {
-        setRequestError("يرجى إدخال رقم هاتف متجر صحيح يبدأ بـ 09 ويتكون من 10 أرقام.");
+        setRequestError(
+          "يرجى إدخال رقم هاتف متجر صحيح يبدأ بـ 09 ويتكون من 10 أرقام."
+        );
         return;
       }
     }
@@ -203,6 +221,31 @@ export default function StoreSubscription() {
         storeId = newStore.id;
         setStores((previous) => [newStore as Store, ...previous]);
         setSelectedStoreId(storeId);
+      } else {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const user = sessionData.session?.user;
+
+        if (!user) {
+          navigate("/auth", {
+            state: {
+              from: `/store-subscription/${storeId}`,
+            },
+          });
+          return;
+        }
+
+        const { data: existingStore, error: storeError } = await supabase
+          .from("stores")
+          .select("id")
+          .eq("id", storeId)
+          .eq("owner_id", user.id)
+          .maybeSingle();
+
+        if (storeError) throw storeError;
+
+        if (!existingStore) {
+          throw new Error("لا يمكنك طلب اشتراك لمتجر لا تملكه.");
+        }
       }
 
       const { data, error: requestErrorFromServer } = await supabase.rpc(

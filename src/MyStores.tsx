@@ -10,6 +10,8 @@ import {
   ExternalLink,
   Package,
   Star,
+  Power,
+  X,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
@@ -23,6 +25,9 @@ type StoreRow = {
   logo_url: string | null;
   cover_url: string | null;
   status: string;
+  owner_disabled: boolean;
+  admin_disabled: boolean;
+  disabled_ads_mode: "hide" | "show";
 };
 
 type SubscriptionRow = {
@@ -67,6 +72,16 @@ export default function MyStores() {
   const [stores, setStores] = useState<StoreInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const [selectedStore, setSelectedStore] = useState<StoreInfo | null>(null);
+  const [selectedEnableStore, setSelectedEnableStore] =
+    useState<StoreInfo | null>(null);
+
+  const [adsMode, setAdsMode] = useState<"hide" | "show">("hide");
+  const [busyStoreId, setBusyStoreId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -77,15 +92,16 @@ export default function MyStores() {
 
       try {
         const { data: authData, error: authError } =
-          await supabase.auth.getUser();
+          await supabase.auth.getSession();
 
         if (authError) throw authError;
 
-        const user = authData.user;
+        const user = authData.session?.user;
 
         if (!user) {
           navigate("/auth", {
             state: { from: "/my-stores" },
+            replace: true,
           });
           return;
         }
@@ -94,7 +110,7 @@ export default function MyStores() {
           await supabase
             .from("stores")
             .select(
-              "id,name,business_type,description,governorate,city,logo_url,cover_url,status"
+              "id,name,business_type,description,governorate,city,logo_url,cover_url,status,owner_disabled,admin_disabled,disabled_ads_mode"
             )
             .eq("owner_id", user.id)
             .order("created_at", { ascending: false });
@@ -126,7 +142,6 @@ export default function MyStores() {
           (subscriptionsData ?? []) as SubscriptionRow[];
 
         const now = Date.now();
-
         const currentSubscriptions = new Map<string, SubscriptionRow>();
 
         for (const subscription of subscriptions) {
@@ -213,7 +228,88 @@ export default function MyStores() {
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, [navigate, refreshKey]);
+
+  function openDisableDialog(store: StoreInfo) {
+    setSelectedStore(store);
+    setAdsMode(store.disabled_ads_mode || "hide");
+    setActionMessage("");
+    setActionError("");
+  }
+
+  async function disableStore() {
+    if (!selectedStore) return;
+
+    const store = selectedStore;
+
+    setBusyStoreId(store.id);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const { error: rpcError } = await supabase.rpc(
+        "owner_set_store_disabled",
+        {
+          p_store_id: store.id,
+          p_disabled: true,
+          p_ads_mode: adsMode,
+        }
+      );
+
+      if (rpcError) throw rpcError;
+
+      setSelectedStore(null);
+      setActionMessage("تم إيقاف المتجر بنجاح.");
+      setRefreshKey((value) => value + 1);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "تعذر إيقاف المتجر."
+      );
+    } finally {
+      setBusyStoreId(null);
+    }
+  }
+
+  function enableStore(store: StoreInfo) {
+    if (store.admin_disabled) return;
+
+    setActionError("");
+    setActionMessage("");
+    setSelectedEnableStore(store);
+  }
+
+  async function confirmEnableStore() {
+    if (!selectedEnableStore) return;
+
+    const store = selectedEnableStore;
+
+    setBusyStoreId(store.id);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const { error: rpcError } = await supabase.rpc(
+        "owner_set_store_disabled",
+        {
+          p_store_id: store.id,
+          p_disabled: false,
+          p_ads_mode: store.disabled_ads_mode || "hide",
+        }
+      );
+
+      if (rpcError) throw rpcError;
+
+      setSelectedEnableStore(null);
+      setActionMessage("تم إعادة تفعيل المتجر بنجاح.");
+      setRefreshKey((value) => value + 1);
+    } catch (err) {
+      setActionError(
+        err instanceof Error ? err.message : "تعذرت إعادة تفعيل المتجر."
+      );
+    } finally {
+      setBusyStoreId(null);
+    }
+  }
 
   return (
     <main dir="rtl" className="min-h-screen bg-slate-50">
@@ -263,6 +359,18 @@ export default function MyStores() {
           </button>
         </div>
 
+        {actionMessage && (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
+            {actionMessage}
+          </div>
+        )}
+
+        {actionError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">
+            {actionError}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-20 text-slate-500">
             <RefreshCw className="animate-spin" size={19} />
@@ -273,7 +381,7 @@ export default function MyStores() {
             {error}
             <button
               type="button"
-              onClick={() => window.location.reload()}
+              onClick={() => setRefreshKey((value) => value + 1)}
               className="mx-auto mt-4 block rounded-xl bg-red-600 px-5 py-2 font-bold text-white"
             >
               إعادة المحاولة
@@ -324,6 +432,9 @@ export default function MyStores() {
                 featuredLimit > 0
                   ? Math.min(100, (store.featuredUsed / featuredLimit) * 100)
                   : 0;
+
+              const isDisabled =
+                store.owner_disabled || store.admin_disabled;
 
               return (
                 <article
@@ -393,6 +504,32 @@ export default function MyStores() {
                       <p className="mt-3 text-sm leading-7 text-slate-600">
                         {store.description}
                       </p>
+                    )}
+
+                    {isDisabled && (
+                      <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                        <p className="font-black text-amber-800">
+                          <Power size={16} className="ml-1 inline" />
+                          المتجر متوقف حالياً
+                        </p>
+
+                        {store.admin_disabled ? (
+                          <p className="mt-1 text-sm leading-6 text-amber-700">
+                            تم إيقاف المتجر من الإدارة. لا يمكنك إعادة تفعيله؛
+                            يمكن للإدارة وحدها رفع الإيقاف.
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-sm leading-6 text-amber-700">
+                            قمت بإيقاف هذا المتجر. يمكنك إعادة تفعيله من حسابك.
+                          </p>
+                        )}
+
+                        <p className="mt-1 text-xs text-amber-700">
+                          {store.disabled_ads_mode === "show"
+                            ? "إعلانات المتجر المعتمدة ما زالت ظاهرة في السوق العام."
+                            : "إعلانات المتجر مخفية من السوق العام."}
+                        </p>
+                      </div>
                     )}
 
                     <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -479,7 +616,7 @@ export default function MyStores() {
                         <p className="mt-3 text-sm leading-7 text-slate-600">
                           {store.status === "pending"
                             ? "المتجر بانتظار مراجعة الإدارة. سيظهر رصيد الاشتراك بعد تفعيله."
-                            : "يمكنك تقديم طلب اشتراك أو تجديد الاشتراك من صفحة الاشتراكات."}
+                            : "يمكنك تقديم طلب اشتراك أو تجديد الاشتراك من صفحة اشتراكات المتاجر."}
                         </p>
                       )}
                     </div>
@@ -492,8 +629,41 @@ export default function MyStores() {
                       تعديل بيانات المتجر
                     </button>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {store.status === "active" && (
+                    {store.status === "active" && (
+                      <div className="mt-3">
+                        {store.admin_disabled ? (
+                          <div className="rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-center text-sm font-bold text-slate-500">
+                            المتجر موقوف من الإدارة
+                          </div>
+                        ) : store.owner_disabled ? (
+                          <button
+                            type="button"
+                            disabled={busyStoreId === store.id}
+                            onClick={() => enableStore(store)}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                          >
+                            {busyStoreId === store.id ? (
+                              <RefreshCw size={17} className="animate-spin" />
+                            ) : (
+                              <Power size={17} />
+                            )}
+                            إعادة تفعيل المتجر
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openDisableDialog(store)}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-100"
+                          >
+                            <Power size={17} />
+                            إيقاف المتجر
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {store.status === "active" && !isDisabled && (
                         <button
                           type="button"
                           onClick={() => navigate(`/store/${store.id}`)}
@@ -506,7 +676,9 @@ export default function MyStores() {
 
                       <button
                         type="button"
-                        onClick={() => navigate("/subscriptions")}
+                        onClick={() =>
+                          navigate(`/store-subscription/${store.id}`)
+                        }
                         className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700"
                       >
                         {subscription ? "الاشتراكات والتجديد" : "طلب اشتراك"}
@@ -519,6 +691,168 @@ export default function MyStores() {
           </div>
         )}
       </div>
+
+      {/* مربع إيقاف المتجر */}
+      {selectedStore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            dir="rtl"
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-black text-slate-900">
+                إيقاف المتجر
+              </h2>
+
+              <button
+                type="button"
+                onClick={() => setSelectedStore(null)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="إغلاق"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              اختر ماذا تريد أن يحدث لإعلانات متجر «{selectedStore.name}»
+              المعتمدة عند إيقافه:
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3">
+                <input
+                  type="radio"
+                  name="adsMode"
+                  value="hide"
+                  checked={adsMode === "hide"}
+                  onChange={() => setAdsMode("hide")}
+                  className="mt-1 accent-emerald-600"
+                />
+                <span>
+                  <strong className="block text-sm text-slate-800">
+                    إخفاء إعلانات المتجر
+                  </strong>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    يختفي المتجر من الدليل وتختفي إعلاناته من السوق العام.
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3">
+                <input
+                  type="radio"
+                  name="adsMode"
+                  value="show"
+                  checked={adsMode === "show"}
+                  onChange={() => setAdsMode("show")}
+                  className="mt-1 accent-emerald-600"
+                />
+                <span>
+                  <strong className="block text-sm text-slate-800">
+                    إبقاء الإعلانات ظاهرة
+                  </strong>
+                  <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    يختفي المتجر من الدليل وتبقى إعلاناته المعتمدة ظاهرة في السوق
+                    العام.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {actionError && (
+              <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                {actionError}
+              </p>
+            )}
+
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                disabled={busyStoreId === selectedStore.id}
+                onClick={disableStore}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {busyStoreId === selectedStore.id
+                  ? "جارٍ الإيقاف..."
+                  : "تأكيد إيقاف المتجر"}
+              </button>
+
+              <button
+                type="button"
+                disabled={busyStoreId === selectedStore.id}
+                onClick={() => setSelectedStore(null)}
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* مربع إعادة تفعيل المتجر */}
+      {selectedEnableStore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            dir="rtl"
+            className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-black text-slate-900">
+                إعادة تفعيل المتجر
+              </h2>
+
+              <button
+                type="button"
+                onClick={() => setSelectedEnableStore(null)}
+                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="إغلاق"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <p className="font-bold text-emerald-800">
+                هل تريد إعادة تفعيل متجر «{selectedEnableStore.name}»؟
+              </p>
+              <p className="mt-2 text-sm leading-6 text-emerald-700">
+                سيعود المتجر للظهور في دليل المتاجر، وستعود إعلاناته وفق حالتها
+                الفردية.
+              </p>
+            </div>
+
+            {actionError && (
+              <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                {actionError}
+              </p>
+            )}
+
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                disabled={busyStoreId === selectedEnableStore.id}
+                onClick={confirmEnableStore}
+                className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {busyStoreId === selectedEnableStore.id
+                  ? "جارٍ إعادة التفعيل..."
+                  : "تأكيد إعادة التفعيل"}
+              </button>
+
+              <button
+                type="button"
+                disabled={busyStoreId === selectedEnableStore.id}
+                onClick={() => setSelectedEnableStore(null)}
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

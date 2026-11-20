@@ -836,147 +836,49 @@ const matchesCondition = selectedConditions.includes(
 )}
 
 
-<header className="sticky top-0 z-50 border-b border-slate-100 bg-white">
-  <div className="mx-auto grid max-w-7xl grid-cols-[auto_1fr] items-center gap-x-6 gap-y-4 px-5 py-4 md:grid-cols-[auto_minmax(0,1fr)]">
+
+<header className="sticky top-0 z-50 border-b border-slate-200/70 bg-white/95 shadow-[0_2px_18px_rgba(15,23,42,0.035)] backdrop-blur-xl">
+  <div className="mx-auto grid max-w-7xl grid-cols-[auto_1fr] items-center gap-x-5 gap-y-4 px-3 py-3 sm:px-5 md:grid-cols-[auto_minmax(0,1fr)] md:gap-x-6 md:py-4">
 
     {/* الشعار */}
     <a
       href="/"
-      className="flex items-center gap-2 md:col-start-1 md:row-start-1"
+      className="group flex min-w-0 items-center gap-2.5 md:col-start-1 md:row-start-1"
     >
-      <img
-        src={siteIcon}
-        alt="Sooq.Sy"
-        className="h-11 w-11 rounded-xl object-contain"
-      />
-      <div>
-        <h1 className="text-2xl font-black tracking-tight text-slate-900">
+      <div className="shrink-0 rounded-2xl bg-emerald-50 p-1 shadow-sm ring-1 ring-emerald-100/80 transition duration-300 group-hover:scale-[1.03] group-hover:shadow-md">
+        <img
+          src={siteIcon}
+          alt="Sooq.Sy"
+          className="h-10 w-10 rounded-xl object-contain sm:h-11 sm:w-11"
+        />
+      </div>
+      <div className="min-w-0">
+        <h1 className="truncate text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
           {siteName}
         </h1>
-        <p className="text-[10px] text-slate-400">
+        <p className="mt-0.5 truncate text-[9px] font-medium text-slate-400 sm:text-[10px]">
           السوق السوري للإعلانات المبوبة
         </p>
       </div>
     </a>
 
-{/* البحث والفلاتر - الكمبيوتر */}
-<div className="hidden min-w-0 items-center gap-3 md:flex md:col-span-2 md:row-start-2">
-
-  {/* خانة البحث - اليمين */}
-  <div className="flex h-12 min-w-0 flex-1 items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm transition focus-within:border-emerald-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-50">
-    <Search size={20} className="mr-4 shrink-0 text-emerald-600" />
-
-    <input
-      value={searchQuery}
-      onChange={(e) => setSearchQuery(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") {
-          document.getElementById("ads-section")?.scrollIntoView({
-            behavior: "smooth",
-          });
-        }
-      }}
-      className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400"
-      placeholder="شو عم تدور عليه؟ ابحث عن أي شيء..."
-    />
-
-    {searchQuery && (
-      <button
-        type="button"
-        onClick={() => setSearchQuery("")}
-        className="mx-2 rounded-lg px-2 py-1 text-xs font-bold text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
-      >
-        مسح
-      </button>
-    )}
-  </div>
-
-  {/* المحافظات والمدن - اليسار */}
-  <div className="flex w-[390px] shrink-0 items-center gap-2 rounded-xl border border-slate-100 bg-white p-2 shadow-sm">
-
-    <div className="relative min-w-0 flex-1">
-      <select
-        value={selectedGovernorate}
-        onChange={(e) => {
-          setSelectedGovernorate(e.target.value);
-          setSelectedCity("");
-        }}
-        className="h-10 w-full appearance-none rounded-xl border border-slate-100 bg-slate-50 px-3 pl-8 text-xs font-bold text-slate-700 outline-none hover:border-emerald-200 focus:border-emerald-400"
-      >
-        <option value="">كل المحافظات</option>
-        {governorates.map((governorate) => (
-          <option key={governorate.id} value={String(governorate.id)}>
-            {governorate.name_ar}
-          </option>
-        ))}
-      </select>
-
-      <ChevronDown
-        size={14}
-        className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
-      />
-    </div>
-
-    <div className="relative min-w-0 flex-1">
-      <select
-        value={selectedCity}
-        onChange={(e) => setSelectedCity(e.target.value)}
-        className="h-10 w-full appearance-none rounded-xl border border-slate-100 bg-slate-50 px-3 pl-8 text-xs font-bold text-slate-700 outline-none hover:border-emerald-200 focus:border-emerald-400"
-      >
-        <option value="">كل المدن</option>
-        {cities
-          .filter(
-            (city) =>
-              selectedGovernorate === "" ||
-              String(city.governorate_id) === selectedGovernorate
-          )
-          .map((city) => (
-            <option key={city.id} value={String(city.id)}>
-              {city.name_ar}
-            </option>
-          ))}
-      </select>
-
-      <ChevronDown
-        size={14}
-        className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-400"
-      />
-    </div>
-
-    {(searchQuery || selectedGovernorate || selectedCity) && (
-      <button
-        type="button"
-        onClick={() => {
-          setSearchQuery("");
-          setSelectedGovernorate("");
-          setSelectedCity("");
-        }}
-        title="مسح البحث والفلاتر"
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition hover:bg-rose-100"
-      >
-        <X size={16} />
-      </button>
-    )}
-  </div>
-</div>
-
     {/* روابط الحساب - الكمبيوتر */}
-    <div className="hidden min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-2 md:col-start-2 md:row-start-1 md:flex">
+    <div className="hidden min-w-0 flex-wrap items-center justify-end gap-1.5 lg:gap-2 md:col-start-2 md:row-start-1 md:flex">
       {isLoggedIn ? (
         <>
           <button
             onClick={() => navigate("/my-ads")}
-            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+            className="group flex items-center gap-2 whitespace-nowrap rounded-xl px-2.5 py-2.5 text-sm font-semibold text-emerald-700 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-800 lg:px-3"
           >
-            <UserRound size={18} />
+            <UserRound size={17} className="transition-transform group-hover:scale-110" />
             إعلاناتي
           </button>
 
           <button
             onClick={() => navigate("/profile")}
-            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-slate-700 hover:text-emerald-800"
+            className="group flex items-center gap-2 whitespace-nowrap rounded-xl px-2.5 py-2.5 text-sm font-semibold text-slate-600 transition-all duration-200 hover:bg-slate-50 hover:text-emerald-700 lg:px-3"
           >
-            <UserRound size={18} />
+            <UserRound size={17} className="transition-transform group-hover:scale-110" />
             الملف الشخصي
           </button>
 
@@ -985,42 +887,70 @@ const matchesCondition = selectedConditions.includes(
               setIsMobileMenuOpen(false);
               navigate("/messages");
             }}
-            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-slate-700 hover:text-emerald-800"
+            className="group flex items-center gap-2 whitespace-nowrap rounded-xl px-2.5 py-2.5 text-sm font-semibold text-slate-600 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-700 lg:px-3"
           >
-            <MessageCircle size={18} />
+            <MessageCircle size={17} className="transition-transform group-hover:scale-110" />
             رسائلي
             {unreadMessagesCount > 0 && (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-sm shadow-rose-200">
                 {unreadMessagesCount}
               </span>
             )}
           </button>
 
+          {/* الإشعارات */}
           <div className="relative">
             <button
               onClick={() => setShowNotifications(!showNotifications)}
-              className="relative flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+              className={`group flex items-center gap-2 whitespace-nowrap rounded-xl px-2.5 py-2.5 text-sm font-semibold transition-all duration-200 lg:px-3 ${
+                showNotifications
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+              }`}
             >
-              <Bell size={20} />
+              <Bell size={18} className="transition-transform group-hover:rotate-[-10deg]" />
               <span>الإشعارات</span>
               {unreadNotificationsCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-sm shadow-rose-200">
                   {unreadNotificationsCount}
                 </span>
               )}
             </button>
 
             {showNotifications && (
-              <div className="absolute left-0 top-full z-50 mt-3 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                <div className="border-b border-slate-100 px-4 py-3">
-                  <h3 className="font-bold text-slate-800">الإشعارات</h3>
+              <div className="absolute left-0 top-full z-[70] mt-3 w-[min(360px,calc(100vw-24px))] overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_16px_50px_rgba(15,23,42,0.14)] animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3.5">
+                  <div className="flex items-center gap-2">
+                    <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700">
+                      <Bell size={16} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-800">الإشعارات</h3>
+                      <p className="mt-0.5 text-[10px] text-slate-400">
+                        آخر التحديثات والتنبيهات
+                      </p>
+                    </div>
+                  </div>
+                  {unreadNotificationsCount > 0 && (
+                    <span className="rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-600">
+                      {unreadNotificationsCount} جديد
+                    </span>
+                  )}
                 </div>
 
-                <div className="max-h-96 overflow-y-auto">
+                <div className="max-h-[420px] overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <p className="p-5 text-center text-sm text-slate-500">
-                      لا توجد إشعارات حالياً
-                    </p>
+                    <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
+                      <div className="mb-3 rounded-2xl bg-slate-100 p-3 text-slate-400">
+                        <Bell size={23} />
+                      </div>
+                      <p className="text-sm font-semibold text-slate-600">
+                        لا توجد إشعارات حالياً
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        ستظهر تحديثاتك الجديدة هنا
+                      </p>
+                    </div>
                   ) : (
                     notifications.map((item: any) => {
                       const notification = Array.isArray(item.notifications)
@@ -1063,19 +993,26 @@ const matchesCondition = selectedConditions.includes(
                               console.error("Invalid notification link:", error);
                             }
                           }}
-                          className={`cursor-pointer border-b border-slate-100 p-4 ${
-                            !item.read_at ? "bg-emerald-50" : "bg-white"
+                          className={`group cursor-pointer border-b border-slate-100/80 p-4 transition-colors duration-200 hover:bg-emerald-50/60 ${
+                            !item.read_at ? "bg-emerald-50/70" : "bg-white"
                           }`}
                         >
-                          <p className="font-bold text-slate-800">
-                            {notification?.title}
-                          </p>
-                          <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
-                            {notification?.body}
-                          </p>
-                          <p className="mt-2 text-xs text-slate-400">
-                            {new Date(item.created_at).toLocaleString("ar")}
-                          </p>
+                          <div className="flex items-start gap-2.5">
+                            <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                              !item.read_at ? "bg-emerald-500" : "bg-transparent"
+                            }`} />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-bold text-slate-800 transition-colors group-hover:text-emerald-700">
+                                {notification?.title}
+                              </p>
+                              <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
+                                {notification?.body}
+                              </p>
+                              <p className="mt-2 text-[10px] font-medium text-slate-400">
+                                {new Date(item.created_at).toLocaleString("ar")}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       );
                     })
@@ -1087,12 +1024,12 @@ const matchesCondition = selectedConditions.includes(
 
           <button
             onClick={() => navigate("/favorites")}
-            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-rose-600 hover:text-rose-700"
+            className="group flex items-center gap-2 whitespace-nowrap rounded-xl px-2.5 py-2.5 text-sm font-semibold text-rose-600 transition-all duration-200 hover:bg-rose-50 hover:text-rose-700 lg:px-3"
           >
-            <Heart size={18} />
+            <Heart size={17} className="transition-transform group-hover:scale-110" />
             <span>مفضلتي</span>
             {favoriteAdIds.length > 0 && (
-              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-xs font-bold text-white">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-sm shadow-rose-200">
                 {favoriteAdIds.length}
               </span>
             )}
@@ -1115,9 +1052,9 @@ const matchesCondition = selectedConditions.includes(
 
               navigate("/");
             }}
-            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-red-600 hover:text-red-700"
+            className="group flex items-center gap-2 whitespace-nowrap rounded-xl px-2.5 py-2.5 text-sm font-semibold text-slate-500 transition-all duration-200 hover:bg-rose-50 hover:text-rose-600 lg:px-3"
           >
-            <LogOut size={18} />
+            <LogOut size={17} className="transition-transform group-hover:-translate-x-0.5" />
             تسجيل الخروج
           </button>
         </>
@@ -1125,46 +1062,46 @@ const matchesCondition = selectedConditions.includes(
         <>
           <button
             onClick={() => navigate("/auth")}
-            className="flex items-center gap-2 whitespace-nowrap text-sm font-semibold text-slate-600"
+            className="flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-600 transition-all hover:bg-slate-100 hover:text-emerald-700"
           >
-            <UserRound size={18} />
+            <UserRound size={17} />
             تسجيل الدخول
           </button>
 
           <a
             href="https://sooq-sy.pages.dev/app.apk"
             download="Sooq-SY.apk"
-            className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+            className="group flex items-center gap-2 whitespace-nowrap rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-700 transition-all duration-200 hover:border-emerald-200 hover:bg-emerald-100"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="currentColor"
-              className="h-5 w-5"
+              className="h-5 w-5 transition-transform group-hover:-translate-y-0.5"
             >
               <path d="M17.6 9.48 19.44 6.3a.5.5 0 0 0-.86-.5l-1.86 3.22a11.3 11.3 0 0 0-9.44 0L5.42 5.8a.5.5 0 1 0-.86.5L6.4 9.48A10.2 10.2 0 0 0 2 17h20a10.2 10.2 0 0 0-4.4-7.52ZM7.5 13.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
             </svg>
             تحميل تطبيق Sooq.Sy
-            <span className="mr-auto">↓</span>
+            <span className="mr-auto text-emerald-500">↓</span>
           </a>
         </>
       )}
 
       {allowNewAds && (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 border-r border-slate-100 pr-2">
           <button
             onClick={() => navigate("/add-ad?type=donation")}
-            className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-rose-500 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-rose-600"
+            className="group flex items-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-l from-rose-500 to-rose-600 px-3.5 py-2.5 text-sm font-bold text-white shadow-sm shadow-rose-200/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-rose-200/80 active:translate-y-0"
           >
-            <Heart size={19} />
+            <Heart size={17} className="transition-transform group-hover:scale-110" />
             تبرع الآن
           </button>
 
           <button
             onClick={() => navigate("/add-ad")}
-            className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
+            className="group flex items-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-l from-emerald-600 to-emerald-700 px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-emerald-200/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-emerald-200/80 active:translate-y-0"
           >
-            <Plus size={19} />
+            <Plus size={18} className="transition-transform group-hover:rotate-90" />
             أضف إعلانك
           </button>
         </div>
@@ -1175,30 +1112,128 @@ const matchesCondition = selectedConditions.includes(
     <button
       onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
       aria-label="فتح القائمة"
-      className="relative rounded-lg p-2 text-slate-600 md:hidden"
+      aria-expanded={isMobileMenuOpen}
+      className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 md:hidden ${
+        isMobileMenuOpen
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+          : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+      }`}
     >
-      <Menu size={24} />
+      {isMobileMenuOpen ? <X size={21} /> : <Menu size={21} />}
       {(unreadMessagesCount > 0 || unreadNotificationsCount > 0) && (
-        <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500" />
+        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-rose-500" />
       )}
     </button>
+
+    {/* البحث والفلاتر - الكمبيوتر */}
+    <div className="hidden min-w-0 items-center gap-3 md:col-span-2 md:row-start-2 md:flex">
+      <div className="flex h-12 min-w-0 flex-1 items-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 shadow-sm transition-all duration-200 focus-within:border-emerald-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-50">
+        <Search size={19} className="mr-4 shrink-0 text-emerald-600" />
+        <input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              document.getElementById("ads-section")?.scrollIntoView({
+                behavior: "smooth",
+              });
+            }
+          }}
+          className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-slate-800 outline-none placeholder:text-slate-400"
+          placeholder="شو عم تدور عليه؟ ابحث عن أي شيء..."
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery("")}
+            className="mx-2 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+          >
+            مسح
+          </button>
+        )}
+      </div>
+
+      <div className="flex w-[390px] shrink-0 items-center gap-2 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-sm">
+        <div className="relative min-w-0 flex-1">
+          <select
+            value={selectedGovernorate}
+            onChange={(e) => {
+              setSelectedGovernorate(e.target.value);
+              setSelectedCity("");
+            }}
+            className="h-11 w-full appearance-none rounded-xl border border-transparent bg-slate-50 px-3 pl-9 text-xs font-semibold text-slate-700 outline-none transition-all hover:bg-emerald-50/60 focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
+          >
+            <option value="">كل المحافظات</option>
+            {governorates.map((governorate) => (
+              <option key={governorate.id} value={String(governorate.id)}>
+                {governorate.name_ar}
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        </div>
+
+        <div className="relative min-w-0 flex-1">
+          <select
+            value={selectedCity}
+            onChange={(e) => setSelectedCity(e.target.value)}
+            className="h-11 w-full appearance-none rounded-xl border border-transparent bg-slate-50 px-3 pl-9 text-xs font-semibold text-slate-700 outline-none transition-all hover:bg-emerald-50/60 focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-500/10"
+          >
+            <option value="">كل المدن</option>
+            {cities
+              .filter(
+                (city) =>
+                  selectedGovernorate === "" ||
+                  String(city.governorate_id) === selectedGovernorate
+              )
+              .map((city) => (
+                <option key={city.id} value={String(city.id)}>
+                  {city.name_ar}
+                </option>
+              ))}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        </div>
+
+        {(searchQuery || selectedGovernorate || selectedCity) && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQuery("");
+              setSelectedGovernorate("");
+              setSelectedCity("");
+            }}
+            title="مسح البحث والفلاتر"
+            aria-label="مسح البحث والفلاتر"
+            className="flex h-11 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500 transition-all hover:bg-rose-100 active:scale-95"
+          >
+            <X size={17} />
+          </button>
+        )}
+      </div>
+    </div>
   </div>
 
   {/* قائمة الموبايل */}
   {isMobileMenuOpen && (
-    <div className="border-t border-slate-100 bg-white px-5 py-4 shadow-md md:hidden">
-      <div className="flex flex-col gap-2">
+    <div className="border-t border-slate-100 bg-white px-3 py-4 shadow-[0_12px_25px_rgba(15,23,42,0.07)] md:hidden sm:px-5">
+      <div className="mx-auto max-w-7xl">
         {isLoggedIn ? (
-          <>
+          <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-1.5">
+            <div className="mb-1 border-b border-slate-100 px-3 py-3">
+              <p className="text-sm font-bold text-slate-800">حسابك</p>
+              <p className="mt-0.5 text-[11px] text-slate-400">إدارة حسابك ومتابعة نشاطك</p>
+            </div>
+
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 navigate("/my-ads");
               }}
-              className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
             >
-              <UserRound size={18} className="ml-2 inline" />
-              إعلاناتي
+              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><UserRound size={18} /></span>
+              <span className="flex-1">إعلاناتي</span>
             </button>
 
             <button
@@ -1206,10 +1241,10 @@ const matchesCondition = selectedConditions.includes(
                 setIsMobileMenuOpen(false);
                 navigate("/profile");
               }}
-              className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700"
             >
-              <UserRound size={18} className="ml-2 inline" />
-              الملف الشخصي
+              <span className="rounded-xl bg-slate-100 p-2 text-slate-600"><UserRound size={18} /></span>
+              <span className="flex-1">الملف الشخصي</span>
             </button>
 
             <button
@@ -1217,14 +1252,12 @@ const matchesCondition = selectedConditions.includes(
                 setIsMobileMenuOpen(false);
                 navigate("/messages");
               }}
-              className="rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
             >
-              <MessageCircle size={18} className="ml-2 inline" />
-              رسائلي
+              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><MessageCircle size={18} /></span>
+              <span className="flex-1">رسائلي</span>
               {unreadMessagesCount > 0 && (
-                <span className="mr-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-                  {unreadMessagesCount}
-                </span>
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{unreadMessagesCount}</span>
               )}
             </button>
 
@@ -1233,16 +1266,12 @@ const matchesCondition = selectedConditions.includes(
                 setIsMobileMenuOpen(false);
                 setShowNotifications(true);
               }}
-              className="flex items-center justify-between rounded-xl px-4 py-3 text-right text-sm font-bold text-emerald-700 hover:bg-emerald-50"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
             >
-              <span className="flex items-center gap-2">
-                <Bell size={18} />
-                الإشعارات
-              </span>
+              <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><Bell size={18} /></span>
+              <span className="flex-1">الإشعارات</span>
               {unreadNotificationsCount > 0 && (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-                  {unreadNotificationsCount}
-                </span>
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{unreadNotificationsCount}</span>
               )}
             </button>
 
@@ -1251,11 +1280,16 @@ const matchesCondition = selectedConditions.includes(
                 setIsMobileMenuOpen(false);
                 navigate("/favorites");
               }}
-              className="rounded-xl px-4 py-3 text-right text-sm font-bold text-rose-600 hover:bg-rose-50"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-rose-50 hover:text-rose-700"
             >
-              <Heart size={18} className="ml-2 inline" />
-              مفضلتي
+              <span className="rounded-xl bg-rose-50 p-2 text-rose-600"><Heart size={18} /></span>
+              <span className="flex-1">مفضلتي</span>
+              {favoriteAdIds.length > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">{favoriteAdIds.length}</span>
+              )}
             </button>
+
+            <div className="my-1 border-t border-slate-100" />
 
             <button
               onClick={async () => {
@@ -1275,34 +1309,46 @@ const matchesCondition = selectedConditions.includes(
                 setIsMobileMenuOpen(false);
                 navigate("/");
               }}
-              className="rounded-xl px-4 py-3 text-right text-sm font-semibold text-red-600 hover:bg-red-50"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-rose-600 transition hover:bg-rose-50"
             >
+              <span className="rounded-xl bg-rose-50 p-2"><LogOut size={18} /></span>
               تسجيل الخروج
             </button>
-          </>
+          </div>
         ) : (
-          <button
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              navigate("/auth");
-            }}
-            className="rounded-xl px-4 py-3 text-right text-sm font-bold text-slate-700 hover:bg-slate-50"
-          >
-            <UserRound size={18} className="ml-2 inline" />
-            تسجيل الدخول
-          </button>
+          <div className="rounded-2xl border border-slate-100 bg-white p-2">
+            <button
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                navigate("/auth");
+              }}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <span className="rounded-xl bg-slate-100 p-2 text-slate-600"><UserRound size={18} /></span>
+              تسجيل الدخول
+            </button>
+            <a
+              href="https://sooq-sy.pages.dev/app.apk"
+              download="Sooq-SY.apk"
+              className="mt-1 flex w-full items-center gap-3 rounded-xl bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+            >
+              <span className="rounded-xl bg-white p-2"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5"><path d="M17.6 9.48 19.44 6.3a.5.5 0 0 0-.86-.5l-1.86 3.22a11.3 11.3 0 0 0-9.44 0L5.42 5.8a.5.5 0 1 0-.86.5L6.4 9.48A10.2 10.2 0 0 0 2 17h20a10.2 10.2 0 0 0-4.4-7.52ZM7.5 13.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" /></svg></span>
+              تحميل تطبيق Sooq.Sy
+              <span className="mr-auto">↓</span>
+            </a>
+          </div>
         )}
 
         {allowNewAds && (
-          <>
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 navigate("/add-ad?type=donation");
               }}
-              className="rounded-xl bg-rose-500 px-4 py-3 text-right text-sm font-bold text-white hover:bg-rose-600"
+              className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-rose-500 to-rose-600 px-3 py-3.5 text-sm font-bold text-white shadow-sm shadow-rose-200/70 transition active:scale-[0.98]"
             >
-              <Heart size={18} className="ml-2 inline" />
+              <Heart size={17} />
               تبرع الآن
             </button>
             <button
@@ -1310,12 +1356,12 @@ const matchesCondition = selectedConditions.includes(
                 setIsMobileMenuOpen(false);
                 navigate("/add-ad");
               }}
-              className="rounded-xl bg-emerald-600 px-4 py-3 text-right text-sm font-bold text-white hover:bg-emerald-700"
+              className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-l from-emerald-600 to-emerald-700 px-3 py-3.5 text-sm font-bold text-white shadow-sm shadow-emerald-200/70 transition active:scale-[0.98]"
             >
-              <Plus size={18} className="ml-2 inline" />
+              <Plus size={18} />
               أضف إعلانك
             </button>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -1324,29 +1370,42 @@ const matchesCondition = selectedConditions.includes(
   {/* إشعارات الموبايل */}
   {showNotifications && (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/40 px-4 pt-20 md:hidden"
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/40 px-3 pt-16 backdrop-blur-[3px] md:hidden sm:px-4 sm:pt-20"
       onClick={() => setShowNotifications(false)}
     >
       <div
-        className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="w-full max-w-md overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.25)] animate-in fade-in slide-in-from-top-3 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
-          <h3 className="font-bold text-slate-800">الإشعارات</h3>
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-emerald-100 p-2.5 text-emerald-700">
+              <Bell size={19} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-800">الإشعارات</h3>
+              <p className="mt-0.5 text-[10px] text-slate-400">كل جديد يخص حسابك</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => setShowNotifications(false)}
-            className="rounded-lg px-3 py-1 text-sm font-bold text-red-600 hover:bg-red-50"
+            aria-label="إغلاق الإشعارات"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-500 ring-1 ring-slate-200 transition hover:bg-rose-50 hover:text-rose-600"
           >
-            إغلاق
+            <X size={18} />
           </button>
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto">
           {notifications.length === 0 ? (
-            <p className="p-6 text-center text-sm text-slate-500">
-              لا توجد إشعارات حالياً
-            </p>
+            <div className="flex flex-col items-center justify-center px-5 py-12 text-center">
+              <div className="mb-3 rounded-2xl bg-slate-100 p-4 text-slate-400">
+                <Bell size={25} />
+              </div>
+              <p className="text-sm font-bold text-slate-600">لا توجد إشعارات حالياً</p>
+              <p className="mt-1 text-xs text-slate-400">ستظهر إشعاراتك الجديدة هنا</p>
+            </div>
           ) : (
             notifications.map((item: any) => {
               const notification = Array.isArray(item.notifications)
@@ -1388,19 +1447,26 @@ const matchesCondition = selectedConditions.includes(
                       console.error("Invalid notification link:", error);
                     }
                   }}
-                  className={`cursor-pointer border-b border-slate-100 p-4 ${
-                    !item.read_at ? "bg-emerald-50" : "bg-white"
+                  className={`cursor-pointer border-b border-slate-100 p-4 transition-colors hover:bg-emerald-50/60 ${
+                    !item.read_at ? "bg-emerald-50/70" : "bg-white"
                   }`}
                 >
-                  <p className="font-bold text-slate-800">
-                    {notification?.title}
-                  </p>
-                  <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
-                    {notification?.body}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-400">
-                    {new Date(item.created_at).toLocaleString("ar")}
-                  </p>
+                  <div className="flex items-start gap-2.5">
+                    <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${
+                      !item.read_at ? "bg-emerald-500" : "bg-transparent"
+                    }`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-bold text-slate-800">
+                        {notification?.title}
+                      </p>
+                      <p className="mt-1 whitespace-pre-line text-sm leading-7 text-slate-600">
+                        {notification?.body}
+                      </p>
+                      <p className="mt-2 text-[10px] font-medium text-slate-400">
+                        {new Date(item.created_at).toLocaleString("ar")}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               );
             })
@@ -1410,94 +1476,118 @@ const matchesCondition = selectedConditions.includes(
     </div>
   )}
 
-  {/* البحث والفلاتر - الموبايل، بدون تغيير */}
-  <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-4 md:hidden">
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm focus-within:border-emerald-400">
-      <div className="flex h-12 items-center px-3">
-        <Search size={19} className="shrink-0 text-emerald-600" />
-        <input
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              document.getElementById("ads-section")?.scrollIntoView({
-                behavior: "smooth",
-              });
-            }
-          }}
-          className="h-full w-full bg-transparent px-3 text-sm outline-none placeholder:text-slate-400"
-          placeholder="ابحث عن أي شيء في السوق..."
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery("")}
-            className="shrink-0 px-2 text-xs font-bold text-rose-500"
-          >
-            مسح
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => {
+  {/* البحث والفلاتر - الموبايل */}
+
+<div className="border-t border-slate-100 bg-slate-50/50 px-3 py-2 md:hidden sm:px-5">
+  <div className="mx-auto max-w-7xl">
+
+    {/* البحث */}
+    <div className="flex h-10 items-center gap-2 overflow-hidden rounded-xl border border-slate-200/80 bg-white px-2.5 shadow-[0_1px_4px_rgba(15,23,42,0.04)] transition-all focus-within:border-emerald-300 focus-within:ring-2 focus-within:ring-emerald-50">
+      <Search size={16} className="shrink-0 text-emerald-600" />
+
+      <input
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
             document.getElementById("ads-section")?.scrollIntoView({
               behavior: "smooth",
             });
-          }}
-          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white"
+          }
+        }}
+        className="h-full min-w-0 flex-1 bg-transparent text-xs text-slate-800 outline-none placeholder:text-slate-400"
+        placeholder="ابحث عن أي شيء في السوق..."
+      />
+
+      {searchQuery && (
+        <button
+          type="button"
+          onClick={() => setSearchQuery("")}
+          className="shrink-0 rounded-md px-1.5 py-1 text-[10px] font-semibold text-rose-500 transition hover:bg-rose-50"
         >
-          بحث
+          مسح
         </button>
-      </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => {
+          document.getElementById("ads-section")?.scrollIntoView({
+            behavior: "smooth",
+          });
+        }}
+        className="shrink-0 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-700 active:scale-95"
+      >
+        بحث
+      </button>
     </div>
 
-    <div className="mt-3 grid grid-cols-2 gap-2">
-      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-        <span className="mb-1 block text-[10px] font-bold text-slate-400">
+    {/* المحافظة والمدينة */}
+    <div className="mt-2 grid grid-cols-2 gap-2">
+
+      <div className="min-w-0 rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5 transition focus-within:border-emerald-300">
+        <span className="mb-0.5 block text-[9px] font-medium text-slate-400">
           المحافظة
         </span>
-        <select
-          value={selectedGovernorate}
-          onChange={(e) => {
-            setSelectedGovernorate(e.target.value);
-            setSelectedCity("");
-          }}
-          className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
-        >
-          <option value="">كل المحافظات</option>
-          {governorates.map((governorate) => (
-            <option key={governorate.id} value={String(governorate.id)}>
-              {governorate.name_ar}
-            </option>
-          ))}
-        </select>
-      </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-        <span className="mb-1 block text-[10px] font-bold text-slate-400">
-          المدينة
-        </span>
-        <select
-          value={selectedCity}
-          onChange={(e) => setSelectedCity(e.target.value)}
-          className="w-full bg-transparent text-xs font-semibold text-slate-700 outline-none"
-        >
-          <option value="">كل المدن</option>
-          {cities
-            .filter(
-              (city) =>
-                selectedGovernorate === "" ||
-                String(city.governorate_id) === selectedGovernorate
-            )
-            .map((city) => (
-              <option key={city.id} value={String(city.id)}>
-                {city.name_ar}
+        <div className="relative">
+          <select
+            value={selectedGovernorate}
+            onChange={(e) => {
+              setSelectedGovernorate(e.target.value);
+              setSelectedCity("");
+            }}
+            className="w-full appearance-none bg-transparent pl-5 text-[11px] font-semibold text-slate-700 outline-none"
+          >
+            <option value="">كل المحافظات</option>
+            {governorates.map((governorate) => (
+              <option key={governorate.id} value={String(governorate.id)}>
+                {governorate.name_ar}
               </option>
             ))}
-        </select>
+          </select>
+
+          <ChevronDown
+            size={12}
+            className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+        </div>
+      </div>
+
+      <div className="min-w-0 rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5 transition focus-within:border-emerald-300">
+        <span className="mb-0.5 block text-[9px] font-medium text-slate-400">
+          المدينة
+        </span>
+
+        <div className="relative">
+          <select
+            value={selectedCity}
+            onChange={(e) => setSelectedCity(e.target.value)}
+            className="w-full appearance-none bg-transparent pl-5 text-[11px] font-semibold text-slate-700 outline-none"
+          >
+            <option value="">كل المدن</option>
+            {cities
+              .filter(
+                (city) =>
+                  selectedGovernorate === "" ||
+                  String(city.governorate_id) === selectedGovernorate
+              )
+              .map((city) => (
+                <option key={city.id} value={String(city.id)}>
+                  {city.name_ar}
+                </option>
+              ))}
+          </select>
+
+          <ChevronDown
+            size={12}
+            className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+        </div>
       </div>
     </div>
 
+    {/* مسح الفلاتر */}
     {(searchQuery || selectedGovernorate || selectedCity) && (
       <button
         type="button"
@@ -1506,13 +1596,17 @@ const matchesCondition = selectedConditions.includes(
           setSelectedGovernorate("");
           setSelectedCity("");
         }}
-        className="mt-3 w-full rounded-xl border border-rose-200 bg-white py-2.5 text-xs font-bold text-rose-600 transition hover:bg-rose-50"
+        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-rose-100 bg-white py-1.5 text-[10px] font-semibold text-rose-500 transition hover:bg-rose-50 active:scale-[0.99]"
       >
+        <X size={12} />
         مسح البحث والفلاتر
       </button>
     )}
   </div>
+</div>
+
 </header>
+
 
 
 
@@ -2551,42 +2645,48 @@ const matchesCondition = selectedConditions.includes(
   )}
 </section>
 
-        <section className="mt-14 rounded-3xl border border-emerald-100 bg-emerald-50 p-7 md:flex md:items-center md:justify-between md:p-10">
-          <div>
-            <h2 className="text-2xl font-black text-emerald-950">عندك شي حابب تبيعه؟</h2>
-            <p className="mt-2 text-sm leading-6 text-emerald-800">
-              انشر إعلانك مجاناً ووصل إلى آلاف المهتمين في مختلف المحافظات السورية.
-            </p>
-          </div>
-{allowNewAds && (
-  <button
-    onClick={() => navigate("/add-ad")}
-    className="mt-5 flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-6 py-3.5 font-bold text-white hover:bg-emerald-800 md:mt-0"
-  >
-    انشر إعلانك
-  </button>
-)}
-        </section>
 
+{/* بطاقة نشر إعلان */}
+<section className="mt-8 rounded-2xl border border-emerald-100 bg-gradient-to-l from-emerald-50 to-white p-5 shadow-sm transition-shadow hover:shadow-md md:flex md:items-center md:justify-between md:gap-5 md:p-6">
+  <div className="min-w-0">
+    <h2 className="text-lg font-extrabold text-emerald-950">
+      عندك شي حابب تبيعه؟
+    </h2>
+    <p className="mt-1.5 text-xs leading-6 text-emerald-800 sm:text-sm">
+      انشر إعلانك مجاناً ووصل إلى آلاف المهتمين في مختلف المحافظات السورية.
+    </p>
+  </div>
+
+  {allowNewAds && (
+    <button
+      onClick={() => navigate("/add-ad")}
+      className="mt-4 flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-800 md:mt-0"
+    >
+      انشر إعلانك
+    </button>
+  )}
+</section>
+
+{/* بطاقة التبرع */}
 <section
   dir="rtl"
-  className="mt-8 overflow-hidden rounded-3xl border border-rose-200 bg-gradient-to-l from-rose-100 via-pink-50 to-white p-7 shadow-sm md:flex md:items-center md:justify-between md:p-10"
+  className="mt-4 overflow-hidden rounded-2xl border border-rose-100 bg-gradient-to-l from-rose-50 to-white p-5 shadow-sm transition-shadow hover:shadow-md md:flex md:items-center md:justify-between md:gap-5 md:p-6"
 >
-  <div>
-    <div className="mb-3 flex items-center gap-2">
-      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-sm">
-        <Heart size={23} />
+  <div className="min-w-0">
+    <div className="mb-2 flex items-center gap-2">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-rose-500 text-white shadow-sm">
+        <Heart size={17} />
       </span>
-      <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-700">
+      <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-bold text-rose-700">
         الخير بيجمعنا ❤️
       </span>
     </div>
 
-    <h2 className="text-2xl font-black text-rose-950">
+    <h2 className="text-lg font-extrabold text-rose-950">
       عندك شي حابب تتبرع فيه؟
     </h2>
 
-    <p className="mt-2 max-w-xl text-sm leading-7 text-rose-800">
+    <p className="mt-1.5 max-w-xl text-xs leading-6 text-rose-800 sm:text-sm">
       غرض ما عدت بحاجة إله ممكن يكون سبب فرحة لشخص تاني.
       شارك أغراضك مجاناً وساهم بنشر الخير ومساعدة غيرك.
     </p>
@@ -2594,9 +2694,9 @@ const matchesCondition = selectedConditions.includes(
 
   <button
     onClick={() => navigate("/add-ad?type=donation")}
-    className="mt-6 flex shrink-0 items-center justify-center gap-2 rounded-xl bg-rose-500 px-7 py-4 font-bold text-white shadow-md shadow-rose-200 transition hover:-translate-y-1 hover:bg-rose-600 md:mt-0"
+    className="mt-4 flex shrink-0 items-center justify-center gap-2 rounded-xl bg-rose-500 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-rose-600 md:mt-0"
   >
-    <Heart size={20} />
+    <Heart size={17} />
     تبرع الآن
   </button>
 </section>

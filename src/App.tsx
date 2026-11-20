@@ -197,6 +197,20 @@ type Ad = {
   ad_images: AdImage[] | null;
 };
 
+type AdminStore = {
+  id: string;
+  owner_id: string | null;
+  name: string | null;
+  business_type: string | null;
+  governorate: string | null;
+  city: string | null;
+  phone: string | null;
+  status: string;
+  owner_disabled: boolean;
+  admin_disabled: boolean;
+  disabled_ads_mode: "hide" | "show";
+};
+
 function getOne<T>(value: Related<T>): T | null {
   if (!value) return null;
 
@@ -269,6 +283,12 @@ const [storeRequests, setStoreRequests] = useState<StoreSubscriptionRequest[]>([
 const [storeRequestsLoading, setStoreRequestsLoading] = useState(false);
 const [storeRequestsError, setStoreRequestsError] = useState("");
 
+const [adminStores, setAdminStores] = useState<AdminStore[]>([]);
+const [adminStoresLoading, setAdminStoresLoading] = useState(false);
+const [adminStoresError, setAdminStoresError] = useState("");
+const [storeActionLoading, setStoreActionLoading] = useState<string | null>(null);
+const [adminStoreAdsMode, setAdminStoreAdsMode] =
+  useState<"hide" | "show">("hide");
 
 const [accountVerificationRequests, setAccountVerificationRequests] =
   useState<AccountVerificationRequest[]>([]);
@@ -1334,6 +1354,82 @@ const loadStoreRequests = useCallback(async () => {
   }
 }, []);
 
+const loadAdminStores = useCallback(async () => {
+  setAdminStoresLoading(true);
+  setAdminStoresError("");
+
+  try {
+    const { data, error } = await supabase
+      .from("stores")
+      .select(`
+        id,
+        owner_id,
+        name,
+        business_type,
+        governorate,
+        city,
+        phone,
+        status,
+        owner_disabled,
+        admin_disabled,
+        disabled_ads_mode
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    setAdminStores((data ?? []) as AdminStore[]);
+  } catch (error) {
+    console.error("Error loading admin stores:", error);
+    setAdminStoresError("تعذر تحميل المتاجر. حاول تحديث الصفحة.");
+  } finally {
+    setAdminStoresLoading(false);
+  }
+}, []);
+
+const handleAdminStoreToggle = async (store: AdminStore) => {
+  const disabling = !store.admin_disabled;
+
+  const confirmed = window.confirm(
+    disabling
+      ? `هل تريد إيقاف متجر "${store.name || "بدون اسم"}" من الإدارة؟`
+      : `هل تريد رفع إيقاف الإدارة عن متجر "${store.name || "بدون اسم"}"؟`
+  );
+
+  if (!confirmed) return;
+
+  setStoreActionLoading(store.id);
+  setAdminStoresError("");
+
+  try {
+    const { error } = await supabase.rpc(
+      "admin_set_store_disabled",
+      {
+        p_store_id: store.id,
+        p_disabled: disabling,
+        p_ads_mode: adminStoreAdsMode,
+      }
+    );
+
+    if (error) throw error;
+
+    await loadAdminStores();
+
+    alert(
+      disabling
+        ? "تم إيقاف المتجر من الإدارة."
+        : "تم رفع إيقاف الإدارة عن المتجر."
+    );
+  } catch (error) {
+    console.error("Error updating store:", error);
+    setAdminStoresError(
+      "تعذر تغيير حالة المتجر. حاول مرة أخرى."
+    );
+  } finally {
+    setStoreActionLoading(null);
+  }
+};
+
 const loadAccountVerificationRequests = useCallback(async () => {
   setAccountVerificationRequestsLoading(true);
   setAccountVerificationRequestsError("");
@@ -1625,6 +1721,12 @@ useEffect(() => {
     loadStoreRequests();
   }
 }, [admin, activeMenu, loadStoreRequests]);
+
+useEffect(() => {
+  if (admin && activeMenu === "إدارة المتاجر") {
+    loadAdminStores();
+  }
+}, [admin, activeMenu, loadAdminStores]);
 
 const handleAdminBan = async (
   report: Report,
@@ -3019,7 +3121,10 @@ function getSubCategories(categoryId: number) {
   label: "طلبات المتاجر",
   icon: Store,
 },
-
+{
+  label: "إدارة المتاجر",
+  icon: Store,
+},
 {
   label: "طلبات توثيق الحسابات",
   icon: ShieldCheck,
@@ -3887,6 +3992,203 @@ function getSubCategories(categoryId: number) {
   })}
 </div>
 
+    )}
+  </>
+)}
+
+
+{/* إدارة المتاجر */}
+{activeMenu === "إدارة المتاجر" && (
+  <>
+    <div className="section-heading">
+      <div>
+        <h2>إدارة المتاجر</h2>
+        <p>
+          متابعة حالة المتاجر وإيقافها أو رفع إيقاف الإدارة عنها
+        </p>
+      </div>
+
+      <button
+        className="refresh-button"
+        onClick={loadAdminStores}
+        disabled={adminStoresLoading}
+      >
+        <RefreshCw size={17} />
+        تحديث
+      </button>
+    </div>
+
+    <div className="category-card mb-5">
+      <label className="block font-bold mb-2">
+        عند إيقاف متجر، ماذا نفعل بإعلاناته؟
+      </label>
+
+      <select
+        value={adminStoreAdsMode}
+        onChange={(e) =>
+          setAdminStoreAdsMode(e.target.value as "hide" | "show")
+        }
+        className="w-full rounded-lg border p-3"
+      >
+        <option value="hide">
+          إخفاء إعلانات المتجر من السوق العام
+        </option>
+        <option value="show">
+          إبقاء إعلانات المتجر ظاهرة في السوق العام
+        </option>
+      </select>
+
+      <p className="mt-2 text-sm text-slate-500">
+        هذا الاختيار يُطبّق عند إيقاف المتجر من الإدارة.
+      </p>
+    </div>
+
+    {adminStoresError && (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 mb-4">
+        {adminStoresError}
+      </div>
+    )}
+
+    {adminStoresLoading && adminStores.length === 0 ? (
+      <div className="py-12 text-center text-slate-500">
+        <LoaderCircle
+          className="mx-auto mb-3 animate-spin"
+          size={30}
+        />
+        جارٍ تحميل المتاجر...
+      </div>
+    ) : adminStores.length === 0 ? (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <Store className="mx-auto mb-3 text-slate-400" size={38} />
+        <p className="font-bold text-slate-700">
+          لا توجد متاجر حالياً
+        </p>
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        {adminStores.map((store) => {
+          const disabled =
+            store.owner_disabled || store.admin_disabled;
+
+          const statusLabel =
+            store.admin_disabled
+              ? "موقوف من الإدارة"
+              : store.owner_disabled
+                ? "موقوف من المالك"
+                : store.status === "active"
+                  ? "مفعّل"
+                  : store.status === "pending"
+                    ? "بانتظار الموافقة"
+                    : store.status === "rejected"
+                      ? "مرفوض"
+                      : store.status;
+
+          return (
+            <div
+              key={store.id}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">
+                    {store.name || "متجر بدون اسم"}
+                  </h3>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {store.business_type || "نوع النشاط غير محدد"}
+                  </p>
+                </div>
+
+                <span
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${
+                    disabled
+                      ? "bg-red-100 text-red-700"
+                      : store.status === "active"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {statusLabel}
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-2 text-sm text-slate-600">
+                <p>
+                  <strong>المحافظة والمدينة:</strong>{" "}
+                  {[store.governorate, store.city]
+                    .filter(Boolean)
+                    .join(" - ") || "غير محدد"}
+                </p>
+
+                <p>
+                  <strong>الهاتف:</strong>{" "}
+                  <span dir="ltr">
+                    {store.phone || "غير محدد"}
+                  </span>
+                </p>
+
+                <p>
+                  <strong>حالة موافقة المتجر:</strong>{" "}
+                  {store.status}
+                </p>
+
+                <p>
+                  <strong>إيقاف المالك:</strong>{" "}
+                  {store.owner_disabled ? "نعم" : "لا"}
+                </p>
+
+                <p>
+                  <strong>إيقاف الإدارة:</strong>{" "}
+                  {store.admin_disabled ? "نعم" : "لا"}
+                </p>
+
+                {(store.owner_disabled || store.admin_disabled) && (
+                  <p>
+                    <strong>ظهور الإعلانات:</strong>{" "}
+                    {store.disabled_ads_mode === "show"
+                      ? "تبقى ظاهرة"
+                      : "مخفية"}
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-5 border-t border-slate-100 pt-4">
+                <button
+                  type="button"
+                  className={`w-full rounded-xl px-4 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+                    store.admin_disabled
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-red-600 hover:bg-red-700"
+                  }`}
+                  disabled={
+                    storeActionLoading === store.id ||
+                    (!store.admin_disabled && store.status !== "active")
+                  }
+                  onClick={() => handleAdminStoreToggle(store)}
+                >
+                  {storeActionLoading === store.id
+                    ? "جارٍ التنفيذ..."
+                    : store.admin_disabled
+                      ? "رفع إيقاف الإدارة"
+                      : "إيقاف المتجر من الإدارة"}
+                </button>
+
+                {store.owner_disabled && !store.admin_disabled && (
+                  <p className="mt-2 text-xs text-amber-700">
+                    المتجر موقوف من المالك حالياً.
+                  </p>
+                )}
+
+                {store.admin_disabled && (
+                  <p className="mt-2 text-xs text-red-600">
+                    المالك لا يستطيع إعادة تفعيل المتجر قبل رفع إيقاف الإدارة.
+                  </p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     )}
   </>
 )}
@@ -5283,6 +5585,8 @@ onClick={() => {
             {![
               "الرئيسية",
               "مراجعة الإعلانات",
+              "طلبات المتاجر",
+              "إدارة المتاجر",
               "التبرعات",
               "المستخدمون",
               "التصنيفات",

@@ -2,7 +2,21 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
-import { ArrowRight, UploadCloud, X, Store } from "lucide-react";
+import {
+  ArrowRight,
+  UploadCloud,
+  X,
+  Store,
+  MapPin,
+  Tag,
+  ImagePlus,
+  CircleDollarSign,
+  Package,
+  CheckCircle2,
+  AlertCircle,
+  Sparkles,
+  RefreshCw,
+} from "lucide-react";
 
 type Category = {
   id: number;
@@ -19,6 +33,8 @@ type StoreOption = {
   id: string;
   name: string;
   status: string;
+  owner_disabled: boolean;
+  admin_disabled: boolean;
 };
 
 type StoreQuota = {
@@ -56,6 +72,7 @@ export default function AddAd() {
   const [currency, setCurrency] = useState("USD");
   const [condition, setCondition] = useState("used");
   const [images, setImages] = useState<File[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [allowNewAds, setAllowNewAds] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -178,9 +195,11 @@ export default function AddAd() {
 
             supabase
               .from("stores")
-              .select("id,name,status")
+              .select("id,name,status,owner_disabled,admin_disabled")
               .eq("owner_id", currentUserId)
               .eq("status", "active")
+              .eq("owner_disabled", false)
+              .eq("admin_disabled", false)
               .order("created_at", { ascending: false }),
           ]);
 
@@ -221,7 +240,7 @@ export default function AddAd() {
 
           if (!requestedStore) {
             throw new Error(
-              "المتجر المطلوب غير موجود أو غير مفعّل أو لا تملك صلاحية إدارته."
+              "لا يمكن النشر في هذا المتجر لأنه غير مفعّل أو موقوف من الإدارة."
             );
           }
 
@@ -265,6 +284,19 @@ export default function AddAd() {
     setError("");
 
     if (!storeId) return;
+
+    const store = stores.find((item) => item.id === storeId);
+
+    if (
+      !store ||
+      store.status !== "active" ||
+      store.owner_disabled ||
+      store.admin_disabled
+    ) {
+      setSelectedStoreId("");
+      setError("لا يمكن النشر في متجر موقوف أو غير مفعّل.");
+      return;
+    }
 
     try {
       const quota = await refreshStoreQuota(storeId);
@@ -380,6 +412,29 @@ export default function AddAd() {
 
     if (selectedStoreId) {
       try {
+        const { data: store, error: storeError } = await supabase
+          .from("stores")
+          .select("id,status,owner_disabled,admin_disabled")
+          .eq("id", selectedStoreId)
+          .eq("owner_id", userId)
+          .maybeSingle();
+
+        if (storeError) throw storeError;
+
+        if (
+          !store ||
+          store.status !== "active" ||
+          store.owner_disabled ||
+          store.admin_disabled
+        ) {
+          setSelectedStoreId("");
+          setStoreQuota(null);
+          setError(
+            "هذا المتجر موقوف حالياً، ولا يمكنك نشر إعلان جديد باسمه."
+          );
+          return;
+        }
+
         const quota = await getStoreQuota(selectedStoreId);
         setStoreQuota(quota);
 
@@ -396,7 +451,7 @@ export default function AddAd() {
         setError(
           err instanceof Error
             ? err.message
-            : "تعذر التحقق من اشتراك المتجر."
+            : "تعذر التحقق من حالة المتجر واشتراكه."
         );
         return;
       }
@@ -491,11 +546,28 @@ export default function AddAd() {
     }
   }
 
+  const inputClass =
+    "w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10";
+
+  const labelClass =
+    "mb-2.5 block text-sm font-bold text-slate-700";
+
+  const sectionClass =
+    "rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6";
+
   if (loading) {
     return (
-      <div dir="rtl" className="p-10 text-center">
-        جارٍ تجهيز الصفحة...
-      </div>
+      <main
+        dir="rtl"
+        className="flex min-h-screen items-center justify-center bg-[#f7f9f8] px-4"
+      >
+        <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-10 py-8 shadow-sm">
+          <RefreshCw size={28} className="animate-spin text-emerald-600" />
+          <p className="text-sm font-bold text-slate-500">
+            جارٍ تجهيز صفحة إضافة الإعلان...
+          </p>
+        </div>
+      </main>
     );
   }
 
@@ -503,10 +575,14 @@ export default function AddAd() {
     return (
       <main
         dir="rtl"
-        className="flex min-h-screen items-center justify-center bg-slate-50 px-4"
+        className="flex min-h-screen items-center justify-center bg-[#f7f9f8] px-4"
       >
-        <div className="w-full max-w-md rounded-2xl border bg-white p-8 text-center shadow-sm">
-          <h2 className="text-xl font-black text-slate-800">
+        <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
+            <AlertCircle size={30} />
+          </div>
+
+          <h2 className="mt-5 text-xl font-black text-slate-800">
             نشر الإعلانات متوقف مؤقتاً
           </h2>
 
@@ -517,8 +593,9 @@ export default function AddAd() {
 
           <Link
             to="/"
-            className="mt-6 inline-block rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white"
+            className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white transition hover:bg-emerald-700"
           >
+            <ArrowRight size={18} />
             العودة للرئيسية
           </Link>
         </div>
@@ -527,327 +604,570 @@ export default function AddAd() {
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-slate-50">
-      <header className="border-b bg-white px-5 py-4">
-        <div className="mx-auto flex max-w-3xl items-center justify-between">
+    <main
+      dir="rtl"
+      className="min-h-screen bg-[#f7f9f8] pb-12"
+    >
+      {/* الشريط العلوي */}
+      <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4 sm:px-6">
           <Link
             to={selectedStoreId ? `/store/${selectedStoreId}` : "/"}
-            className="flex items-center gap-2 font-bold text-emerald-700"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700"
           >
-            <ArrowRight size={20} />
-            {selectedStoreId ? "العودة للمتجر" : "العودة للرئيسية"}
+            <ArrowRight size={19} />
+            <span>
+              {selectedStoreId ? "العودة للمتجر" : "العودة للرئيسية"}
+            </span>
           </Link>
-          <span className="text-xl font-black text-emerald-700">
-            Sooq.sy
-          </span>
+
+          <Link to="/" className="flex items-center gap-2">
+            <span className="text-xl font-black tracking-tight text-emerald-700">
+              Sooq.sy
+            </span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-200">
+              <Store size={19} />
+            </span>
+          </Link>
         </div>
       </header>
 
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-black text-slate-800">
+      <div className="mx-auto max-w-3xl px-4 pt-7 sm:px-6 sm:pt-10">
+        {/* مقدمة الصفحة */}
+        <div className="mb-7">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+            <Sparkles size={14} />
+            <span>سوقك أقرب وأسهل</span>
+          </div>
+
+          <h1 className="text-2xl font-black leading-tight text-slate-900 sm:text-3xl">
             {listingType === "donation"
-              ? "تبرع بغرض مجاناً"
+              ? "أضف تبرعاً جديداً"
               : selectedStoreId
                 ? "إضافة منتج للمتجر"
-                : "أضف إعلانك"}
+                : "أضف إعلانك الجديد"}
           </h1>
 
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 max-w-xl text-sm leading-7 text-slate-500">
             {listingType === "donation"
               ? "شارك غرضاً لم تعد بحاجة إليه، وساعد شخصاً آخر على الاستفادة منه."
               : selectedStoreId
-                ? "أضف منتجاً جديداً ليظهر في صفحة متجرك وأقسام السوق بعد الموافقة عليه."
-                : "أدخل تفاصيل إعلانك وأضف الصور ليصل إلى المهتمين."}
+                ? "أضف منتجاً جديداً إلى متجرك ليصل إلى المهتمين."
+                : "املأ تفاصيل إعلانك وأضف الصور، ودع إعلانك يصل إلى الأشخاص المهتمين."}
           </p>
+
+          <div className="mt-5 flex items-center gap-2">
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-emerald-100">
+              <div className="h-full w-full rounded-full bg-emerald-500" />
+            </div>
+            <span className="text-xs font-bold text-emerald-700">
+              نموذج إضافة إعلان
+            </span>
+          </div>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="space-y-6 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm md:p-7"
-        >
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* اختيار المتجر */}
           {listingType === "sale" && stores.length > 0 && (
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-              <label className="mb-2 flex items-center gap-2 text-sm font-bold text-emerald-800">
-                <Store size={18} />
-                أين تريد نشر الإعلان؟
-              </label>
-
-              <select
-                value={selectedStoreId}
-                onChange={(event) => handleStoreChange(event.target.value)}
-                className="w-full rounded-xl border border-emerald-200 bg-white px-4 py-3 outline-none focus:border-emerald-500"
-              >
-                <option value="">إعلان شخصي - بدون متجر</option>
-                {stores.map((store) => (
-                  <option key={store.id} value={store.id}>
-                    {store.name}
-                  </option>
-                ))}
-              </select>
-
-              {selectedStoreId && (
-                <div className="mt-3 rounded-lg bg-white p-3 text-sm">
-                  {quotaLoading ? (
-                    <p className="text-slate-500">
-                      جارٍ التحقق من رصيد المتجر...
-                    </p>
-                  ) : storeQuota?.active ? (
-                    <>
-                      <p className="font-bold text-emerald-800">
-                        رصيد الإعلانات العادية
-                      </p>
-                      <p className="mt-1 text-slate-600">
-                        المستخدم: {storeQuota.used} من {storeQuota.limit}
-                      </p>
-                      <p className="mt-1 font-bold text-emerald-700">
-                        المتبقي: {storeQuota.remaining} إعلان
-                      </p>
-                      {storeQuota.endAt && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          انتهاء الاشتراك:{" "}
-                          {new Date(storeQuota.endAt).toLocaleDateString(
-                            "ar-SY"
-                          )}
-                        </p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="font-bold text-red-600">
-                      لا يوجد اشتراك فعّال لهذا المتجر.
-                    </p>
-                  )}
+            <section className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
+              <div className="flex items-center gap-3 border-b border-emerald-50 bg-emerald-50/60 px-5 py-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <Store size={20} />
                 </div>
-              )}
-            </div>
+                <div>
+                  <h2 className="font-black text-slate-800">
+                    مكان نشر الإعلان
+                  </h2>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    اختر إن كنت تريد النشر باسم متجرك أو حسابك الشخصي
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-5">
+                <label className={labelClass}>
+                  اختر المتجر
+                </label>
+
+                <select
+                  value={selectedStoreId}
+                  onChange={(event) => handleStoreChange(event.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">إعلان شخصي - بدون متجر</option>
+                  {stores.map((store) => (
+                    <option key={store.id} value={store.id}>
+                      {store.name}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedStoreId && (
+                  <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
+                    {quotaLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <RefreshCw size={16} className="animate-spin" />
+                        جارٍ التحقق من رصيد المتجر...
+                      </div>
+                    ) : storeQuota?.active ? (
+                      <>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-black text-emerald-800">
+                            رصيد الإعلانات العادية
+                          </p>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700">
+                            اشتراك فعّال
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex items-end justify-between">
+                          <div>
+                            <p className="text-xs text-slate-500">
+                              الإعلانات المستخدمة
+                            </p>
+                            <p className="mt-1 text-lg font-black text-slate-800">
+                              {storeQuota.used}
+                              <span className="mx-1 text-sm font-medium text-slate-400">
+                                من
+                              </span>
+                              {storeQuota.limit}
+                            </p>
+                          </div>
+
+                          <div className="text-left">
+                            <p className="text-xs text-slate-500">
+                              المتبقي
+                            </p>
+                            <p className="mt-1 text-lg font-black text-emerald-700">
+                              {storeQuota.remaining}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100">
+                          <div
+                            className="h-full rounded-full bg-emerald-500 transition-all"
+                            style={{
+                              width: `${
+                                storeQuota.limit > 0
+                                  ? Math.min(
+                                      100,
+                                      (storeQuota.used / storeQuota.limit) * 100
+                                    )
+                                  : 0
+                              }%`,
+                            }}
+                          />
+                        </div>
+
+                        {storeQuota.endAt && (
+                          <p className="mt-3 text-xs text-slate-500">
+                            ينتهي الاشتراك بتاريخ:{" "}
+                            {new Date(storeQuota.endAt).toLocaleDateString(
+                              "ar-SY"
+                            )}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm font-bold text-red-600">
+                        <AlertCircle size={17} />
+                        لا يوجد اشتراك فعّال لهذا المتجر.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
           )}
 
-          <div>
-            <label className="mb-2 block text-sm font-bold">
-              عنوان الإعلان
-            </label>
-            <input
-              required
-              minLength={5}
-              maxLength={150}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="مثلاً: سيارة للبيع بحالة ممتازة"
-              className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-bold">
-              وصف الإعلان
-            </label>
-            <textarea
-              required
-              minLength={10}
-              maxLength={10000}
-              rows={5}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={
-                listingType === "donation"
-                  ? "اكتب تفاصيل الغرض الذي تريد التبرع به..."
-                  : "اكتب تفاصيل الإعلان..."
-              }
-              className="w-full resize-y rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
-            />
-
-            <p className="mt-2 text-xs text-slate-500">
-              يجب ألا يقل الوصف عن 10 أحرف.
-              <span className="mr-2">
-                عدد الأحرف: {description.length} / 10000
-              </span>
-            </p>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-2 block text-sm font-bold">
-                التصنيف
-              </label>
-              <select
-                required
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500"
-              >
-                <option value="">اختر التصنيف</option>
-                {categories.map((category) => {
-                  const parent = categories.find(
-                    (item) => item.id === category.parent_id
-                  );
-
-                  return (
-                    <option key={category.id} value={category.id}>
-                      {parent
-                        ? `${parent.name_ar} - ${category.name_ar}`
-                        : category.name_ar}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-bold">
-                المدينة
-              </label>
-              <select
-                required
-                value={cityId}
-                onChange={(e) => setCityId(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500"
-              >
-                <option value="">اختر المدينة</option>
-                {cities.map((city) => (
-                  <option key={city.id} value={city.id}>
-                    {city.name_ar}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {listingType === "donation" ? (
-            <div className="rounded-xl border border-rose-100 bg-rose-50 p-4">
-              <p className="font-bold text-rose-700">
-                ❤️ هذا الغرض للتبرع مجاناً
-              </p>
-              <p className="mt-1 text-sm text-rose-600">
-                لن يُطلب من المستفيد دفع أي مبلغ مقابل هذا الغرض.
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
+          {/* تفاصيل الإعلان */}
+          <section className={sectionClass}>
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <Package size={20} />
+              </div>
               <div>
-                <label className="mb-2 block text-sm font-bold">
-                  السعر (اختياري)
+                <h2 className="font-black text-slate-800">
+                  تفاصيل الإعلان
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  اكتب معلومات واضحة تساعد المشتري على فهم إعلانك
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>
+                عنوان الإعلان
+                <span className="mr-1 text-red-500">*</span>
+              </label>
+
+              <input
+                required
+                minLength={5}
+                maxLength={150}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="مثلاً: سيارة للبيع بحالة ممتازة"
+                className={inputClass}
+              />
+
+              <p className="mt-2 text-left text-xs text-slate-400">
+                {title.length} / 150
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <label className={labelClass}>
+                وصف الإعلان
+                <span className="mr-1 text-red-500">*</span>
+              </label>
+
+              <textarea
+                required
+                minLength={10}
+                maxLength={10000}
+                rows={6}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={
+                  listingType === "donation"
+                    ? "اكتب تفاصيل الغرض الذي تريد التبرع به..."
+                    : "اكتب تفاصيل الإعلان، والمواصفات، والحالة، وأي معلومات مهمة..."
+                }
+                className={`${inputClass} min-h-36 resize-y leading-7`}
+              />
+
+              <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+                <span>يفضل كتابة وصف واضح ومفصل.</span>
+                <span>{description.length} / 10000</span>
+              </div>
+            </div>
+          </section>
+
+          {/* التصنيف والموقع */}
+          <section className={sectionClass}>
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
+                <MapPin size={20} />
+              </div>
+              <div>
+                <h2 className="font-black text-slate-800">
+                  التصنيف والموقع
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  حدد القسم والمدينة المناسبة لإعلانك
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Tag size={15} className="text-slate-400" />
+                    التصنيف
+                  </span>
+                  <span className="mr-1 text-red-500">*</span>
                 </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="أدخل السعر"
-                  className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500"
-                />
+
+                <select
+                  required
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">اختر التصنيف</option>
+                  {categories.map((category) => {
+                    const parent = categories.find(
+                      (item) => item.id === category.parent_id
+                    );
+
+                    return (
+                      <option key={category.id} value={category.id}>
+                        {parent
+                          ? `${parent.name_ar} - ${category.name_ar}`
+                          : category.name_ar}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-bold">
-                  العملة
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin size={15} className="text-slate-400" />
+                    المدينة
+                  </span>
+                  <span className="mr-1 text-red-500">*</span>
                 </label>
+
                 <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500"
+                  required
+                  value={cityId}
+                  onChange={(e) => setCityId(e.target.value)}
+                  className={inputClass}
                 >
-                  <option value="USD">دولار أمريكي</option>
-                  <option value="SYP">ليرة سورية</option>
+                  <option value="">اختر المدينة</option>
+                  {cities.map((city) => (
+                    <option key={city.id} value={city.id}>
+                      {city.name_ar}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
-          )}
+          </section>
 
-          <div>
-            <label className="mb-2 block text-sm font-bold">
-              حالة المنتج
-            </label>
-            <select
-              value={condition}
-              onChange={(e) => setCondition(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500"
-            >
-              <option value="new">جديد</option>
-              <option value="used">مستعمل</option>
-            </select>
-          </div>
+          {/* السعر والحالة */}
+          <section className={sectionClass}>
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <CircleDollarSign size={21} />
+              </div>
+              <div>
+                <h2 className="font-black text-slate-800">
+                  السعر وحالة المنتج
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  أضف السعر وحدد حالة المنتج
+                </p>
+              </div>
+            </div>
 
-          <div>
-            <label className="mb-3 block text-sm font-bold">
-              صور الإعلان (حتى 3 صور)
-              <span className="mr-2 text-emerald-600">
-                {images.length}/3
-              </span>
-            </label>
+            {listingType === "donation" ? (
+              <div className="rounded-xl border border-rose-100 bg-rose-50/70 p-4">
+                <div className="flex items-center gap-2 font-black text-rose-700">
+                  <span className="text-xl">❤️</span>
+                  هذا الغرض للتبرع مجاناً
+                </div>
+                <p className="mt-2 text-sm leading-6 text-rose-600">
+                  لن يُطلب من المستفيد دفع أي مبلغ مقابل هذا الغرض.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label className={labelClass}>
+                    السعر
+                    <span className="mr-1 text-xs font-normal text-slate-400">
+                      (اختياري)
+                    </span>
+                  </label>
 
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center hover:border-emerald-500">
-              <UploadCloud size={32} className="mb-3 text-emerald-600" />
-              <span className="font-bold text-slate-700">
-                اضغط لاختيار الصور
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    placeholder="أدخل السعر"
+                    className={inputClass}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>
+                    العملة
+                  </label>
+
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="USD">دولار أمريكي</option>
+                    <option value="SYP">ليرة سورية</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5">
+              <label className={labelClass}>
+                حالة المنتج
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCondition("new")}
+                  className={`rounded-xl border px-4 py-3.5 text-sm font-bold transition ${
+                    condition === "new"
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-500/10"
+                      : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    {condition === "new" && <CheckCircle2 size={17} />}
+                    جديد
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCondition("used")}
+                  className={`rounded-xl border px-4 py-3.5 text-sm font-bold transition ${
+                    condition === "used"
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700 ring-2 ring-emerald-500/10"
+                      : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300"
+                  }`}
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    {condition === "used" && <CheckCircle2 size={17} />}
+                    مستعمل
+                  </span>
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* صور الإعلان */}
+          <section className={sectionClass}>
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                  <ImagePlus size={21} />
+                </div>
+                <div>
+                  <h2 className="font-black text-slate-800">
+                    صور الإعلان
+                  </h2>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    الصور الواضحة تزيد اهتمام المشترين
+                  </p>
+                </div>
+              </div>
+
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500">
+                {images.length} / 3
               </span>
-              <span className="mt-2 text-xs text-slate-400">
-                JPG أو PNG أو WEBP، بحد أقصى 5 ميغابايت للصورة
-              </span>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                multiple
-                onChange={handleImages}
-                className="hidden"
-              />
-            </label>
+            </div>
+
+            {images.length < 3 && (
+              <label className="group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/70 px-5 py-9 text-center transition hover:border-emerald-400 hover:bg-emerald-50/40">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-emerald-600 shadow-sm transition group-hover:scale-105">
+                  <UploadCloud size={27} />
+                </div>
+
+                <span className="mt-4 text-sm font-black text-slate-700 transition group-hover:text-emerald-700">
+                  اضغط هنا لاختيار الصور
+                </span>
+
+                <span className="mt-2 text-xs text-slate-400">
+                  JPG أو PNG أو WEBP
+                </span>
+
+                <span className="mt-1 text-xs text-slate-400">
+                  الحد الأقصى 5 ميغابايت للصورة
+                </span>
+
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={handleImages}
+                  className="hidden"
+                />
+              </label>
+            )}
 
             {images.length > 0 && (
-              <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
+              <div className="mt-4 grid grid-cols-3 gap-3">
                 {images.map((file, index) => (
                   <div
                     key={`${file.name}-${index}`}
-                    className="relative"
+                    className="group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
                   >
                     <img
                       src={URL.createObjectURL(file)}
                       alt={file.name}
-                      className="h-24 w-full rounded-lg object-cover"
+                      className="h-28 w-full object-cover transition duration-300 group-hover:scale-105 sm:h-36"
                     />
+
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-2 pb-2 pt-5">
+                      <p className="truncate text-[10px] font-medium text-white">
+                        {file.name}
+                      </p>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => removeImage(index)}
-                      className="absolute -left-2 -top-2 rounded-full bg-red-600 p-1 text-white"
+                      className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-red-600 shadow-sm transition hover:bg-red-600 hover:text-white"
                       aria-label="حذف الصورة"
                     >
-                      <X size={14} />
+                      <X size={15} />
                     </button>
                   </div>
                 ))}
               </div>
             )}
-          </div>
 
-          {error && (
-            <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
-              {error}
+            <p className="mt-3 text-xs leading-6 text-slate-400">
+              يمكنك إضافة 3 صور كحد أقصى. تأكد أن الصور واضحة وتعبر عن المنتج
+              أو الغرض المعروض.
             </p>
+          </section>
+
+          {/* رسائل الخطأ والنجاح */}
+          {error && (
+            <div className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-700">
+              <AlertCircle size={19} className="mt-0.5 shrink-0" />
+              <p>{error}</p>
+            </div>
           )}
 
           {success && (
-            <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">
-              {success}
-            </p>
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm leading-6 text-emerald-700">
+              <CheckCircle2 size={19} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-black">{success}</p>
+                <p className="mt-1 text-xs text-emerald-600">
+                  سيتم تحويلك تلقائياً بعد قليل...
+                </p>
+              </div>
+            </div>
           )}
 
-          <button
-            type="submit"
-            disabled={
-              saving ||
-              quotaLoading ||
-              (!!selectedStoreId &&
-                (!storeQuota?.active || storeQuota.remaining <= 0))
-            }
-            className="w-full rounded-xl bg-emerald-600 py-4 font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
-          >
-            {saving
-              ? "جارٍ الإرسال..."
-              : listingType === "donation"
-                ? "إرسال التبرع للمراجعة"
-                : "إرسال الإعلان للمراجعة"}
-          </button>
+          {/* زر الإرسال */}
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
+            <button
+              type="submit"
+              disabled={
+                saving ||
+                quotaLoading ||
+                (!!selectedStoreId &&
+                  (!storeQuota?.active || storeQuota.remaining <= 0))
+              }
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/15 transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-emerald-700/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw size={19} className="animate-spin" />
+                  جارٍ إرسال الإعلان...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={19} />
+                  {listingType === "donation"
+                    ? "إرسال التبرع للمراجعة"
+                    : "إرسال الإعلان للمراجعة"}
+                </>
+              )}
+            </button>
+
+            <p className="mt-3 text-center text-xs leading-6 text-slate-400">
+              سيتم مراجعة الإعلان من الإدارة قبل ظهوره للزوار.
+            </p>
+          </div>
         </form>
+
+        <p className="mt-6 text-center text-xs text-slate-400">
+          شكراً لاستخدامك Sooq.sy ❤️
+        </p>
       </div>
     </main>
   );

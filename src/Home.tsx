@@ -2480,39 +2480,40 @@ onClick={(e) => {
 </section>
 
 
+
+{/* الإعلانات المميزة */}
 <section
   dir="rtl"
-  className="featured-premium relative isolate mt-14 overflow-hidden rounded-3xl border-2 border-amber-300 bg-gradient-to-bl from-amber-100 via-yellow-50 to-amber-200 p-4 shadow-[0_0_18px_rgba(245,158,11,0.22),0_0_35px_rgba(251,191,36,0.12)] sm:p-6"
+  className="featured-premium relative isolate mt-10 overflow-hidden rounded-2xl border border-amber-300 bg-gradient-to-bl from-amber-100 via-yellow-50 to-amber-200 p-3 shadow-sm sm:p-5"
 >
   <style>
     {`
       @keyframes goldShine {
-        0% {
-          transform: translateX(-180%) skewX(-22deg);
-          opacity: 0;
-        }
-        15%, 75% { opacity: .75; }
-        100% {
-          transform: translateX(450%) skewX(-22deg);
-          opacity: 0;
-        }
+        0% { transform: translateX(-180%) skewX(-22deg); opacity: 0; }
+        15%, 75% { opacity: .45; }
+        100% { transform: translateX(450%) skewX(-22deg); opacity: 0; }
       }
 
       @keyframes goldGlow {
         0%, 100% {
-          box-shadow: 0 0 10px rgba(245,158,11,.16);
-          border-color: rgba(245,158,11,.55);
+          box-shadow: 0 1px 5px rgba(245,158,11,.10);
+          border-color: rgba(245,158,11,.40);
         }
         50% {
-          box-shadow: 0 0 22px rgba(245,158,11,.42),
-                      0 0 35px rgba(251,191,36,.20);
-          border-color: rgba(217,119,6,.85);
+          box-shadow: 0 2px 12px rgba(245,158,11,.20);
+          border-color: rgba(217,119,6,.65);
         }
       }
 
       @keyframes starSparkle {
-        0%, 100% { transform: rotate(-8deg) scale(1); filter: drop-shadow(0 0 2px rgba(245,158,11,.3)); }
-        50% { transform: rotate(12deg) scale(1.2); filter: drop-shadow(0 0 9px rgba(245,158,11,.9)); }
+        0%, 100% {
+          transform: rotate(-6deg) scale(1);
+          filter: drop-shadow(0 0 2px rgba(245,158,11,.25));
+        }
+        50% {
+          transform: rotate(8deg) scale(1.12);
+          filter: drop-shadow(0 0 5px rgba(245,158,11,.55));
+        }
       }
 
       @keyframes badgeShine {
@@ -2529,16 +2530,16 @@ onClick={(e) => {
         background: linear-gradient(
           110deg,
           transparent 20%,
-          rgba(255,255,255,.65) 45%,
-          rgba(255,255,255,.18) 52%,
+          rgba(255,255,255,.55) 45%,
+          rgba(255,255,255,.12) 52%,
           transparent 72%
         );
         background-size: 220% 100%;
-        animation: goldShine 3s ease-in-out infinite;
+        animation: goldShine 4s ease-in-out infinite;
       }
 
       .featured-premium .featured-card {
-        animation: goldGlow 3s ease-in-out infinite;
+        animation: goldGlow 4s ease-in-out infinite;
       }
 
       .featured-premium .featured-badge {
@@ -2551,13 +2552,13 @@ onClick={(e) => {
         position: absolute;
         inset: -20% auto -20% -60%;
         width: 45%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent);
-        animation: badgeShine 2.5s ease-in-out infinite;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.7), transparent);
+        animation: badgeShine 3.5s ease-in-out infinite;
       }
 
       .featured-premium .featured-star {
         display: inline-block;
-        animation: starSparkle 1.8s ease-in-out infinite;
+        animation: starSparkle 2.5s ease-in-out infinite;
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -2571,21 +2572,19 @@ onClick={(e) => {
     `}
   </style>
 
-  <div className="relative z-10 mb-6 flex items-center justify-between gap-3">
+  <div className="relative z-10 mb-5 flex items-center justify-between gap-3">
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="featured-star text-2xl">⭐</span>
-
-        <h2 className="text-xl font-black text-amber-950">
+        <span className="featured-star text-xl">⭐</span>
+        <h2 className="text-lg font-black text-amber-950">
           إعلانات مميزة
         </h2>
-
-        <span className="rounded-md border border-amber-400 bg-gradient-to-l from-amber-200 to-yellow-100 px-2 py-1 text-[10px] font-bold text-amber-950 shadow-sm">
+        <span className="rounded-lg border border-amber-300 bg-gradient-to-l from-amber-200 to-yellow-100 px-2 py-1 text-[10px] font-bold text-amber-950">
           مختارة بعناية
         </span>
       </div>
 
-      <p className="mt-1 text-sm text-amber-900">
+      <p className="mt-1.5 text-xs text-amber-900 sm:text-sm">
         مجموعة من الإعلانات التي تستحق المشاهدة
       </p>
     </div>
@@ -2593,26 +2592,26 @@ onClick={(e) => {
     <button
       type="button"
       onClick={() => navigate("/featured-ads")}
-      className="shrink-0 rounded-xl border border-amber-400 bg-white/90 px-3 py-2 text-xs font-black text-amber-950 shadow-sm transition hover:-translate-y-0.5 hover:bg-amber-200 hover:shadow-md sm:px-4 sm:text-sm"
+      className="shrink-0 rounded-lg border border-amber-400 bg-white/90 px-3 py-2 text-xs font-bold text-amber-950 transition-colors hover:bg-amber-200"
     >
       عرض الكل ←
     </button>
   </div>
 
   {featuredAdsLoading && (
-    <p className="relative z-10 py-8 text-center text-sm font-semibold text-amber-900">
+    <p className="relative z-10 py-7 text-center text-sm font-semibold text-amber-900">
       جارٍ تحميل الإعلانات...
     </p>
   )}
 
   {!featuredAdsLoading && featuredAds.length === 0 && (
-    <p className="relative z-10 py-10 text-center text-sm text-amber-900">
+    <p className="relative z-10 py-8 text-center text-sm text-amber-900">
       لا توجد إعلانات مميزة حالياً.
     </p>
   )}
 
   {!featuredAdsLoading && featuredAds.length > 0 && (
-    <div className="relative z-10 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+    <div className="relative z-10 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3">
       {featuredAds
         .filter((ad) => {
           const matchesCategory =
@@ -2658,9 +2657,9 @@ onClick={(e) => {
           <article
             key={ad.id}
             onClick={() => navigate(`/ad/${ad.id}`)}
-            className="featured-card group w-[270px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-2xl border-2 border-amber-300 bg-white shadow-md shadow-amber-300/30 transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:w-[300px] lg:w-[310px]"
+            className="featured-card group w-[225px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-xl border border-amber-300 bg-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:w-[245px]"
           >
-            <div className="relative h-52 overflow-hidden bg-amber-50">
+            <div className="relative h-40 overflow-hidden bg-amber-50">
               {ad.images.length > 0 ? (
                 <img
                   src={ad.images[0]}
@@ -2669,11 +2668,11 @@ onClick={(e) => {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-amber-400">
-                  <Car size={48} />
+                  <Car size={38} />
                 </div>
               )}
 
-              <span className="featured-badge absolute right-3 top-3 rounded-lg border border-amber-400 bg-gradient-to-l from-amber-300 to-yellow-100 px-3 py-1.5 text-xs font-black text-amber-950 shadow-[0_0_12px_rgba(245,158,11,0.35)]">
+              <span className="featured-badge absolute right-2 top-2 rounded-md border border-amber-400 bg-gradient-to-l from-amber-300 to-yellow-100 px-2 py-1 text-[10px] font-bold text-amber-950 shadow-sm">
                 ⭐ إعلان مميز
               </span>
 
@@ -2684,26 +2683,26 @@ onClick={(e) => {
                   e.stopPropagation();
                   toggleFavorite(ad.id);
                 }}
-                className="absolute left-3 top-3 rounded-full bg-white/90 p-2 text-slate-500 shadow-sm transition hover:scale-110 hover:text-red-500"
+                className="absolute left-2 top-2 rounded-full bg-white/95 p-1.5 text-slate-500 shadow-sm transition-colors hover:text-red-500"
               >
                 <Heart
-                  size={18}
+                  size={16}
                   fill={favoriteAdIds.includes(ad.id) ? "currentColor" : "none"}
                   className={favoriteAdIds.includes(ad.id) ? "text-red-500" : ""}
                 />
               </button>
             </div>
 
-            <div className="p-4">
-              <h3 className="line-clamp-2 min-h-12 font-bold leading-6 text-slate-800">
+            <div className="p-3">
+              <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-slate-800">
                 {ad.title}
               </h3>
 
-              <div className="mt-3 flex items-baseline gap-1">
-                <span className="text-xl font-black text-emerald-700">
+              <div className="mt-2.5 flex items-baseline gap-1">
+                <span className="text-lg font-black text-emerald-700">
                   {ad.price?.toLocaleString("en-US") ?? "السعر عند التواصل"}
                 </span>
-                <span className="text-xs font-semibold text-slate-500">
+                <span className="text-[10px] font-semibold text-slate-500">
                   {ad.currency === "USD"
                     ? "دولار"
                     : ad.currency === "SYP"
@@ -2712,9 +2711,10 @@ onClick={(e) => {
                 </span>
               </div>
 
-              <div className="mt-4 flex items-center justify-between border-t border-amber-100 pt-3 text-xs text-slate-400">
+              <div className="mt-3 flex items-center justify-between border-t border-amber-100 pt-2.5 text-[10px] text-slate-400">
                 <span className="flex items-center gap-1">
-                  <MapPin size={14} /> {ad.city_name}
+                  <MapPin size={12} />
+                  {ad.city_name}
                 </span>
                 <span>
                   {new Date(ad.created_at).toLocaleDateString("ar-SY")}
@@ -2727,106 +2727,127 @@ onClick={(e) => {
   )}
 </section>
 
-
-
-
-
-
+{/* المتاجر المميزة */}
 <section
   dir="rtl"
-  className="mt-10 overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-bl from-emerald-100 via-white to-teal-100 p-4 shadow-md shadow-emerald-100/70 sm:p-6"
+  className="mt-8 overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-bl from-emerald-100 via-white to-teal-100 p-3 shadow-sm sm:p-5"
 >
-  <div className="mb-6 flex items-center justify-between gap-3">
+  <div className="mb-5 flex items-center justify-between gap-3">
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm"><StoreIcon size={22} /></span>
-        <h2 className="text-xl font-black text-emerald-950">متاجر مميزة</h2>
-        <span className="rounded-md border border-emerald-200 bg-white/80 px-2 py-1 text-[10px] font-bold text-emerald-800">تسوق من المتجر مباشرة</span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white">
+          <StoreIcon size={19} />
+        </span>
+        <h2 className="text-lg font-black text-emerald-950">
+          متاجر مميزة
+        </h2>
+        <span className="rounded-lg border border-emerald-200 bg-white/80 px-2 py-1 text-[10px] font-bold text-emerald-800">
+          تسوق من المتجر مباشرة
+        </span>
       </div>
-      <p className="mt-2 text-sm text-emerald-800">اكتشف المتاجر المحلية وتصفح منتجاتها من مكان واحد</p>
+      <p className="mt-1.5 text-xs text-emerald-800 sm:text-sm">
+        اكتشف المتاجر المحلية وتصفح منتجاتها من مكان واحد
+      </p>
     </div>
-    <button type="button" onClick={() => navigate("/stores")} className="shrink-0 rounded-xl border border-emerald-300 bg-white/90 px-3 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-200 sm:px-4 sm:text-sm">كل المتاجر ←</button>
-  </div>
-  {featuredStoresLoading && <p className="py-8 text-center text-sm text-emerald-800">جارٍ تحميل المتاجر...</p>}
-  {!featuredStoresLoading && featuredStores.length === 0 && <div className="rounded-2xl border border-dashed border-emerald-300 bg-white/60 py-8 text-center text-sm text-emerald-800">ستظهر المتاجر هنا بعد تفعيلها</div>}
-  {!featuredStoresLoading && featuredStores.length > 0 && (
 
-<div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3">
-  {featuredStores.map((store) => (
     <button
-      key={store.id}
       type="button"
-      onClick={() => navigate(`/store/${store.id}`)}
-      className="group w-[245px] shrink-0 snap-start overflow-hidden rounded-2xl border border-emerald-200 bg-white text-right shadow-sm transition hover:-translate-y-1 hover:shadow-lg sm:w-[275px]"
+      onClick={() => navigate("/stores")}
+      className="shrink-0 rounded-lg border border-emerald-300 bg-white/90 px-3 py-2 text-xs font-bold text-emerald-900 transition-colors hover:bg-emerald-100"
     >
-      {/* غلاف المتجر */}
-      <div
-        className="relative z-0 h-28 bg-gradient-to-l from-emerald-200 via-teal-100 to-slate-100"
-        style={
-          store.cover_url
-            ? {
-                backgroundImage: `url(${store.cover_url})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
-      >
-        <span className="absolute left-3 top-3 rounded-lg bg-white/90 px-2 py-1 text-[10px] font-black text-emerald-800 shadow-sm">
-          متجر
-        </span>
-      </div>
-
-      <div className="relative z-10 px-4 pb-4">
-        {/* شعار المتجر */}
-        <div className="relative z-20 -mt-8 mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white shadow-lg">
-          {store.logo_url ? (
-            <img
-              src={store.logo_url}
-              alt={store.name}
-              className="relative z-10 h-full w-full object-cover"
-            />
-          ) : (
-            <StoreIcon size={27} className="text-emerald-600" />
-          )}
-        </div>
-
-        <h3 className="truncate text-base font-black text-slate-900">
-          {store.name}
-        </h3>
-
-        <p className="mt-1 truncate text-sm font-bold text-emerald-700">
-          {store.business_type}
-        </p>
-
-        <p className="mt-2 flex items-center gap-1 text-xs text-slate-500">
-          <MapPin size={13} />
-          {[store.governorate, store.city].filter(Boolean).join(" - ") ||
-            "الموقع غير محدد"}
-        </p>
-
-        <span className="mt-4 inline-flex rounded-lg bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-800 transition group-hover:bg-emerald-600 group-hover:text-white">
-          تصفح المتجر ←
-        </span>
-      </div>
+      كل المتاجر ←
     </button>
-  ))}
-</div>
+  </div>
 
+  {featuredStoresLoading && (
+    <p className="py-7 text-center text-sm text-emerald-800">
+      جارٍ تحميل المتاجر...
+    </p>
+  )}
+
+  {!featuredStoresLoading && featuredStores.length === 0 && (
+    <div className="rounded-xl border border-dashed border-emerald-300 bg-white/60 py-7 text-center text-sm text-emerald-800">
+      ستظهر المتاجر هنا بعد تفعيلها
+    </div>
+  )}
+
+  {!featuredStoresLoading && featuredStores.length > 0 && (
+    <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3">
+      {featuredStores.map((store) => (
+        <button
+          key={store.id}
+          type="button"
+          onClick={() => navigate(`/store/${store.id}`)}
+          className="group w-[210px] shrink-0 snap-start overflow-hidden rounded-xl border border-emerald-200/90 bg-white text-right shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:w-[230px]"
+        >
+          <div
+            className="relative h-20 bg-gradient-to-l from-emerald-200 via-teal-100 to-slate-100"
+            style={
+              store.cover_url
+                ? {
+                    backgroundImage: `url(${store.cover_url})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }
+                : undefined
+            }
+          >
+            <span className="absolute left-2 top-2 rounded-md bg-white/90 px-2 py-1 text-[9px] font-bold text-emerald-800 shadow-sm">
+              متجر
+            </span>
+          </div>
+
+          <div className="relative px-3 pb-3">
+            <div className="relative z-10 -mt-7 mb-2.5 flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border-[3px] border-white bg-white shadow-md">
+              {store.logo_url ? (
+                <img
+                  src={store.logo_url}
+                  alt={store.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <StoreIcon size={24} className="text-emerald-600" />
+              )}
+            </div>
+
+            <h3 className="truncate text-sm font-black text-slate-900">
+              {store.name}
+            </h3>
+
+            <p className="mt-1 truncate text-xs font-bold text-emerald-700">
+              {store.business_type}
+            </p>
+
+            <p className="mt-2 flex items-center gap-1 text-[11px] text-slate-500">
+              <MapPin size={12} />
+              <span className="truncate">
+                {[store.governorate, store.city].filter(Boolean).join(" - ") ||
+                  "الموقع غير محدد"}
+              </span>
+            </p>
+
+            <span className="mt-3 inline-flex rounded-lg bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-800 transition-colors group-hover:bg-emerald-600 group-hover:text-white">
+              تصفح المتجر ←
+            </span>
+          </div>
+        </button>
+      ))}
+    </div>
   )}
 </section>
 
+{/* أحدث الإعلانات */}
 <section
-  className="mt-14 rounded-3xl border border-emerald-200 bg-gradient-to-bl from-emerald-50 via-white to-teal-50 p-4 shadow-sm sm:p-6"
+  className="mt-10 rounded-2xl border border-emerald-200 bg-gradient-to-bl from-emerald-50 via-white to-teal-50 p-3 shadow-sm sm:p-5"
   id="ads-section"
   dir="rtl"
 >
-  <div className="mb-6 flex items-center justify-between gap-3">
+  <div className="mb-5 flex items-center justify-between gap-3">
     <div>
-      <h2 className="text-xl font-black text-emerald-950">
+      <h2 className="text-lg font-black text-emerald-950">
         أحدث الإعلانات
       </h2>
-      <p className="mt-1 text-sm text-emerald-800">
+      <p className="mt-1 text-xs text-emerald-800 sm:text-sm">
         تصفح أحدث ما أُضيف إلى السوق
       </p>
     </div>
@@ -2834,26 +2855,26 @@ onClick={(e) => {
     <button
       type="button"
       onClick={() => navigate("/regular-ads")}
-      className="shrink-0 rounded-xl border border-emerald-300 bg-white/80 px-3 py-2 text-xs font-black text-emerald-900 transition hover:bg-emerald-100 sm:px-4 sm:text-sm"
+      className="shrink-0 rounded-lg border border-emerald-300 bg-white/80 px-3 py-2 text-xs font-bold text-emerald-900 transition-colors hover:bg-emerald-100"
     >
       عرض الكل ←
     </button>
   </div>
 
   {adsLoading && (
-    <p className="py-8 text-center text-sm text-emerald-800">
+    <p className="py-7 text-center text-sm text-emerald-800">
       جارٍ تحميل الإعلانات...
     </p>
   )}
 
   {!adsLoading && filteredLatestAds.length === 0 && (
-    <p className="py-10 text-center text-sm text-emerald-800">
+    <p className="py-8 text-center text-sm text-emerald-800">
       لا توجد إعلانات جديدة حالياً.
     </p>
   )}
 
   {!adsLoading && filteredLatestAds.length > 0 && (
-    <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+    <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3">
       {filteredLatestAds.slice(0, 8).map((ad) => (
         <article
           key={ad.id}
@@ -2862,9 +2883,9 @@ onClick={(e) => {
               state: { from: "/" },
             })
           }
-          className="group w-[270px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-2xl border-2 border-emerald-200 bg-white shadow-md shadow-emerald-100/50 transition hover:-translate-y-1 hover:shadow-xl sm:w-[300px] lg:w-[310px]"
+          className="group w-[225px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:w-[245px]"
         >
-          <div className="relative h-52 overflow-hidden bg-emerald-50">
+          <div className="relative h-40 overflow-hidden bg-emerald-50">
             {ad.images.length > 0 ? (
               <img
                 src={ad.images[0]}
@@ -2873,11 +2894,11 @@ onClick={(e) => {
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-emerald-50 text-emerald-400">
-                <Car size={48} />
+                <Car size={38} />
               </div>
             )}
 
-            <span className="absolute right-3 top-3 rounded-lg border border-emerald-300 bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800">
+            <span className="absolute right-2 top-2 rounded-md border border-emerald-200 bg-emerald-50/95 px-2 py-1 text-[10px] font-bold text-emerald-800">
               إعلان للبيع
             </span>
 
@@ -2888,26 +2909,26 @@ onClick={(e) => {
                 e.stopPropagation();
                 toggleFavorite(ad.id);
               }}
-              className="absolute left-3 top-3 rounded-full bg-white/90 p-2 text-slate-500 hover:text-red-500"
+              className="absolute left-2 top-2 rounded-full bg-white/95 p-1.5 text-slate-500 shadow-sm transition-colors hover:text-red-500"
             >
               <Heart
-                size={18}
+                size={16}
                 fill={favoriteAdIds.includes(ad.id) ? "currentColor" : "none"}
                 className={favoriteAdIds.includes(ad.id) ? "text-red-500" : ""}
               />
             </button>
           </div>
 
-          <div className="p-4">
-            <h3 className="line-clamp-2 min-h-12 font-bold leading-6 text-slate-800">
+          <div className="p-3">
+            <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-slate-800">
               {ad.title}
             </h3>
 
-            <div className="mt-3 flex items-baseline gap-1">
-              <span className="text-xl font-black text-emerald-700">
+            <div className="mt-2.5 flex items-baseline gap-1">
+              <span className="text-lg font-black text-emerald-700">
                 {ad.price?.toLocaleString("en-US") ?? "السعر عند التواصل"}
               </span>
-              <span className="text-xs font-semibold text-slate-500">
+              <span className="text-[10px] font-semibold text-slate-500">
                 {ad.currency === "USD"
                   ? "دولار"
                   : ad.currency === "SYP"
@@ -2916,12 +2937,12 @@ onClick={(e) => {
               </span>
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-emerald-100 pt-3 text-xs text-slate-400">
-              <span className="flex items-center gap-1">
-                <MapPin size={14} />
+            <div className="mt-3 flex items-center justify-between border-t border-emerald-100 pt-2.5 text-[10px] text-slate-400">
+              <span className="flex items-center gap-1 truncate">
+                <MapPin size={12} />
                 {ad.city_name}
               </span>
-              <span>
+              <span className="shrink-0">
                 {new Date(ad.created_at).toLocaleDateString("ar-SY")}
               </span>
             </div>
@@ -2932,30 +2953,27 @@ onClick={(e) => {
   )}
 </section>
 
-
-
-
-
+{/* أغراض مجانية للتبرع */}
 <section
-  className="mt-14 rounded-3xl border border-rose-200 bg-gradient-to-bl from-rose-50 via-white to-pink-50 p-4 shadow-sm sm:p-6"
+  className="mt-10 rounded-2xl border border-rose-200 bg-gradient-to-bl from-rose-50 via-white to-pink-50 p-3 shadow-sm sm:p-5"
   dir="rtl"
 >
-  <div className="mb-6 flex items-center justify-between gap-3">
+  <div className="mb-5 flex items-center justify-between gap-3">
     <div>
       <div className="flex items-center gap-2">
         <Heart
-  className="text-rose-500"
-  size={23}
-  style={{
-    animation: "heartbeat 3s ease-in-out infinite",
-    transformOrigin: "center",
-  }}
-/>
-        <h2 className="text-xl font-black text-rose-950">
+          className="text-rose-500"
+          size={21}
+          style={{
+            animation: "heartbeat 3s ease-in-out infinite",
+            transformOrigin: "center",
+          }}
+        />
+        <h2 className="text-lg font-black text-rose-950">
           أغراض مجانية للتبرع
         </h2>
       </div>
-      <p className="mt-1 text-sm text-rose-800">
+      <p className="mt-1 text-xs text-rose-800 sm:text-sm">
         خذ ما تحتاجه، وتبرع بما لم تعد بحاجة إليه
       </p>
     </div>
@@ -2963,39 +2981,39 @@ onClick={(e) => {
     <button
       type="button"
       onClick={() => navigate("/donations")}
-      className="shrink-0 rounded-xl border border-rose-300 bg-white/80 px-3 py-2 text-xs font-black text-rose-900 transition hover:bg-rose-100 sm:px-4 sm:text-sm"
+      className="shrink-0 rounded-lg border border-rose-300 bg-white/80 px-3 py-2 text-xs font-bold text-rose-900 transition-colors hover:bg-rose-100"
     >
       عرض الكل ←
     </button>
   </div>
 
   {donationsLoading && (
-    <p className="py-8 text-center text-sm text-rose-800">
+    <p className="py-7 text-center text-sm text-rose-800">
       جارٍ تحميل التبرعات...
     </p>
   )}
 
   {!donationsLoading && donations.length === 0 && (
-    <div className="rounded-2xl border border-dashed border-rose-200 bg-white/80 py-10 text-center">
-      <Heart size={35} className="mx-auto text-rose-300" />
-      <p className="mt-3 font-bold text-slate-700">
+    <div className="rounded-xl border border-dashed border-rose-200 bg-white/80 py-8 text-center">
+      <Heart size={30} className="mx-auto text-rose-300" />
+      <p className="mt-2.5 text-sm font-bold text-slate-700">
         لا توجد أغراض متاحة للتبرع حالياً
       </p>
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-xs text-slate-500">
         كن أول من يشارك غرضاً ليستفيد منه غيره
       </p>
     </div>
   )}
 
   {!donationsLoading && donations.length > 0 && (
-    <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+    <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3">
       {donations.slice(0, 8).map((ad) => (
         <article
           key={ad.id}
           onClick={() => navigate(`/ad/${ad.id}`)}
-          className="group w-[270px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-2xl border-2 border-rose-200 bg-white shadow-md shadow-rose-100/50 transition hover:-translate-y-1 hover:shadow-xl sm:w-[300px] lg:w-[310px]"
+          className="group w-[225px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-xl border border-rose-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md sm:w-[245px]"
         >
-          <div className="relative h-52 overflow-hidden bg-rose-50">
+          <div className="relative h-40 overflow-hidden bg-rose-50">
             {ad.images.length > 0 ? (
               <img
                 src={ad.images[0]}
@@ -3004,30 +3022,30 @@ onClick={(e) => {
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-rose-50 text-rose-400">
-                <Heart size={48} />
+                <Heart size={38} />
               </div>
             )}
 
-            <span className="absolute right-3 top-3 rounded-lg border border-rose-300 bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-800">
+            <span className="absolute right-2 top-2 rounded-md border border-rose-200 bg-rose-50/95 px-2 py-1 text-[10px] font-bold text-rose-800">
               ❤️ للتبرع مجاناً
             </span>
           </div>
 
-          <div className="p-4">
-            <h3 className="line-clamp-2 min-h-12 font-bold leading-6 text-slate-800">
+          <div className="p-3">
+            <h3 className="line-clamp-2 min-h-10 text-sm font-bold leading-5 text-slate-800">
               {ad.title}
             </h3>
 
-            <p className="mt-3 text-xl font-black text-rose-600">
+            <p className="mt-2.5 text-lg font-black text-rose-600">
               مجاناً ❤️
             </p>
 
-            <div className="mt-4 flex items-center justify-between border-t border-rose-100 pt-3 text-xs text-slate-400">
-              <span className="flex items-center gap-1">
-                <MapPin size={14} />
+            <div className="mt-3 flex items-center justify-between border-t border-rose-100 pt-2.5 text-[10px] text-slate-400">
+              <span className="flex items-center gap-1 truncate">
+                <MapPin size={12} />
                 {ad.city_name}
               </span>
-              <span>
+              <span className="shrink-0">
                 {new Date(ad.created_at).toLocaleDateString("ar-SY")}
               </span>
             </div>

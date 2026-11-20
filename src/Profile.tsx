@@ -23,7 +23,20 @@ import {
   BadgeCheck,
   Eye,
   EyeOff,
+  XCircle,
+  RefreshCw,
 } from "lucide-react";
+
+type VerificationRequest = {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  phone: string;
+  payment_reference: string | null;
+  admin_note: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  created_at: string;
+};
 
 export default function Profile() {
   const [loading, setLoading] = useState(true);
@@ -56,6 +69,14 @@ export default function Profile() {
     ordinary: 0,
     featured: 0,
   });
+
+  const [verificationRequests, setVerificationRequests] = useState<
+    VerificationRequest[]
+  >([]);
+  const [qrUrl, setQrUrl] = useState("");
+  const [exchangeRate, setExchangeRate] = useState(0);
+  const [paymentReference, setPaymentReference] = useState("");
+  const [submittingVerification, setSubmittingVerification] = useState(false);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -162,6 +183,52 @@ export default function Profile() {
     }
   }
 
+  async function loadVerificationData(id: string) {
+    const [
+      { data: settingsData, error: settingsError },
+      { data: verificationData, error: verificationError },
+    ] = await Promise.all([
+      supabase
+        .from("site_settings")
+        .select("sham_cash_qr_url, usd_syp_rate")
+        .eq("id", 1)
+        .single(),
+
+      supabase
+        .from("account_verifications")
+        .select(
+          "id, status, phone, payment_reference, admin_note, start_at, end_at, created_at"
+        )
+        .eq("user_id", id)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (settingsError) throw settingsError;
+    if (verificationError) throw verificationError;
+
+    setQrUrl(settingsData?.sham_cash_qr_url || "");
+    setExchangeRate(Number(settingsData?.usd_syp_rate || 0));
+    setVerificationRequests(
+      (verificationData || []) as VerificationRequest[]
+    );
+  }
+
+  async function refreshVerificationData() {
+    if (!userId) return;
+
+    const { data, error: verificationError } = await supabase
+      .from("account_verifications")
+      .select(
+        "id, status, phone, payment_reference, admin_note, start_at, end_at, created_at"
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (verificationError) throw verificationError;
+
+    setVerificationRequests((data || []) as VerificationRequest[]);
+  }
+
   async function loadProfile() {
     setLoading(true);
     setError("");
@@ -222,8 +289,11 @@ export default function Profile() {
       setBio(profile.bio || "");
       setShowPhone(profile.show_phone ?? false);
 
-      await loadLocations(profile.city_id ?? null);
-      await loadSubscription(id);
+      await Promise.all([
+        loadLocations(profile.city_id ?? null),
+        loadSubscription(id),
+        loadVerificationData(id),
+      ]);
     } catch (err) {
       setError(
         err instanceof Error
@@ -232,6 +302,59 @@ export default function Profile() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function submitVerificationRequest() {
+    setError("");
+    setMessage("");
+
+    if (submittingVerification) return;
+
+    if (!/^09[0-9]{8}$/.test(phone.trim())) {
+      setError("يرجى التأكد من رقم الهاتف المسجل في حسابك قبل طلب التوثيق.");
+      return;
+    }
+
+    const pendingRequest = verificationRequests.find(
+      (request) => request.status === "pending"
+    );
+
+    if (pendingRequest) {
+      setError("لديك طلب توثيق قيد المراجعة بالفعل.");
+      return;
+    }
+
+    setSubmittingVerification(true);
+
+    try {
+      const { data, error: submitError } = await supabase.rpc(
+        "submit_account_verification",
+        {
+          p_phone: phone.trim(),
+          p_payment_reference: paymentReference.trim() || null,
+        }
+      );
+
+      if (submitError) throw submitError;
+
+      if (!data) {
+        throw new Error("لم يتم استلام رقم طلب التوثيق.");
+      }
+
+      setPaymentReference("");
+      await refreshVerificationData();
+      setMessage(
+        "تم إرسال طلب توثيق الحساب بنجاح. سيبقى الطلب قيد المراجعة حتى موافقة الإدارة."
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "تعذر إرسال طلب التوثيق. حاول مرة أخرى."
+      );
+    } finally {
+      setSubmittingVerification(false);
     }
   }
 
@@ -294,11 +417,12 @@ export default function Profile() {
     setUploadingAvatar(true);
 
     try {
-      const extension = file.type === "image/png"
-        ? "png"
-        : file.type === "image/webp"
-          ? "webp"
-          : "jpg";
+      const extension =
+        file.type === "image/png"
+          ? "png"
+          : file.type === "image/webp"
+            ? "webp"
+            : "jpg";
 
       const filePath = `${userId}/avatar-${Date.now()}.${extension}`;
 
@@ -519,14 +643,48 @@ export default function Profile() {
     featuredLimit - subscriptionUsage.featured
   );
 
+  const latestVerification = verificationRequests[0] || null;
+
+  const activeVerification = verificationRequests.find(
+    (request) =>
+      request.status === "approved" &&
+      request.start_at &&
+      request.end_at &&
+      new Date(request.start_at) <= new Date() &&
+      new Date(request.end_at) > new Date()
+  );
+
+  const verificationPending = verificationRequests.some(
+    (request) => request.status === "pending"
+  );
+
+
+  const verificationDaysRemaining = activeVerification?.end_at
+  ? Math.max(
+      0,
+      Math.ceil(
+        (new Date(activeVerification.end_at).getTime() -
+          Date.now()) /
+          (1000 * 60 * 60 * 24)
+      )
+    )
+  : 0;
+
+  const canRenewVerification =
+  !verificationPending &&
+  (!activeVerification || verificationDaysRemaining <= 30);
+
+
+  const verificationAmountSyp = Math.floor(20 * exchangeRate);
+
   const inputClass =
-    "w-full min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10";
+    "w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10";
 
   const buttonClass =
-    "flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
+    "flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
 
   const sectionClass =
-    "overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6";
+    "overflow-hidden rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm sm:p-4";
 
   if (loading) {
     return (
@@ -547,9 +705,7 @@ export default function Profile() {
       dir="rtl"
       className="min-h-screen bg-[#f5f7f6] px-3 pb-10 pt-4 sm:px-5 sm:py-8"
     >
-      <div className="mx-auto max-w-2xl">
-
-        {/* شريط العودة */}
+      <div className="mx-auto max-w-3xl">
         <Link
           to="/"
           className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-bold text-slate-600 shadow-sm transition hover:text-emerald-700"
@@ -558,8 +714,7 @@ export default function Profile() {
           العودة إلى السوق
         </Link>
 
-        {/* رأس الصفحة والصورة الشخصية */}
-        <div className="mb-5 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+        <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="h-24 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-32" />
 
           <div className="px-5 pb-5 sm:px-7">
@@ -582,9 +737,36 @@ export default function Profile() {
                 <p className="text-xs font-semibold text-emerald-700">
                   أهلاً بك في Sooq.Sy
                 </p>
-                <h1 className="mt-1 truncate text-xl font-black text-slate-900 sm:text-2xl">
-                  {name || "الملف الشخصي"}
-                </h1>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <h1 className="truncate text-xl font-black text-slate-900 sm:text-2xl">
+                      {name || "الملف الشخصي"}
+                    </h1>
+
+
+{activeVerification ? (
+  <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1">
+    <span
+      title="حساب موثّق"
+      className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-blue-500 text-white"
+    >
+      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor">
+        <path d="M9.2 16.2 4.9 12l-1.4 1.4 5.7 5.7L21 7.3l-1.4-1.4z" />
+      </svg>
+    </span>
+    <span className="text-[10px] font-extrabold text-blue-700">
+      حساب موثّق
+    </span>
+  </span>
+) : (
+  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1">
+    <ShieldCheck size={15} className="text-slate-400" />
+    <span className="text-[10px] font-bold text-slate-500">
+      حساب غير موثّق
+    </span>
+  </span>
+)}
+
+                  </div>
                 <p className="mt-1 text-xs text-slate-500">
                   إدارة معلوماتك الشخصية وإعدادات حسابك
                 </p>
@@ -609,7 +791,6 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* رسائل النجاح والخطأ */}
         {message && (
           <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
             <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
@@ -623,10 +804,9 @@ export default function Profile() {
           </div>
         )}
 
-        {/* إدارة المتاجر */}
         <Link
           to="/my-stores"
-          className="mb-5 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm transition hover:border-emerald-300 hover:shadow-md active:scale-[0.99]"
+          className="mb-3 flex items-center gap-2.5 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm transition hover:border-emerald-300 hover:shadow-md active:scale-[0.99]"
         >
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
             <Store size={25} />
@@ -642,10 +822,9 @@ export default function Profile() {
           <ArrowRight className="shrink-0 text-emerald-600" size={21} />
         </Link>
 
-                {/* المبيعات وطلبات الشراء */}
         <Link
           to="/my-sales"
-          className="mb-5 flex items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md active:scale-[0.99]"
+          className="mb-3 flex items-center gap-2.5 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md active:scale-[0.99]"
         >
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
             <Gift size={25} />
@@ -661,7 +840,6 @@ export default function Profile() {
           <ArrowRight className="shrink-0 text-blue-600" size={21} />
         </Link>
 
-        {/* الاشتراك الإعلاني */}
         {subscriptionIsActive && subscription?.plan && (
           <section className="mb-5 overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
             <div className="bg-gradient-to-l from-blue-700 to-indigo-600 p-4 text-white sm:p-5">
@@ -671,9 +849,7 @@ export default function Profile() {
                     <Crown size={24} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-black">
-                      اشتراكي الإعلاني
-                    </h2>
+                    <h2 className="text-lg font-black">اشتراكي الإعلاني</h2>
                     <p className="mt-1 text-xs text-blue-100">
                       {subscription.plan.name}
                     </p>
@@ -716,7 +892,15 @@ export default function Profile() {
                     <div
                       className="h-full rounded-full bg-blue-600 transition-all"
                       style={{
-                        width: `${ordinaryLimit > 0 ? Math.min(100, (subscriptionUsage.ordinary / ordinaryLimit) * 100) : 0}%`,
+                        width: `${
+                          ordinaryLimit > 0
+                            ? Math.min(
+                                100,
+                                (subscriptionUsage.ordinary / ordinaryLimit) *
+                                  100
+                              )
+                            : 0
+                        }%`,
                       }}
                     />
                   </div>
@@ -742,7 +926,15 @@ export default function Profile() {
                     <div
                       className="h-full rounded-full bg-amber-500 transition-all"
                       style={{
-                        width: `${featuredLimit > 0 ? Math.min(100, (subscriptionUsage.featured / featuredLimit) * 100) : 0}%`,
+                        width: `${
+                          featuredLimit > 0
+                            ? Math.min(
+                                100,
+                                (subscriptionUsage.featured / featuredLimit) *
+                                  100
+                              )
+                            : 0
+                        }%`,
                       }}
                     />
                   </div>
@@ -759,7 +951,9 @@ export default function Profile() {
                     <p className="text-[11px] text-slate-500">تاريخ البداية</p>
                     <p className="mt-1 truncate text-xs font-bold text-slate-800">
                       {subscription.start_at
-                        ? new Date(subscription.start_at).toLocaleDateString("ar-SY")
+                        ? new Date(subscription.start_at).toLocaleDateString(
+                            "ar-SY"
+                          )
                         : "غير محدد"}
                     </p>
                   </div>
@@ -770,7 +964,9 @@ export default function Profile() {
                     <p className="text-[11px] text-slate-500">تاريخ الانتهاء</p>
                     <p className="mt-1 truncate text-xs font-bold text-slate-800">
                       {subscription.end_at
-                        ? new Date(subscription.end_at).toLocaleDateString("ar-SY")
+                        ? new Date(subscription.end_at).toLocaleDateString(
+                            "ar-SY"
+                          )
                         : "غير محدد"}
                     </p>
                   </div>
@@ -780,9 +976,8 @@ export default function Profile() {
           </section>
         )}
 
-        {/* المعلومات الشخصية */}
-        <section className={`${sectionClass} mb-4`}>
-          <div className="mb-5 flex items-center gap-3">
+        <section className={`${sectionClass} mb-3`}>
+          <div className="mb-3 flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
               <UserRound size={21} />
             </div>
@@ -818,9 +1013,8 @@ export default function Profile() {
           </button>
         </section>
 
-        {/* النبذة والخصوصية والتوثيق */}
-        <section className={`${sectionClass} mb-4`}>
-          <div className="mb-5 flex items-center gap-3">
+        <section className={`${sectionClass} mb-3`}>
+          <div className="mb-3 flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
               <UserRound size={21} />
             </div>
@@ -895,41 +1089,209 @@ export default function Profile() {
               ? "جارٍ الحفظ..."
               : "حفظ معلومات البروفايل"}
           </button>
+        </section>
 
-          <div className="mt-5 border-t border-slate-100 pt-4">
+        {/* توثيق الحساب */}
+        <section className="mb-4 overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+          <div className="bg-gradient-to-l from-blue-800 to-blue-600 p-4 text-white">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                <BadgeCheck size={24} />
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15">
+                <ShieldCheck size={27} />
               </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="font-black text-slate-800">
-                  توثيق الحساب
-                </h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  وثّق حسابك لتحصل على شارة التوثيق بعد مراجعة الإدارة.
+              <div>
+                <h2 className="text-lg font-black">توثيق الحساب</h2>
+                <p className="mt-1 text-xs text-blue-100">
+                  شارة توثيق بعد مراجعة وموافقة الإدارة
                 </p>
               </div>
             </div>
+          </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setMessage(
-                  "خدمة توثيق الحساب قيد التجهيز، وستتوفر قريباً."
-                );
-                setError("");
-              }}
-              className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 transition hover:bg-amber-100"
-            >
-              <ShieldCheck size={19} />
-              توثيق الحساب
-            </button>
+          <div className="space-y-3 p-3.5 sm:p-4">
+            <div className="flex items-center justify-between rounded-xl bg-blue-50 p-4">
+              <div>
+                <p className="text-sm font-bold text-slate-700">
+                  رسوم التوثيق لمدة سنة
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  صلاحية التوثيق 365 يوماً
+                </p>
+              </div>
+              <strong className="text-2xl font-black text-blue-700">
+                $20
+              </strong>
+            </div>
+
+            {activeVerification && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+                <div className="flex items-center gap-2 text-blue-800">
+                  <BadgeCheck size={22} />
+                  <strong>حسابك موثّق حالياً</strong>
+                </div>
+                <p className="mt-2 text-sm text-blue-900">
+                  متبقي {verificationDaysRemaining} يوم على انتهاء التوثيق.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                  <div className="rounded-lg bg-white p-3">
+                    <span className="text-slate-500">بداية التوثيق</span>
+                    <strong className="mt-1 block text-slate-800">
+                      {activeVerification.start_at
+                        ? new Date(
+                            activeVerification.start_at
+                          ).toLocaleDateString("ar-SY")
+                        : "—"}
+                    </strong>
+                  </div>
+                  <div className="rounded-lg bg-white p-3">
+                    <span className="text-slate-500">انتهاء التوثيق</span>
+                    <strong className="mt-1 block text-slate-800">
+                      {activeVerification.end_at
+                        ? new Date(
+                            activeVerification.end_at
+                          ).toLocaleDateString("ar-SY")
+                        : "—"}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            )}
+
+
+
+            {latestVerification?.status === "rejected" && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                <div className="flex items-center gap-2 text-red-700">
+                  <XCircle size={20} />
+                  <strong className="text-sm">تم رفض طلب التوثيق السابق</strong>
+                </div>
+                {latestVerification.admin_note && (
+                  <p className="mt-2 text-sm leading-6 text-red-800">
+                    سبب الرفض: {latestVerification.admin_note}
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-red-700">
+                  يمكنك إرسال طلب جديد بعد معالجة سبب الرفض.
+                </p>
+              </div>
+            )}
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <h3 className="font-bold text-slate-800">
+                الدفع عبر شام كاش
+              </h3>
+
+              {qrUrl ? (
+                <img
+                  src={qrUrl}
+                  alt="رمز الدفع عبر شام كاش"
+                  className="mx-auto mt-3 max-h-48 max-w-full rounded-lg object-contain"
+                />
+              ) : (
+                <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+                  رمز الدفع غير متوفر حالياً. يرجى مراجعة الإدارة قبل التحويل.
+                </p>
+              )}
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-600">
+                  المبلغ المطلوب
+                </span>
+                <strong className="text-lg font-black text-slate-900">
+                  $20
+                </strong>
+              </div>
+
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span className="text-sm text-slate-600">
+                  ما يعادله بالليرة السورية
+                </span>
+                <strong className="text-base font-bold text-emerald-700">
+                  {exchangeRate > 0
+                    ? `${verificationAmountSyp.toLocaleString("en-US")} ل.س`
+                    : "سعر الصرف غير مضبوط"}
+                </strong>
+              </div>
+
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
+                يرجى كتابة رقم الهاتف المسجل في حسابك على Sooq.Sy ضمن ملاحظات
+                الحوالة، حتى تتمكن الإدارة من مطابقة التحويل مع طلب التوثيق.
+                إرسال الطلب لا يعني تفعيل التوثيق تلقائياً؛ التفعيل يتم بعد
+                مراجعة الإدارة.
+              </p>
+            </div>
+
+
+            {verificationPending ? (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                <CalendarDays size={17} className="mt-0.5 shrink-0" />
+                <span>لديك طلب توثيق قيد المراجعة حالياً. سيظهر خيار الطلب مجدداً بعد انتهاء المراجعة.</span>
+              </div>
+            ) : (
+              <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold text-slate-600">
+                    رقم الهاتف المسجل في الحساب
+                  </label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    readOnly
+                    dir="ltr"
+                    className={`${inputClass} bg-slate-100 text-left`}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold text-slate-600">
+                    مرجع الحوالة <span className="font-normal text-slate-400">(اختياري)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={paymentReference}
+                    onChange={(event) => setPaymentReference(event.target.value)}
+                    className={inputClass}
+                    placeholder="أدخل رقم أو مرجع الحوالة إن وجد"
+                  />
+                </div>
+
+                {activeVerification && verificationDaysRemaining > 30 && (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs leading-5 text-amber-800">
+                    يتاح تجديد التوثيق عند بقاء 30 يوماً أو أقل. المتبقي حالياً {verificationDaysRemaining} يوماً.
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={submitVerificationRequest}
+                  disabled={submittingVerification || !canRenewVerification}
+                  className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {submittingVerification ? (
+                    <LoaderCircle className="animate-spin" size={17} />
+                  ) : activeVerification || latestVerification?.status === "approved" ? (
+                    <RefreshCw size={17} />
+                  ) : (
+                    <ShieldCheck size={17} />
+                  )}
+                  {submittingVerification
+                    ? "جارٍ إرسال الطلب..."
+                    : activeVerification && verificationDaysRemaining > 30
+                      ? "التجديد غير متاح حالياً"
+                      : activeVerification || latestVerification?.status === "approved"
+                        ? "طلب تجديد التوثيق"
+                        : "إرسال طلب التوثيق"}
+                </button>
+              </div>
+            )}
+            <p className="text-center text-[11px] leading-5 text-slate-400">
+              التوثيق هو شارة اعتماد داخل منصة Sooq.Sy بعد مراجعة الإدارة،
+              ولا يُعد بحد ذاته إثباتاً قانونياً للهوية.
+            </p>
           </div>
         </section>
 
-        {/* النقاط ودعوة الأصدقاء */}
-        <section className={`${sectionClass} mb-4`}>
-          <div className="mb-5 flex items-center gap-3">
+        <section className={`${sectionClass} mb-3`}>
+          <div className="mb-3 flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
               <Gift size={22} />
             </div>
@@ -983,13 +1345,13 @@ export default function Profile() {
           </div>
 
           <p className="mt-3 text-xs leading-6 text-slate-500">
-            ادعُ أصدقاءك للتسجيل باستخدام رابطك، واحصل على 20 نقطة عند إنشاء كل صديق لحسابه بنجاح.
+            ادعُ أصدقاءك للتسجيل باستخدام رابطك، واحصل على 20 نقطة عند إنشاء
+            كل صديق لحسابه بنجاح.
           </p>
         </section>
 
-        {/* المحافظة والمدينة */}
-        <section className={`${sectionClass} mb-4`}>
-          <div className="mb-5 flex items-center gap-3">
+        <section className={`${sectionClass} mb-3`}>
+          <div className="mb-3 flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
               <MapPin size={21} />
             </div>
@@ -1055,16 +1417,13 @@ export default function Profile() {
           </button>
         </section>
 
-        {/* رقم الموبايل */}
-        <section className={`${sectionClass} mb-4`}>
-          <div className="mb-5 flex items-center gap-3">
+        <section className={`${sectionClass} mb-3`}>
+          <div className="mb-3 flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
               <Phone size={21} />
             </div>
             <div>
-              <h2 className="font-black text-slate-800">
-                رقم الموبايل
-              </h2>
+              <h2 className="font-black text-slate-800">رقم الموبايل</h2>
               <p className="mt-0.5 text-xs text-slate-400">
                 رقم الهاتف المرتبط بتسجيل الدخول
               </p>
@@ -1078,9 +1437,7 @@ export default function Profile() {
             inputMode="numeric"
             value={phone}
             onChange={(e) =>
-              setPhone(
-                e.target.value.replace(/\D/g, "").slice(0, 10)
-              )
+              setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
             }
             className={`${inputClass} text-left`}
             placeholder="09XXXXXXXX"
@@ -1101,9 +1458,8 @@ export default function Profile() {
           </button>
         </section>
 
-        {/* تغيير كلمة المرور */}
         <section className={sectionClass}>
-          <div className="mb-5 flex items-center gap-3">
+          <div className="mb-3 flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
               <LockKeyhole size={21} />
             </div>

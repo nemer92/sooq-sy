@@ -1569,14 +1569,57 @@ const matchesCondition = selectedConditions.includes(
 </section>
 {true && (
 
-<section className="mt-5 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-amber-50 px-4 py-4 shadow-sm sm:mt-8 sm:rounded-3xl sm:p-6 md:flex md:items-center md:justify-between md:gap-5">
+
+
+<section className="relative isolate mt-5 overflow-hidden rounded-2xl border-2 border-emerald-300 bg-gradient-to-l from-emerald-100 via-white to-amber-100 px-4 py-4 shadow-[0_0_18px_rgba(16,185,129,0.25),0_0_35px_rgba(245,158,11,0.12)] sm:mt-8 sm:rounded-3xl sm:p-6 md:flex md:items-center md:justify-between md:gap-5">
+
+  <style>
+    {`
+      @keyframes premiumShine {
+        0% {
+          transform: translateX(-180%) skewX(-25deg);
+          opacity: 0;
+        }
+        15% { opacity: 1; }
+        70% { opacity: 1; }
+        100% {
+          transform: translateX(450%) skewX(-25deg);
+          opacity: 0;
+        }
+      }
+
+      @keyframes premiumGlow {
+        0%, 100% {
+          box-shadow: 0 0 10px rgba(16,185,129,.25),
+                      0 0 20px rgba(16,185,129,.12);
+        }
+        50% {
+          box-shadow: 0 0 22px rgba(16,185,129,.55),
+                      0 0 42px rgba(245,158,11,.25);
+        }
+      }
+
+      @keyframes starPulse {
+        0%, 100% { transform: scale(1) rotate(0deg); }
+        50% { transform: scale(1.18) rotate(12deg); }
+      }
+    `}
+  </style>
+
+  {/* شعاع لمعان قوي ومتكرر */}
+  <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+    <div className="absolute -inset-y-12 left-0 w-[35%] bg-gradient-to-r from-transparent via-white to-transparent opacity-90 blur-sm animate-[premiumShine_2.2s_ease-in-out_infinite]" />
+    <div className="absolute inset-0 bg-gradient-to-r from-emerald-200/10 via-transparent to-amber-200/20" />
+  </div>
+
   <div className="flex min-w-0 items-start gap-3">
-    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 sm:h-12 sm:w-12">
-      <Star size={22} />
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-200 to-amber-100 text-emerald-800 shadow-md animate-[premiumGlow_2s_ease-in-out_infinite] sm:h-12 sm:w-12">
+      <Star size={24} className="fill-emerald-500/30 animate-[starPulse_1.8s_ease-in-out_infinite]" />
     </span>
 
     <div className="min-w-0">
-      <span className="inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 sm:text-xs">
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-white/90 px-2.5 py-1 text-[10px] font-extrabold text-emerald-700 shadow-sm sm:text-xs">
+        <Star size={12} className="fill-emerald-500 text-emerald-600" />
         باقات Sooq.Sy
       </span>
 
@@ -1584,20 +1627,24 @@ const matchesCondition = selectedConditions.includes(
         ارتقِ بإعلاناتك مع باقات الاشتراك
       </h2>
 
-      <p className="mt-1 text-[11px] leading-5 text-gray-600 sm:text-sm">
+      <p className="mt-1 text-[11px] leading-5 text-gray-700 sm:text-sm">
         فرص ظهور أكبر وإعلانات مميزة مع الباقة المناسبة لك.
       </p>
     </div>
   </div>
 
   <button
+    type="button"
     onClick={() => navigate("/subscriptions")}
-    className="mt-3 flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 sm:mt-4 sm:w-auto sm:px-5 sm:py-3 sm:text-sm md:mt-0"
+    className="group relative mt-3 flex w-full shrink-0 items-center justify-center gap-2 overflow-hidden rounded-xl border border-emerald-400/50 bg-gradient-to-l from-emerald-800 via-emerald-600 to-emerald-500 px-4 py-2.5 text-xs font-extrabold text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_0_25px_rgba(16,185,129,0.65)] sm:mt-4 sm:w-auto sm:px-5 sm:py-3 sm:text-sm md:mt-0"
   >
-    <Star size={15} />
-    استكشف الباقات
+    <span className="pointer-events-none absolute inset-y-0 left-0 w-1/2 -translate-x-full bg-gradient-to-r from-transparent via-white/60 to-transparent group-hover:translate-x-[300%] group-hover:transition-transform group-hover:duration-700" />
+    <Star size={16} className="relative fill-white/30" />
+    <span className="relative">استكشف الباقات</span>
   </button>
 </section>
+
+
 
 )}
 
@@ -1945,27 +1992,113 @@ const matchesCondition = selectedConditions.includes(
   </div>
 </section>
 
+
 <section
   dir="rtl"
-  className="mt-14 overflow-hidden rounded-3xl border border-amber-300 bg-gradient-to-bl from-amber-100 via-yellow-50 to-amber-200 p-4 shadow-sm shadow-amber-200/60 sm:p-6"
+  className="featured-premium relative isolate mt-14 overflow-hidden rounded-3xl border-2 border-amber-300 bg-gradient-to-bl from-amber-100 via-yellow-50 to-amber-200 p-4 shadow-[0_0_18px_rgba(245,158,11,0.22),0_0_35px_rgba(251,191,36,0.12)] sm:p-6"
 >
-  <div className="mb-6 flex items-center justify-between gap-3">
+  <style>
+    {`
+      @keyframes goldShine {
+        0% {
+          transform: translateX(-180%) skewX(-22deg);
+          opacity: 0;
+        }
+        15%, 75% { opacity: .75; }
+        100% {
+          transform: translateX(450%) skewX(-22deg);
+          opacity: 0;
+        }
+      }
+
+      @keyframes goldGlow {
+        0%, 100% {
+          box-shadow: 0 0 10px rgba(245,158,11,.16);
+          border-color: rgba(245,158,11,.55);
+        }
+        50% {
+          box-shadow: 0 0 22px rgba(245,158,11,.42),
+                      0 0 35px rgba(251,191,36,.20);
+          border-color: rgba(217,119,6,.85);
+        }
+      }
+
+      @keyframes starSparkle {
+        0%, 100% { transform: rotate(-8deg) scale(1); filter: drop-shadow(0 0 2px rgba(245,158,11,.3)); }
+        50% { transform: rotate(12deg) scale(1.2); filter: drop-shadow(0 0 9px rgba(245,158,11,.9)); }
+      }
+
+      @keyframes badgeShine {
+        0% { transform: translateX(-160%) skewX(-25deg); }
+        100% { transform: translateX(260%) skewX(-25deg); }
+      }
+
+      .featured-premium::before {
+        content: "";
+        position: absolute;
+        z-index: -1;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(
+          110deg,
+          transparent 20%,
+          rgba(255,255,255,.65) 45%,
+          rgba(255,255,255,.18) 52%,
+          transparent 72%
+        );
+        background-size: 220% 100%;
+        animation: goldShine 3s ease-in-out infinite;
+      }
+
+      .featured-premium .featured-card {
+        animation: goldGlow 3s ease-in-out infinite;
+      }
+
+      .featured-premium .featured-badge {
+        position: relative;
+        overflow: hidden;
+      }
+
+      .featured-premium .featured-badge::after {
+        content: "";
+        position: absolute;
+        inset: -20% auto -20% -60%;
+        width: 45%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent);
+        animation: badgeShine 2.5s ease-in-out infinite;
+      }
+
+      .featured-premium .featured-star {
+        display: inline-block;
+        animation: starSparkle 1.8s ease-in-out infinite;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .featured-premium::before,
+        .featured-premium .featured-card,
+        .featured-premium .featured-badge::after,
+        .featured-premium .featured-star {
+          animation: none !important;
+        }
+      }
+    `}
+  </style>
+
+  <div className="relative z-10 mb-6 flex items-center justify-between gap-3">
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <span
-  className="inline-block text-2xl"
-  style={{ animation: "spin 3s linear infinite" }}
->
-  ⭐
-</span>
+        <span className="featured-star text-2xl">⭐</span>
+
         <h2 className="text-xl font-black text-amber-950">
           إعلانات مميزة
         </h2>
-        <span className="rounded-md border border-amber-300 bg-amber-200 px-2 py-1 text-[10px] font-bold text-amber-900">
+
+        <span className="rounded-md border border-amber-400 bg-gradient-to-l from-amber-200 to-yellow-100 px-2 py-1 text-[10px] font-bold text-amber-950 shadow-sm">
           مختارة بعناية
         </span>
       </div>
-      <p className="mt-1 text-sm text-amber-800">
+
+      <p className="mt-1 text-sm text-amber-900">
         مجموعة من الإعلانات التي تستحق المشاهدة
       </p>
     </div>
@@ -1973,26 +2106,26 @@ const matchesCondition = selectedConditions.includes(
     <button
       type="button"
       onClick={() => navigate("/featured-ads")}
-      className="shrink-0 rounded-xl border border-amber-400 bg-white/80 px-3 py-2 text-xs font-black text-amber-900 transition hover:bg-amber-300 sm:px-4 sm:text-sm"
+      className="shrink-0 rounded-xl border border-amber-400 bg-white/90 px-3 py-2 text-xs font-black text-amber-950 shadow-sm transition hover:-translate-y-0.5 hover:bg-amber-200 hover:shadow-md sm:px-4 sm:text-sm"
     >
       عرض الكل ←
     </button>
   </div>
 
   {featuredAdsLoading && (
-    <p className="py-8 text-center text-sm text-amber-800">
+    <p className="relative z-10 py-8 text-center text-sm font-semibold text-amber-900">
       جارٍ تحميل الإعلانات...
     </p>
   )}
 
   {!featuredAdsLoading && featuredAds.length === 0 && (
-    <p className="py-10 text-center text-sm text-amber-800">
+    <p className="relative z-10 py-10 text-center text-sm text-amber-900">
       لا توجد إعلانات مميزة حالياً.
     </p>
   )}
 
   {!featuredAdsLoading && featuredAds.length > 0 && (
-    <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
+    <div className="relative z-10 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-4">
       {featuredAds
         .filter((ad) => {
           const matchesCategory =
@@ -2006,9 +2139,9 @@ const matchesCondition = selectedConditions.includes(
                     sub.id === Number(ad.category_id)
                 );
 
-                const matchesCondition = selectedConditions.includes(
-  ad.condition as "new" | "used"
-);
+          const matchesCondition = selectedConditions.includes(
+            ad.condition as "new" | "used"
+          );
 
           const matchesCity =
             selectedCity !== ""
@@ -2028,17 +2161,17 @@ const matchesCondition = selectedConditions.includes(
             ad.description.toLowerCase().includes(query);
 
           return (
-  matchesCategory &&
-  matchesSearch &&
-  matchesCity &&
-  matchesCondition
-);
+            matchesCategory &&
+            matchesSearch &&
+            matchesCity &&
+            matchesCondition
+          );
         })
         .map((ad) => (
           <article
             key={ad.id}
             onClick={() => navigate(`/ad/${ad.id}`)}
-            className="group w-[270px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-2xl border-2 border-amber-300 bg-white shadow-md shadow-amber-200/50 transition hover:-translate-y-1 hover:shadow-xl sm:w-[300px] lg:w-[310px]"
+            className="featured-card group w-[270px] shrink-0 snap-start cursor-pointer overflow-hidden rounded-2xl border-2 border-amber-300 bg-white shadow-md shadow-amber-300/30 transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:w-[300px] lg:w-[310px]"
           >
             <div className="relative h-52 overflow-hidden bg-amber-50">
               {ad.images.length > 0 ? (
@@ -2053,7 +2186,7 @@ const matchesCondition = selectedConditions.includes(
                 </div>
               )}
 
-              <span className="absolute right-3 top-3 rounded-lg border border-amber-300 bg-gradient-to-l from-amber-200 to-yellow-100 px-3 py-1.5 text-xs font-black text-amber-900 shadow-sm">
+              <span className="featured-badge absolute right-3 top-3 rounded-lg border border-amber-400 bg-gradient-to-l from-amber-300 to-yellow-100 px-3 py-1.5 text-xs font-black text-amber-950 shadow-[0_0_12px_rgba(245,158,11,0.35)]">
                 ⭐ إعلان مميز
               </span>
 
@@ -2064,7 +2197,7 @@ const matchesCondition = selectedConditions.includes(
                   e.stopPropagation();
                   toggleFavorite(ad.id);
                 }}
-                className="absolute left-3 top-3 rounded-full bg-white/90 p-2 text-slate-500 hover:text-red-500"
+                className="absolute left-3 top-3 rounded-full bg-white/90 p-2 text-slate-500 shadow-sm transition hover:scale-110 hover:text-red-500"
               >
                 <Heart
                   size={18}
@@ -2106,6 +2239,7 @@ const matchesCondition = selectedConditions.includes(
     </div>
   )}
 </section>
+
 
 
 

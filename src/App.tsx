@@ -32,7 +32,9 @@ import {
   Plus,
   Image as ImageIcon,
   Hash,
-    Store,
+  Store,
+  ShieldCheck,
+
 } from "lucide-react";
 
 import { supabase } from "./lib/supabase";
@@ -266,6 +268,28 @@ const [campaignRequestsError, setCampaignRequestsError] = useState("");
 const [storeRequests, setStoreRequests] = useState<StoreSubscriptionRequest[]>([]);
 const [storeRequestsLoading, setStoreRequestsLoading] = useState(false);
 const [storeRequestsError, setStoreRequestsError] = useState("");
+
+
+const [accountVerificationRequests, setAccountVerificationRequests] =
+  useState<AccountVerificationRequest[]>([]);
+const [accountVerificationRequestsLoading, setAccountVerificationRequestsLoading] =
+  useState(false);
+const [accountVerificationRequestsError, setAccountVerificationRequestsError] =
+
+  useState("");
+  type AccountVerificationRequest = {
+  id: string;
+  user_id: string;
+  status: string;
+  phone: string;
+  payment_reference: string | null;
+  admin_note: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  user_name: string;
+};
   const [reportsLoading, setReportsLoading] = useState(false);
   const [reportsError, setReportsError] = useState("");
   const [reportSearch, setReportSearch] = useState("");
@@ -1310,6 +1334,26 @@ const loadStoreRequests = useCallback(async () => {
   }
 }, []);
 
+const loadAccountVerificationRequests = useCallback(async () => {
+  setAccountVerificationRequestsLoading(true);
+  setAccountVerificationRequestsError("");
+
+  const { data, error } = await supabase.rpc(
+    "get_admin_account_verification_requests"
+  );
+
+  if (error) {
+    console.error("loadAccountVerificationRequests:", error);
+    setAccountVerificationRequestsError(error.message);
+    setAccountVerificationRequests([]);
+  } else {
+    setAccountVerificationRequests(
+      (data ?? []) as AccountVerificationRequest[]
+    );
+  }
+
+  setAccountVerificationRequestsLoading(false);
+}, []);
 
 const approveSubscriptionRequest = async (requestId: string) => {
   const confirmed = await window.sooqConfirm(
@@ -1482,6 +1526,54 @@ const approveStoreRequest = async (requestId: string) => {
   }
 };
 
+const approveAccountVerificationRequest = async (requestId: string) => {
+  const confirmed = window.confirm("هل تريد الموافقة على توثيق هذا الحساب لمدة 365 يوماً؟");
+  if (!confirmed) return;
+
+  const { error } = await supabase.rpc(
+    "approve_account_verification_request",
+    {
+      p_request_id: requestId,
+      p_admin_note: null,
+    }
+  );
+
+  if (error) {
+    alert("تعذرت الموافقة: " + error.message);
+    return;
+  }
+
+  alert("تم توثيق الحساب بنجاح");
+  await loadAccountVerificationRequests();
+};
+
+const rejectAccountVerificationRequest = async (requestId: string) => {
+  const reason = window.prompt("اكتب سبب رفض طلب التوثيق:");
+
+  if (reason === null) return;
+
+  if (!reason.trim()) {
+    alert("يجب كتابة سبب الرفض");
+    return;
+  }
+
+  const { error } = await supabase.rpc(
+    "reject_account_verification_request",
+    {
+      p_request_id: requestId,
+      p_admin_note: reason.trim(),
+    }
+  );
+
+  if (error) {
+    alert("تعذر رفض الطلب: " + error.message);
+    return;
+  }
+
+  alert("تم رفض طلب التوثيق");
+  await loadAccountVerificationRequests();
+};
+
 const rejectStoreRequest = async (requestId: string) => {
   const adminNote = await window.sooqPrompt(
     "اكتب سبب رفض طلب المتجر:"
@@ -1521,6 +1613,12 @@ useEffect(() => {
   loadSubscriptionRequests,
   loadCampaignRequests,
 ]);
+
+useEffect(() => {
+  if (admin && activeMenu === "طلبات توثيق الحسابات") {
+    loadAccountVerificationRequests();
+  }
+}, [admin, activeMenu, loadAccountVerificationRequests]);
 
 useEffect(() => {
   if (admin && activeMenu === "طلبات المتاجر") {
@@ -2911,6 +3009,8 @@ function getSubCategories(categoryId: number) {
   label: "إدارة الإعلانات",
   icon: Megaphone,
 },
+
+
 {
   label: "طلبات الاشتراك",
   icon: Megaphone,
@@ -2918,6 +3018,11 @@ function getSubCategories(categoryId: number) {
 {
   label: "طلبات المتاجر",
   icon: Store,
+},
+
+{
+  label: "طلبات توثيق الحسابات",
+  icon: ShieldCheck,
 },
     {
   label: "الإعلانات المؤرشفة",
@@ -3785,6 +3890,169 @@ function getSubCategories(categoryId: number) {
     )}
   </>
 )}
+
+
+{/* طلبات توثيق الحسابات */}
+{activeMenu === "طلبات توثيق الحسابات" && (
+  <>
+    <div className="section-heading">
+      <div>
+        <h2>طلبات توثيق الحسابات</h2>
+        <p>مراجعة طلبات توثيق الحسابات والموافقة عليها أو رفضها</p>
+      </div>
+
+      <button
+        className="refresh-button"
+        onClick={loadAccountVerificationRequests}
+        disabled={accountVerificationRequestsLoading}
+      >
+        <RefreshCw size={17} />
+        تحديث
+      </button>
+    </div>
+
+    {accountVerificationRequestsError && (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {accountVerificationRequestsError}
+      </div>
+    )}
+
+    {accountVerificationRequestsLoading &&
+    accountVerificationRequests.length === 0 ? (
+      <div className="py-12 text-center text-slate-500">
+        <LoaderCircle className="mx-auto mb-3 animate-spin" size={30} />
+        جارٍ تحميل طلبات التوثيق...
+      </div>
+    ) : accountVerificationRequests.length === 0 ? (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <ShieldCheck className="mx-auto mb-3 text-slate-400" size={38} />
+        <p className="font-bold text-slate-700">
+          لا توجد طلبات توثيق حالياً
+        </p>
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        {accountVerificationRequests.map((request) => (
+          <div
+            key={request.id}
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 p-4">
+              <div>
+                <h3 className="font-black text-slate-800">
+                  {request.user_name}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500" dir="ltr">
+                  {request.user_id}
+                </p>
+              </div>
+
+              <span
+                className={`rounded-full px-3 py-1 text-xs font-bold ${
+                  request.status === "pending"
+                    ? "bg-amber-100 text-amber-700"
+                    : request.status === "approved"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-red-100 text-red-700"
+                }`}
+              >
+                {request.status === "pending"
+                  ? "قيد المراجعة"
+                  : request.status === "approved"
+                    ? "تمت الموافقة"
+                    : "مرفوض"}
+              </span>
+            </div>
+
+            <div className="space-y-3 p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-xs text-slate-500">
+                    رقم الهاتف المطلوب توثيقه
+                  </p>
+                  <p className="mt-1 font-bold text-slate-800" dir="ltr">
+                    {request.phone}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-xs text-slate-500">مرجع الدفع</p>
+                  <p className="mt-1 font-bold text-slate-800">
+                    {request.payment_reference || "غير مرفق"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-xs text-slate-500">تاريخ تقديم الطلب</p>
+                <p className="mt-1 font-bold text-slate-800">
+                  {formatDate(request.created_at)}
+                </p>
+              </div>
+
+              {request.status === "approved" && (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                  <p className="text-xs font-bold text-emerald-700">
+                    مدة التوثيق
+                  </p>
+                  <p className="mt-1 font-bold text-emerald-800">
+                    {request.start_at
+                      ? formatDate(request.start_at)
+                      : "—"}
+                    {" إلى "}
+                    {request.end_at
+                      ? formatDate(request.end_at)
+                      : "—"}
+                  </p>
+                </div>
+              )}
+
+              {request.admin_note && (
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-xs font-bold text-slate-500">
+                    ملاحظة الإدارة
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {request.admin_note}
+                  </p>
+                </div>
+              )}
+
+              {request.status === "pending" && (
+                <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    disabled={accountVerificationRequestsLoading}
+                    onClick={() =>
+                      approveAccountVerificationRequest(request.id)
+                    }
+                    className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <CheckCircle size={18} className="ml-2" />
+                    الموافقة وتوثيق الحساب
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={accountVerificationRequestsLoading}
+                    onClick={() =>
+                      rejectAccountVerificationRequest(request.id)
+                    }
+                    className="flex min-h-12 items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    <XCircle size={18} className="ml-2" />
+                    رفض الطلب
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </>
+)}
+
 
 {/* قسم إدارة الإعلانات */}
 {activeMenu === "إدارة الإعلانات" && (

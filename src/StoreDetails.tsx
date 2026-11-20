@@ -5,6 +5,7 @@ import {
   ArrowRight,
   MapPin,
   Search,
+  X,
   Store as StoreIcon,
   Phone,
   MessageCircle,
@@ -23,6 +24,7 @@ type Store = {
   whatsapp: string | null;
   logo_url: string | null;
   cover_url: string | null;
+  owner_id: string;
 };
 
 type Ad = {
@@ -49,6 +51,9 @@ export default function StoreDetails() {
   const [search, setSearch] = useState("");
   const [condition, setCondition] = useState("all");
   const [category, setCategory] = useState("all");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+const [closingAdId, setClosingAdId] = useState<string | null>(null);
+const [isClosingAd, setIsClosingAd] = useState(false);
 
   // الرجوع للصفحة السابقة، أو للرئيسية عند عدم وجود صفحة سابقة
 const goBack = () => {
@@ -56,6 +61,59 @@ const goBack = () => {
     navigate(-1);
   } else {
     navigate("/", { replace: true });
+  }
+};
+
+useEffect(() => {
+  async function loadCurrentUser() {
+    const { data } = await supabase.auth.getUser();
+    setCurrentUserId(data.user?.id ?? null);
+  }
+
+  loadCurrentUser();
+}, []);
+const confirmCloseAd = async () => {
+  if (!closingAdId || !store || isClosingAd) return;
+
+  setIsClosingAd(true);
+
+  try {
+    const { data: userData, error: userError } =
+      await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      throw new Error("يجب تسجيل الدخول أولاً");
+    }
+
+    if (userData.user.id !== store.owner_id) {
+      throw new Error("ليس لديك صلاحية إغلاق هذا الإعلان");
+    }
+
+    const { data, error } = await supabase
+      .from("ads")
+      .update({ status: "archived" })
+      .eq("id", closingAdId)
+      .eq("store_id", store.id)
+      .eq("user_id", userData.user.id)
+      .eq("status", "approved")
+      .select("id");
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      throw new Error("تعذر إغلاق الإعلان أو ليس لديك صلاحية عليه");
+    }
+
+    setAds((current) =>
+      current.filter((ad) => ad.id !== closingAdId)
+    );
+
+    setClosingAdId(null);
+  } catch (error: any) {
+    console.error("تعذر إغلاق الإعلان:", error);
+    alert(error.message || "حدث خطأ أثناء إغلاق الإعلان");
+  } finally {
+    setIsClosingAd(false);
   }
 };
 
@@ -77,7 +135,7 @@ const goBack = () => {
         supabase
           .from("stores")
           .select(
-            "id,name,business_type,description,governorate,city,phone,whatsapp,logo_url,cover_url"
+            "id,owner_id,name,business_type,description,governorate,city,phone,whatsapp,logo_url,cover_url"
           )
           .eq("id", id)
           .eq("status", "active")
@@ -190,6 +248,7 @@ const goBack = () => {
       >
         <RefreshCw className="animate-spin" />
         جارٍ تحميل المتجر...
+
       </main>
     );
   }
@@ -365,63 +424,124 @@ const goBack = () => {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {filtered.map((ad) => (
-              <button
-                key={ad.id}
-                onClick={() => navigate(`/ad/${ad.id}`)}
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-right shadow-sm transition hover:shadow-md"
-              >
-                {ad.images[0] ? (
-                  <img
-                    src={ad.images[0]}
-                    alt={ad.title}
-                    className="h-36 w-full object-cover sm:h-48"
-                  />
-                ) : (
-                  <div className="flex h-36 items-center justify-center bg-slate-100 text-slate-400 sm:h-48">
-                    لا توجد صورة
-                  </div>
-                )}
 
-                <div className="p-3">
-                  <div className="mb-1 flex flex-wrap gap-1">
-                    {ad.is_featured && (
-                      <span className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">
-                        مميز
-                      </span>
-                    )}
+{filtered.map((ad) => (
+  <div
+    key={ad.id}
+    className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+  >
+    {currentUserId === store.owner_id && (
+<button
+  type="button"
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-                    <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] text-slate-600">
-                      {ad.condition === "new"
-                        ? "جديد"
-                        : ad.condition === "used"
-                        ? "مستعمل"
-                        : ""}
-                    </span>
-                  </div>
+    setClosingAdId(ad.id);
+  }}
+  className="absolute left-2 top-2 z-50 flex h-8 w-8 items-center justify-center rounded-full bg-white text-red-600 shadow-md"
+>
+  <X size={19} />
+</button>
+    )}
 
-                  <h3 className="line-clamp-2 min-h-10 text-sm font-bold text-slate-800">
-                    {ad.title}
-                  </h3>
+    <button
+      type="button"
+      onClick={() => navigate(`/ad/${ad.id}`)}
+      className="block w-full text-right"
+    >
+      {ad.images[0] ? (
+        <img
+          src={ad.images[0]}
+          alt={ad.title}
+          className="h-36 w-full object-cover sm:h-48"
+        />
+      ) : (
+        <div className="flex h-36 items-center justify-center bg-slate-100 text-slate-400 sm:h-48">
+          لا توجد صورة
+        </div>
+      )}
 
-                  <p className="mt-2 font-black text-emerald-700">
-                    {ad.price == null
-                      ? "السعر عند التواصل"
-                      : `${ad.price.toLocaleString("en-US")} ${
-                          ad.currency ?? ""
-                        }`}
-                  </p>
+      <div className="p-3">
+        <div className="mb-1 flex flex-wrap gap-1">
+          {ad.is_featured && (
+            <span className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-bold text-amber-700">
+              مميز
+            </span>
+          )}
 
-                  <p className="mt-1 text-xs text-slate-400">
-                    {ad.category_name}
-                    {ad.city_name ? ` • ${ad.city_name}` : ""}
-                  </p>
-                </div>
-              </button>
-            ))}
+          <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] text-slate-600">
+            {ad.condition === "new"
+              ? "جديد"
+              : ad.condition === "used"
+              ? "مستعمل"
+              : ""}
+          </span>
+        </div>
+
+        <h3 className="line-clamp-2 min-h-10 text-sm font-bold text-slate-800">
+          {ad.title}
+        </h3>
+
+        <p className="mt-2 font-black text-emerald-700">
+          {ad.price == null
+            ? "السعر عند التواصل"
+            : `${ad.price.toLocaleString("en-US")} ${
+                ad.currency ?? ""
+              }`}
+        </p>
+
+        <p className="mt-1 text-xs text-slate-400">
+          {ad.category_name}
+          {ad.city_name ? ` • ${ad.city_name}` : ""}
+        </p>
+      </div>
+    </button>
+  </div>
+))}
+
           </div>
         )}
       </div>
+              {closingAdId && (
+  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4">
+    <div
+      dir="rtl"
+      className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+    >
+      <div className="mb-3 flex items-center gap-2">
+        <X className="text-red-600" size={22} />
+        <h3 className="text-lg font-black text-slate-900">
+          إغلاق الإعلان
+        </h3>
+      </div>
+
+      <p className="mb-5 text-sm leading-7 text-slate-600">
+        هل أنت متأكد من إغلاق هذا الإعلان؟ سيختفي من المتجر والسوق، ولن يتم حذفه نهائياً.
+      </p>
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={isClosingAd}
+          onClick={() => setClosingAdId(null)}
+          className="flex-1 rounded-xl bg-slate-100 px-4 py-3 text-sm font-bold text-slate-700 disabled:opacity-50"
+        >
+          إلغاء
+        </button>
+
+        <button
+          type="button"
+          disabled={isClosingAd}
+          onClick={confirmCloseAd}
+          className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+        >
+          {isClosingAd ? "جارٍ الإغلاق..." : "تأكيد الإغلاق"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </main>
   );
 }

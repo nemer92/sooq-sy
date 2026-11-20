@@ -29,6 +29,8 @@ import {
   UserRound,
   MapPin,
   Tag,
+  Coins,
+  Wallet,
   Plus,
   Image as ImageIcon,
   Hash,
@@ -138,6 +140,20 @@ type SubscriptionPaymentRequest = {
   duration_months?: number;
   user_name?: string;
 };
+
+type PointsCampaignRequest = {
+  id: string;
+  user_id: string;
+  ad_id: string | null;
+  points_cost: number;
+  status: string;
+  created_at: string;
+  admin_note: string | null;
+  reviewed_at: string | null;
+  user_name?: string;
+  ad_title?: string;
+};
+
 type StoreSubscriptionRequest = {
   id: string;
   store_id: string;
@@ -279,6 +295,8 @@ const [subscriptionRequestsError, setSubscriptionRequestsError] = useState("");
 const [campaignRequests, setCampaignRequests] = useState<SubscriptionPaymentRequest[]>([]);
 const [campaignRequestsLoading, setCampaignRequestsLoading] = useState(false);
 const [campaignRequestsError, setCampaignRequestsError] = useState("");
+const [pointsCampaignRequests, setPointsCampaignRequests] =
+  useState<PointsCampaignRequest[]>([]);
 const [storeRequests, setStoreRequests] = useState<StoreSubscriptionRequest[]>([]);
 const [storeRequestsLoading, setStoreRequestsLoading] = useState(false);
 const [storeRequestsError, setStoreRequestsError] = useState("");
@@ -359,6 +377,169 @@ rejected: reports.filter((r) => r.status === "rejected").length,
   
 
   const [userAds, setUserAds] = useState<UserAd[]>([]);  const [userAdsLoading, setUserAdsLoading] = useState(false);
+  // شحن النقاط - إدارة الباقات
+type PointPackage = {
+  id: string;
+  name: string;
+  price_usd: number;
+  points: number;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+};
+
+type PointTopupRequest = {
+  id: string;
+  user_id: string;
+  package_id: string;
+  amount_usd: number;
+  points: number;
+  phone: string;
+  exchange_rate: number;
+  amount_syp: number;
+  status: "pending" | "approved" | "rejected";
+  admin_note: string | null;
+  created_at: string;
+};
+
+const [pointPackages, setPointPackages] = useState<PointPackage[]>([]);
+const [pointPackagesLoading, setPointPackagesLoading] = useState(false);
+const [pointPackagesError, setPointPackagesError] = useState("");
+const [pointPackagesSuccess, setPointPackagesSuccess] = useState("");
+
+const [editingPointPackage, setEditingPointPackage] =
+  useState<PointPackage | null>(null);
+const [pointPackageName, setPointPackageName] = useState("");
+const [pointPackagePrice, setPointPackagePrice] = useState("");
+const [pointPackageSortOrder, setPointPackageSortOrder] = useState("0");
+const [pointPackageSaving, setPointPackageSaving] = useState(false);
+
+const [pointTopupRequests, setPointTopupRequests] =
+  useState<PointTopupRequest[]>([]);
+const [pointTopupRequestsLoading, setPointTopupRequestsLoading] =
+  useState(false);
+const [pointTopupRequestsError, setPointTopupRequestsError] = useState("");
+const [pointTopupActionLoading, setPointTopupActionLoading] =
+  useState<string | null>(null);
+const [pointTopupAdminNote, setPointTopupAdminNote] = useState("");
+
+const resetPointPackageForm = () => {
+  setEditingPointPackage(null);
+  setPointPackageName("");
+  setPointPackagePrice("");
+  setPointPackageSortOrder("0");
+};
+
+const handleSavePointPackage = async () => {
+  const name = pointPackageName.trim();
+  const price = Number(pointPackagePrice);
+  const sortOrder = Number(pointPackageSortOrder);
+
+  if (!name || !Number.isFinite(price) || price <= 0) {
+    setPointPackagesError("أدخل اسم الباقة وسعراً صحيحاً.");
+    return;
+  }
+
+  if (!Number.isFinite(sortOrder)) {
+    setPointPackagesError("ترتيب الباقة غير صحيح.");
+    return;
+  }
+
+  setPointPackageSaving(true);
+  setPointPackagesError("");
+  setPointPackagesSuccess("");
+
+  try {
+    const payload = {
+      name,
+      price_usd: price,
+      points: Math.round(price * 10),
+      sort_order: sortOrder,
+    };
+
+    const query = editingPointPackage
+      ? supabase
+          .from("point_packages")
+          .update(payload)
+          .eq("id", editingPointPackage.id)
+      : supabase
+          .from("point_packages")
+          .insert({ ...payload, is_active: true });
+
+    const { error } = await query;
+
+    if (error) throw error;
+
+    setPointPackagesSuccess("تم حفظ الباقة بنجاح.");
+    resetPointPackageForm();
+    await loadPointPackages();
+  } catch (err) {
+    setPointPackagesError(
+      err instanceof Error ? err.message : "تعذر حفظ الباقة."
+    );
+  } finally {
+    setPointPackageSaving(false);
+  }
+};
+
+const handleTogglePointPackage = async (pkg: PointPackage) => {
+  setPointPackagesError("");
+  setPointPackagesSuccess("");
+
+  const { error } = await supabase
+    .from("point_packages")
+    .update({ is_active: !pkg.is_active })
+    .eq("id", pkg.id);
+
+  if (error) {
+    setPointPackagesError(error.message);
+    return;
+  }
+
+  setPointPackagesSuccess("تم تحديث حالة الباقة.");
+  await loadPointPackages();
+};
+
+const handlePointTopupAction = async (
+  request: PointTopupRequest,
+  action: "approve" | "reject"
+) => {
+  if (request.status !== "pending") return;
+
+  const confirmed = window.confirm(
+    action === "approve"
+      ? "هل أنت متأكد من الموافقة على طلب الشحن وإضافة النقاط؟"
+      : "هل أنت متأكد من رفض طلب الشحن؟"
+  );
+
+  if (!confirmed) return;
+
+  setPointTopupActionLoading(request.id);
+  setPointTopupRequestsError("");
+
+  try {
+    const { error } = await supabase.rpc(
+      action === "approve"
+        ? "approve_point_topup"
+        : "reject_point_topup",
+      {
+        p_request_id: request.id,
+        p_admin_note: pointTopupAdminNote.trim() || null,
+      }
+    );
+
+    if (error) throw error;
+
+    setPointTopupAdminNote("");
+    await loadPointTopupRequests();
+  } catch (err) {
+    setPointTopupRequestsError(
+      err instanceof Error ? err.message : "تعذر تنفيذ العملية."
+    );
+  } finally {
+    setPointTopupActionLoading(null);
+  }
+};
 
   // التحقق من صلاحيات المدير
   async function verifyAdmin(userId: string, userEmail?: string) {
@@ -421,6 +602,57 @@ rejected: reports.filter((r) => r.status === "rejected").length,
       active = false;
     };
   }, []);
+
+  const loadPointPackages = async () => {
+  setPointPackagesLoading(true);
+  setPointPackagesError("");
+
+  try {
+    const { data, error } = await supabase
+      .from("point_packages")
+      .select("*")
+      .order("sort_order", { ascending: true });
+
+    if (error) throw error;
+
+    setPointPackages(data || []);
+  } catch (err) {
+    setPointPackagesError(
+      err instanceof Error ? err.message : "تعذر تحميل الباقات."
+    );
+  } finally {
+    setPointPackagesLoading(false);
+  }
+};
+
+const loadPointTopupRequests = async () => {
+  setPointTopupRequestsLoading(true);
+  setPointTopupRequestsError("");
+
+  try {
+    const { data, error } = await supabase
+      .from("point_topup_requests")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    setPointTopupRequests(data || []);
+  } catch (err) {
+    setPointTopupRequestsError(
+      err instanceof Error ? err.message : "تعذر تحميل طلبات الشحن."
+    );
+  } finally {
+    setPointTopupRequestsLoading(false);
+  }
+};
+
+useEffect(() => {
+  if (activeMenu !== "شحن النقاط" || !admin) return;
+
+  loadPointPackages();
+  loadPointTopupRequests();
+}, [activeMenu, admin]);
 
 // تسجيل الدخول برقم الموبايل
 async function handleLogin(
@@ -1116,18 +1348,45 @@ const loadCampaignRequests = useCallback(async () => {
   setCampaignRequestsError("");
 
   try {
-    const { data, error } = await supabase
-      .from("subscription_payment_requests")
-      .select("*")
-      .eq("request_type", "featured_campaign")
-      .order("created_at", { ascending: false });
+    const [
+      { data: cashData, error: cashError },
+      { data: pointsData, error: pointsError },
+    ] = await Promise.all([
+      supabase
+        .from("subscription_payment_requests")
+        .select("*")
+        .eq("request_type", "featured_campaign")
+        .order("created_at", { ascending: false }),
 
-    if (error) throw error;
+      supabase
+        .from("featured_ad_campaigns")
+        .select(
+          "id, user_id, ad_id, points_cost, status, created_at, admin_note, reviewed_at"
+        )
+        .is("payment_request_id", null)
+        .not("points_transaction_id", "is", null)
+        .order("created_at", { ascending: false }),
+    ]);
 
-    const requests = (data ?? []) as SubscriptionPaymentRequest[];
+    if (cashError) throw cashError;
+    if (pointsError) throw pointsError;
+
+    const cashRequests = (cashData ?? []) as SubscriptionPaymentRequest[];
+    const pointsRequests = (pointsData ?? []) as PointsCampaignRequest[];
 
     const userIds = [
-      ...new Set(requests.map((request) => request.user_id)),
+      ...new Set([
+        ...cashRequests.map((request) => request.user_id),
+        ...pointsRequests.map((request) => request.user_id),
+      ]),
+    ];
+
+    const adIds = [
+      ...new Set(
+        pointsRequests
+          .map((request) => request.ad_id)
+          .filter((id): id is string => Boolean(id))
+      ),
     ];
 
     let profiles: {
@@ -1135,17 +1394,34 @@ const loadCampaignRequests = useCallback(async () => {
       display_name: string | null;
     }[] = [];
 
-    if (userIds.length > 0) {
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, display_name")
-        .in("id", userIds);
+    let ads: {
+      id: string;
+      title: string;
+    }[] = [];
 
-      if (profilesError) throw profilesError;
-      profiles = profilesData ?? [];
-    }
+    const [profilesResult, adsResult] = await Promise.all([
+      userIds.length > 0
+        ? supabase
+            .from("profiles")
+            .select("id, display_name")
+            .in("id", userIds)
+        : Promise.resolve({ data: [], error: null }),
 
-    const enrichedRequests = requests.map((request) => {
+      adIds.length > 0
+        ? supabase
+            .from("ads")
+            .select("id, title")
+            .in("id", adIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (profilesResult.error) throw profilesResult.error;
+    if (adsResult.error) throw adsResult.error;
+
+    profiles = profilesResult.data ?? [];
+    ads = adsResult.data ?? [];
+
+    const enrichedCashRequests = cashRequests.map((request) => {
       const profile = profiles.find(
         (item) => item.id === request.user_id
       );
@@ -1156,7 +1432,24 @@ const loadCampaignRequests = useCallback(async () => {
       };
     });
 
-    setCampaignRequests(enrichedRequests);
+    const enrichedPointsRequests = pointsRequests.map((request) => {
+      const profile = profiles.find(
+        (item) => item.id === request.user_id
+      );
+
+      const ad = ads.find(
+        (item) => item.id === request.ad_id
+      );
+
+      return {
+        ...request,
+        user_name: profile?.display_name ?? "مستخدم غير معروف",
+        ad_title: ad?.title ?? "إعلان غير متوفر",
+      };
+    });
+
+    setCampaignRequests(enrichedCashRequests);
+    setPointsCampaignRequests(enrichedPointsRequests);
   } catch (err) {
     console.error("Error loading campaign requests:", err);
     setCampaignRequestsError("تعذر تحميل طلبات حملات التمييز.");
@@ -1521,6 +1814,63 @@ const approveCampaignRequest = async (requestId: string) => {
   );
 }
  finally {
+    setCampaignRequestsLoading(false);
+  }
+};
+
+const approvePointsCampaignRequest = async (campaignId: string) => {
+  const confirmed = await window.sooqConfirm(
+    "هل تريد الموافقة على حملة التمييز؟ ستبدأ الحملة لمدة 10 أيام."
+  );
+
+  if (!confirmed) return;
+
+  setCampaignRequestsLoading(true);
+
+  try {
+    const { error } = await supabase.rpc(
+      "approve_featured_campaign_points",
+      { p_campaign_id: campaignId }
+    );
+
+    if (error) throw error;
+
+    alert("تمت الموافقة على حملة التمييز وتفعيلها بنجاح.");
+    await loadCampaignRequests();
+  } catch (err: any) {
+    console.error("Error approving points campaign:", err);
+    alert(err?.message || "تعذرت الموافقة على الحملة.");
+  } finally {
+    setCampaignRequestsLoading(false);
+  }
+};
+
+const rejectPointsCampaignRequest = async (campaignId: string) => {
+  const adminNote = await window.sooqPrompt(
+    "اكتب سبب رفض طلب حملة التمييز:"
+  );
+
+  if (!adminNote || !adminNote.trim()) return;
+
+  setCampaignRequestsLoading(true);
+
+  try {
+    const { error } = await supabase.rpc(
+      "reject_featured_campaign_points",
+      {
+        p_campaign_id: campaignId,
+        p_admin_note: adminNote.trim(),
+      }
+    );
+
+    if (error) throw error;
+
+    alert("تم رفض الحملة وإعادة النقاط إلى رصيد المستخدم.");
+    await loadCampaignRequests();
+  } catch (err: any) {
+    console.error("Error rejecting points campaign:", err);
+    alert(err?.message || "تعذر رفض طلب الحملة.");
+  } finally {
     setCampaignRequestsLoading(false);
   }
 };
@@ -3118,6 +3468,10 @@ function getSubCategories(categoryId: number) {
   icon: Megaphone,
 },
 {
+  label: "شحن النقاط",
+  icon: Coins,
+},
+{
   label: "طلبات المتاجر",
   icon: Store,
 },
@@ -3697,7 +4051,144 @@ function getSubCategories(categoryId: number) {
 </div>
 </>
 )}
+{/* طلبات حملات التمييز بالنقاط */}
+<div className="mt-8 space-y-5" dir="rtl">
+  <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
+    <h2 className="text-lg font-black text-slate-800">
+      طلبات حملات التمييز بالنقاط
+    </h2>
+    <p className="mt-1 text-sm text-slate-500">
+      مراجعة طلبات المستخدمين والموافقة عليها أو رفضها
+    </p>
+  </div>
 
+  {campaignRequestsLoading ? (
+    <div className="rounded-2xl border bg-white p-6 text-center text-sm text-slate-500">
+      جارٍ تحميل الطلبات...
+    </div>
+  ) : pointsCampaignRequests.length === 0 ? (
+    <div className="rounded-2xl border border-dashed bg-white p-8 text-center">
+      <p className="font-bold text-slate-700">
+        لا توجد طلبات حملات بالنقاط حالياً
+      </p>
+    </div>
+  ) : (
+    <div className="grid grid-cols-1 gap-4">
+      {pointsCampaignRequests.map((request) => (
+        <div
+          key={request.id}
+          className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm"
+        >
+          <div className="flex flex-col gap-2 border-b bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs text-slate-500">رقم الطلب</p>
+              <p className="mt-1 break-all text-sm font-bold text-slate-700" dir="ltr">
+                {request.id}
+              </p>
+            </div>
+
+            {request.status === "pending_ad_approval" ? (
+              <span className="w-fit rounded-full bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800">
+                بانتظار موافقة الإدارة
+              </span>
+            ) : request.status === "active" ? (
+              <span className="w-fit rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                الحملة مفعّلة
+              </span>
+            ) : request.status === "completed" ? (
+              <span className="w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">
+                مكتملة
+              </span>
+            ) : request.status === "cancelled" ? (
+              <span className="w-fit rounded-full bg-red-100 px-3 py-1.5 text-xs font-bold text-red-700">
+                مرفوضة أو ملغاة
+              </span>
+            ) : (
+              <span className="w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">
+                {request.status}
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-4 p-4 sm:p-5">
+            <div>
+              <p className="text-xs text-slate-500">المستخدم</p>
+              <p className="mt-1 font-bold text-slate-800">
+                {request.user_name || "مستخدم غير معروف"}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500">الإعلان</p>
+              <p className="mt-1 font-bold text-slate-800">
+                {request.ad_title || "إعلان غير متوفر"}
+              </p>
+              {request.ad_id && (
+                <p className="mt-1 break-all text-xs text-slate-400" dir="ltr">
+                  {request.ad_id}
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+              <p className="text-sm text-emerald-700">
+                النقاط المخصومة للحملة
+              </p>
+              <p className="mt-1 text-2xl font-black text-emerald-800">
+                {Number(request.points_cost).toLocaleString("en-US")} نقطة
+              </p>
+            </div>
+
+            <div className="border-t pt-3">
+              <p className="text-xs text-slate-500">تاريخ تقديم الطلب</p>
+              <p className="mt-1 text-sm font-medium text-slate-700">
+                {formatDate(request.created_at)}
+              </p>
+            </div>
+
+            {request.admin_note && (
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-xs font-bold text-slate-500">
+                  ملاحظة الإدارة
+                </p>
+                <p className="mt-1 text-sm text-slate-700">
+                  {request.admin_note}
+                </p>
+              </div>
+            )}
+
+            {request.status === "pending_ad_approval" ? (
+              <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
+                <button
+                  type="button"
+                  disabled={campaignRequestsLoading}
+                  onClick={() => approvePointsCampaignRequest(request.id)}
+                  className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  <CheckCircle size={18} className="ml-2" />
+                  موافقة وتفعيل الحملة
+                </button>
+
+                <button
+                  type="button"
+                  disabled={campaignRequestsLoading}
+                  onClick={() => rejectPointsCampaignRequest(request.id)}
+                  className="min-h-12 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                >
+                  رفض الطلب وإعادة النقاط
+                </button>
+              </div>
+            ) : (
+              <div className="border-t pt-3 text-center text-sm text-slate-400">
+                تمت مراجعة هذا الطلب
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
 {/* طلبات المتاجر */}
 {activeMenu === "طلبات المتاجر" && (
   <>
@@ -5581,32 +6072,349 @@ onClick={() => {
   </div>
 )}
 
-          {/* الأقسام التي لم يتم تجهيزها بعد */}
-            {![
-              "الرئيسية",
-              "مراجعة الإعلانات",
-              "طلبات المتاجر",
-              "إدارة المتاجر",
-              "التبرعات",
-              "المستخدمون",
-              "التصنيفات",
-              "المدن",
-              "إدارة المدن",
-              "البلاغات",
-              "إدارة الإعلانات",
-              "الإعلانات المؤرشفة",
-              "الإعدادات",
-            ].includes(activeMenu) && (
-            <div className="empty-state">
-              <div className="empty-icon">
-                <Eye size={30} />
+{/* قسم شحن النقاط */}
+{activeMenu === "شحن النقاط" && (
+  <div className="space-y-6">
+
+    {/* إدارة الباقات */}
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+            <Coins className="text-amber-500" />
+            إدارة باقات النقاط
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            أضف الباقات وعدّل أسعارها ورتّب ظهورها للمستخدمين.
+          </p>
+        </div>
+      </div>
+
+      {pointPackagesError && (
+        <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">
+          {pointPackagesError}
+        </div>
+      )}
+
+      {pointPackagesSuccess && (
+        <div className="mb-4 rounded-xl bg-green-50 p-3 text-sm text-green-700">
+          {pointPackagesSuccess}
+        </div>
+      )}
+
+      <div className="mb-6 grid gap-3 rounded-xl bg-gray-50 p-4 md:grid-cols-4">
+        <input
+          value={pointPackageName}
+          onChange={(e) => setPointPackageName(e.target.value)}
+          placeholder="اسم الباقة"
+          className="rounded-xl border border-gray-200 bg-white px-3 py-2 outline-none focus:border-amber-400"
+        />
+
+        <input
+          type="number"
+          min="0.1"
+          step="0.1"
+          value={pointPackagePrice}
+          onChange={(e) => setPointPackagePrice(e.target.value)}
+          placeholder="السعر بالدولار"
+          className="rounded-xl border border-gray-200 bg-white px-3 py-2 outline-none focus:border-amber-400"
+        />
+
+        <input
+          type="number"
+          value={pointPackageSortOrder}
+          onChange={(e) => setPointPackageSortOrder(e.target.value)}
+          placeholder="ترتيب الظهور"
+          className="rounded-xl border border-gray-200 bg-white px-3 py-2 outline-none focus:border-amber-400"
+        />
+
+        <button
+          type="button"
+          onClick={handleSavePointPackage}
+          disabled={pointPackageSaving}
+          className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2 font-semibold text-white transition hover:bg-amber-600 disabled:opacity-50"
+        >
+          {pointPackageSaving ? (
+            <LoaderCircle className="animate-spin" size={18} />
+          ) : (
+            <Plus size={18} />
+          )}
+          {editingPointPackage ? "حفظ التعديلات" : "إضافة باقة"}
+        </button>
+
+        {editingPointPackage && (
+          <button
+            type="button"
+            onClick={resetPointPackageForm}
+            className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-gray-600 md:col-span-4"
+          >
+            إلغاء التعديل
+          </button>
+        )}
+      </div>
+
+      <div className="mb-4 text-sm text-gray-500">
+        النقاط تُحسب تلقائياً: كل دولار = 10 نقاط.
+      </div>
+
+      {pointPackagesLoading ? (
+        <div className="flex justify-center py-8">
+          <LoaderCircle className="animate-spin text-amber-500" size={28} />
+        </div>
+      ) : pointPackages.length === 0 ? (
+        <p className="py-8 text-center text-gray-500">
+          لا توجد باقات حتى الآن.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {pointPackages.map((pkg) => (
+            <div
+              key={pkg.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-100 p-4"
+            >
+              <div>
+                <h3 className="font-bold text-gray-800">{pkg.name}</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {Number(pkg.price_usd).toFixed(2)} دولار
+                  {" · "}
+                  {pkg.points} نقطة
+                </p>
               </div>
 
-              <h3>{activeMenu}</h3>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    pkg.is_active
+                      ? "bg-green-50 text-green-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {pkg.is_active ? "نشطة" : "متوقفة"}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingPointPackage(pkg);
+                    setPointPackageName(pkg.name);
+                    setPointPackagePrice(String(pkg.price_usd));
+                    setPointPackageSortOrder(String(pkg.sort_order));
+                    setPointPackagesError("");
+                    setPointPackagesSuccess("");
+                  }}
+                  className="rounded-lg bg-blue-50 p-2 text-blue-600 hover:bg-blue-100"
+                  title="تعديل الباقة"
+                >
+                  <Pencil size={17} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleTogglePointPackage(pkg)}
+                  className={`rounded-lg p-2 ${
+                    pkg.is_active
+                      ? "bg-red-50 text-red-600 hover:bg-red-100"
+                      : "bg-green-50 text-green-600 hover:bg-green-100"
+                  }`}
+                  title={pkg.is_active ? "إيقاف الباقة" : "تفعيل الباقة"}
+                >
+                  {pkg.is_active ? (
+                    <XCircle size={17} />
+                  ) : (
+                    <CheckCircle size={17} />
+                  )}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
 
 
+{/* طلبات شحن النقاط */}
+<div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+  <div className="mb-5">
+    <h2 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+      <Wallet className="text-green-600" />
+      طلبات شحن النقاط
+    </h2>
+    <p className="mt-1 text-sm text-gray-500">
+      راجع التحويلات اليدوية ووافق على الطلب أو ارفضه.
+    </p>
+  </div>
+
+  {pointTopupRequestsError && (
+    <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-600">
+      {pointTopupRequestsError}
+    </div>
+  )}
+
+  <textarea
+    value={pointTopupAdminNote}
+    onChange={(e) => setPointTopupAdminNote(e.target.value)}
+    placeholder="ملاحظة إدارية اختيارية للطلب..."
+    rows={2}
+    className="mb-5 w-full rounded-xl border border-gray-200 p-3 outline-none focus:border-green-400"
+  />
+
+  {pointTopupRequestsLoading ? (
+    <div className="flex justify-center py-8">
+      <LoaderCircle className="animate-spin text-green-600" size={28} />
+    </div>
+  ) : pointTopupRequests.length === 0 ? (
+    <p className="py-8 text-center text-gray-500">
+      لا توجد طلبات شحن حتى الآن.
+    </p>
+  ) : (
+    <div className="space-y-4">
+      {pointTopupRequests.map((request) => (
+        <div
+          key={request.id}
+          className="rounded-xl border border-gray-100 p-4"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-bold text-gray-800">
+                طلب شحن نقاط جديد
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
+                المستخدم: {request.user_id}
+              </p>
+              <p className="text-sm text-gray-500">
+                رقم الهاتف: {request.phone || "غير متوفر"}
+              </p>
+            </div>
+
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                request.status === "approved"
+                  ? "bg-green-50 text-green-700"
+                  : request.status === "rejected"
+                  ? "bg-red-50 text-red-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {request.status === "approved"
+                ? "مقبول"
+                : request.status === "rejected"
+                ? "مرفوض"
+                : "قيد المراجعة"}
+            </span>
+          </div>
+
+          {/* عدد النقاط المطلوبة */}
+          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4">
+            <p className="text-sm font-medium text-green-700">
+              عدد النقاط المطلوبة
+            </p>
+            <p className="mt-1 text-3xl font-extrabold text-green-700">
+              {Number(request.points).toLocaleString("en-US")}
+              <span className="mr-2 text-base font-semibold">نقطة</span>
+            </p>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-gray-50 p-3 text-sm md:grid-cols-3">
+            <div>
+              <p className="text-gray-500">المبلغ بالدولار</p>
+              <p className="font-bold">
+                {Number(request.amount_usd).toFixed(2)} $
+              </p>
+            </div>
+
+            <div>
+              <p className="text-gray-500">المبلغ بالليرة</p>
+              <p className="font-bold">
+                {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+              </p>
+            </div>
+
+            <div>
+              <p className="text-gray-500">سعر الصرف</p>
+              <p className="font-bold">
+                {Number(request.exchange_rate).toLocaleString("en-US")}
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs text-gray-400">
+            تاريخ الطلب:{" "}
+            {new Date(request.created_at).toLocaleString("ar")}
+          </p>
+
+          {request.admin_note && (
+            <p className="mt-2 rounded-lg bg-gray-50 p-3 text-sm text-gray-600">
+              ملاحظة الإدارة: {request.admin_note}
+            </p>
+          )}
+
+          {request.status === "pending" && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={pointTopupActionLoading === request.id}
+                onClick={() =>
+                  handlePointTopupAction(request, "approve")
+                }
+                className="flex items-center gap-2 rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {pointTopupActionLoading === request.id ? (
+                  <LoaderCircle size={16} className="animate-spin" />
+                ) : (
+                  <CheckCircle size={16} />
+                )}
+                موافقة وإضافة النقاط
+              </button>
+
+              <button
+                type="button"
+                disabled={pointTopupActionLoading === request.id}
+                onClick={() =>
+                  handlePointTopupAction(request, "reject")
+                }
+                className="flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50"
+              >
+                <XCircle size={16} />
+                رفض الطلب
+              </button>
             </div>
           )}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
+  </div>
+)}
+
+{/* الأقسام التي لم يتم تجهيزها بعد */}
+{![
+  "الرئيسية",
+  "مراجعة الإعلانات",
+  "طلبات الاشتراك",
+  "طلبات المتاجر",
+  "إدارة المتاجر",
+  "طلبات توثيق الحسابات",
+  "التبرعات",
+  "المستخدمون",
+  "التصنيفات",
+  "المدن",
+  "إدارة المدن",
+  "البلاغات",
+  "إدارة الإعلانات",
+  "الإعلانات المؤرشفة",
+  "الإعدادات",
+  "الإشعارات",
+  "شحن النقاط",
+].includes(activeMenu) && (
+  <div className="empty-state">
+    <div className="empty-icon">
+      <Eye size={30} />
+    </div>
+    <h3>{activeMenu}</h3>
+  </div>
+)}
         </section>
       </main>
 

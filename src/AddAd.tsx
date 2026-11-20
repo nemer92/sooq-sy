@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Sparkles,
   RefreshCw,
+  Star,
 } from "lucide-react";
 
 type Category = {
@@ -24,9 +25,15 @@ type Category = {
   parent_id: number | null;
 };
 
+type Governorate = {
+  id: number;
+  name_ar: string;
+};
+
 type City = {
   id: number;
   name_ar: string;
+  governorate_id: number;
 };
 
 type StoreOption = {
@@ -42,6 +49,9 @@ type StoreQuota = {
   used: number;
   limit: number;
   remaining: number;
+  featuredUsed: number;
+  featuredLimit: number;
+  featuredRemaining: number;
   endAt: string | null;
 };
 
@@ -58,15 +68,18 @@ export default function AddAd() {
 
   const [userId, setUserId] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
+  const [governorates, setGovernorates] = useState<Governorate[]>([]);
   const [cities, setCities] = useState<City[]>([]);
   const [stores, setStores] = useState<StoreOption[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState("");
   const [storeQuota, setStoreQuota] = useState<StoreQuota | null>(null);
   const [quotaLoading, setQuotaLoading] = useState(false);
+  const [requestedFeatured, setRequestedFeatured] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [governorateId, setGovernorateId] = useState("");
   const [cityId, setCityId] = useState("");
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -79,12 +92,18 @@ export default function AddAd() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const filteredCities = governorateId
+    ? cities.filter(
+        (city) => city.governorate_id === Number(governorateId)
+      )
+    : [];
+
   async function getStoreQuota(storeId: string): Promise<StoreQuota> {
     const now = new Date().toISOString();
 
     const { data: subscription, error: subscriptionError } = await supabase
       .from("store_subscriptions")
-      .select("id,ordinary_ads_limit,end_at")
+      .select("id,ordinary_ads_limit,featured_ads_limit,end_at")
       .eq("store_id", storeId)
       .eq("status", "active")
       .lte("start_at", now)
@@ -101,26 +120,46 @@ export default function AddAd() {
         used: 0,
         limit: 0,
         remaining: 0,
+        featuredUsed: 0,
+        featuredLimit: 0,
+        featuredRemaining: 0,
         endAt: null,
       };
     }
 
-    const { count, error: usageError } = await supabase
-      .from("store_ad_usage")
-      .select("id", { count: "exact", head: true })
-      .eq("subscription_id", subscription.id)
-      .eq("ad_type", "ordinary");
+    const [
+      { count: ordinaryCount, error: ordinaryError },
+      { count: featuredCount, error: featuredError },
+    ] = await Promise.all([
+      supabase
+        .from("store_ad_usage")
+        .select("id", { count: "exact", head: true })
+        .eq("subscription_id", subscription.id)
+        .eq("ad_type", "ordinary"),
 
-    if (usageError) throw usageError;
+      supabase
+        .from("store_ad_usage")
+        .select("id", { count: "exact", head: true })
+        .eq("subscription_id", subscription.id)
+        .eq("ad_type", "featured"),
+    ]);
 
-    const used = count ?? 0;
+    if (ordinaryError) throw ordinaryError;
+    if (featuredError) throw featuredError;
+
+    const used = ordinaryCount ?? 0;
     const limit = subscription.ordinary_ads_limit ?? 0;
+    const featuredUsed = featuredCount ?? 0;
+    const featuredLimit = subscription.featured_ads_limit ?? 0;
 
     return {
       active: true,
       used,
       limit,
       remaining: Math.max(0, limit - used),
+      featuredUsed,
+      featuredLimit,
+      featuredRemaining: Math.max(0, featuredLimit - featuredUsed),
       endAt: subscription.end_at,
     };
   }
@@ -138,6 +177,12 @@ export default function AddAd() {
     } finally {
       setQuotaLoading(false);
     }
+  }
+
+  function handleGovernorateChange(value: string) {
+    setGovernorateId(value);
+    setCityId("");
+    setError("");
   }
 
   useEffect(() => {
@@ -179,32 +224,46 @@ export default function AddAd() {
           setAllowNewAds(settings.allow_new_ads ?? true);
         }
 
-        const [categoriesResult, citiesResult, storesResult] =
-          await Promise.all([
-            supabase
-              .from("categories")
-              .select("id, name_ar, parent_id")
-              .eq("is_active", true)
-              .order("sort_order", { ascending: true }),
+        const [
+          categoriesResult,
+          governoratesResult,
+          citiesResult,
+          storesResult,
+        ] = await Promise.all([
+          supabase
+            .from("categories")
+            .select("id, name_ar, parent_id")
+            .eq("is_active", true)
+            .order("sort_order", { ascending: true }),
 
-            supabase
-              .from("cities")
-              .select("id, name_ar")
-              .eq("is_active", true)
-              .order("name_ar", { ascending: true }),
+          supabase
+            .from("governorates")
+            .select("id, name_ar")
+            .eq("is_active", true)
+            .order("name_ar", { ascending: true }),
 
-            supabase
-              .from("stores")
-              .select("id,name,status,owner_disabled,admin_disabled")
-              .eq("owner_id", currentUserId)
-              .eq("status", "active")
-              .eq("owner_disabled", false)
-              .eq("admin_disabled", false)
-              .order("created_at", { ascending: false }),
-          ]);
+          supabase
+            .from("cities")
+            .select("id, name_ar, governorate_id")
+            .eq("is_active", true)
+            .order("name_ar", { ascending: true }),
+
+          supabase
+            .from("stores")
+            .select("id,name,status,owner_disabled,admin_disabled")
+            .eq("owner_id", currentUserId)
+            .eq("status", "active")
+            .eq("owner_disabled", false)
+            .eq("admin_disabled", false)
+            .order("created_at", { ascending: false }),
+        ]);
 
         if (categoriesResult.error) {
           throw new Error("تعذر تحميل التصنيفات.");
+        }
+
+        if (governoratesResult.error) {
+          throw new Error("تعذر تحميل المحافظات.");
         }
 
         if (citiesResult.error) {
@@ -229,6 +288,7 @@ export default function AddAd() {
             )
           );
 
+          setGovernorates(governoratesResult.data ?? []);
           setCities(citiesResult.data ?? []);
           setStores(storesResult.data ?? []);
         }
@@ -253,8 +313,11 @@ export default function AddAd() {
 
             if (!quota.active) {
               setError("اشتراك هذا المتجر غير فعّال. يرجى تجديد الاشتراك.");
-            } else if (quota.remaining <= 0) {
-              setError("استهلك المتجر كامل رصيد الإعلانات العادية.");
+            } else if (
+              quota.remaining <= 0 &&
+              quota.featuredRemaining <= 0
+            ) {
+              setError("استهلك المتجر كامل رصيد الإعلانات العادية والمميزة.");
             }
           }
         }
@@ -281,6 +344,7 @@ export default function AddAd() {
   async function handleStoreChange(storeId: string) {
     setSelectedStoreId(storeId);
     setStoreQuota(null);
+    setRequestedFeatured(false);
     setError("");
 
     if (!storeId) return;
@@ -303,8 +367,11 @@ export default function AddAd() {
 
       if (!quota.active) {
         setError("اشتراك هذا المتجر غير فعّال. يرجى تجديد الاشتراك.");
-      } else if (quota.remaining <= 0) {
-        setError("استهلك المتجر كامل رصيد الإعلانات العادية.");
+      } else if (
+        quota.remaining <= 0 &&
+        quota.featuredRemaining <= 0
+      ) {
+        setError("استهلك المتجر كامل رصيد الإعلانات العادية والمميزة.");
       }
     } catch (err) {
       setError(
@@ -380,8 +447,19 @@ export default function AddAd() {
       return;
     }
 
-    if (!categoryId || !cityId) {
-      setError("يرجى اختيار التصنيف والمدينة.");
+    if (!categoryId || !governorateId || !cityId) {
+      setError("يرجى اختيار التصنيف والمحافظة والمدينة.");
+      return;
+    }
+
+    const selectedCity = cities.find(
+      (city) =>
+        city.id === Number(cityId) &&
+        city.governorate_id === Number(governorateId)
+    );
+
+    if (!selectedCity) {
+      setError("المدينة المختارة لا تتبع المحافظة المحددة. يرجى اختيار المدينة من جديد.");
       return;
     }
 
@@ -443,7 +521,12 @@ export default function AddAd() {
           return;
         }
 
-        if (quota.remaining <= 0) {
+        if (requestedFeatured && quota.featuredRemaining <= 0) {
+          setError("لا يوجد رصيد متبقٍ للإعلانات المميزة في هذا المتجر.");
+          return;
+        }
+
+        if (!requestedFeatured && quota.remaining <= 0) {
           setError("لا يوجد رصيد متبقٍ للإعلانات العادية في هذا المتجر.");
           return;
         }
@@ -479,6 +562,7 @@ export default function AddAd() {
           condition,
           status: "pending",
           store_id: selectedStoreId || null,
+          requested_featured: selectedStoreId ? requestedFeatured : false,
         })
         .select("id")
         .single();
@@ -555,6 +639,10 @@ export default function AddAd() {
   const sectionClass =
     "rounded-2xl border border-slate-100 bg-white p-5 shadow-sm sm:p-6";
 
+  const selectedQuotaRemaining = requestedFeatured
+    ? storeQuota?.featuredRemaining ?? 0
+    : storeQuota?.remaining ?? 0;
+
   if (loading) {
     return (
       <main
@@ -608,7 +696,6 @@ export default function AddAd() {
       dir="rtl"
       className="min-h-screen bg-[#f7f9f8] pb-12"
     >
-      {/* الشريط العلوي */}
       <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4 sm:px-6">
           <Link
@@ -633,7 +720,6 @@ export default function AddAd() {
       </header>
 
       <div className="mx-auto max-w-3xl px-4 pt-7 sm:px-6 sm:pt-10">
-        {/* مقدمة الصفحة */}
         <div className="mb-7">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
             <Sparkles size={14} />
@@ -667,7 +753,6 @@ export default function AddAd() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* اختيار المتجر */}
           {listingType === "sale" && stores.length > 0 && (
             <section className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm">
               <div className="flex items-center gap-3 border-b border-emerald-50 bg-emerald-50/60 px-5 py-4">
@@ -713,51 +798,37 @@ export default function AddAd() {
                       <>
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-black text-emerald-800">
-                            رصيد الإعلانات العادية
+                            رصيد المتجر
                           </p>
                           <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700">
                             اشتراك فعّال
                           </span>
                         </div>
 
-                        <div className="mt-3 flex items-end justify-between">
-                          <div>
-                            <p className="text-xs text-slate-500">
-                              الإعلانات المستخدمة
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                          <div className="rounded-lg bg-white/80 p-3">
+                            <p className="text-xs font-bold text-slate-500">
+                              الإعلانات العادية
                             </p>
-                            <p className="mt-1 text-lg font-black text-slate-800">
-                              {storeQuota.used}
-                              <span className="mx-1 text-sm font-medium text-slate-400">
-                                من
-                              </span>
-                              {storeQuota.limit}
-                            </p>
-                          </div>
-
-                          <div className="text-left">
-                            <p className="text-xs text-slate-500">
-                              المتبقي
-                            </p>
-                            <p className="mt-1 text-lg font-black text-emerald-700">
+                            <p className="mt-1 text-base font-black text-slate-800">
                               {storeQuota.remaining}
+                              <span className="mx-1 text-xs font-medium text-slate-400">
+                                متبقي من {storeQuota.limit}
+                              </span>
                             </p>
                           </div>
-                        </div>
 
-                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-100">
-                          <div
-                            className="h-full rounded-full bg-emerald-500 transition-all"
-                            style={{
-                              width: `${
-                                storeQuota.limit > 0
-                                  ? Math.min(
-                                      100,
-                                      (storeQuota.used / storeQuota.limit) * 100
-                                    )
-                                  : 0
-                              }%`,
-                            }}
-                          />
+                          <div className="rounded-lg bg-white/80 p-3">
+                            <p className="text-xs font-bold text-amber-700">
+                              الإعلانات المميزة ⭐
+                            </p>
+                            <p className="mt-1 text-base font-black text-slate-800">
+                              {storeQuota.featuredRemaining}
+                              <span className="mx-1 text-xs font-medium text-slate-400">
+                                متبقي من {storeQuota.featuredLimit}
+                              </span>
+                            </p>
+                          </div>
                         </div>
 
                         {storeQuota.endAt && (
@@ -768,6 +839,85 @@ export default function AddAd() {
                             )}
                           </p>
                         )}
+
+                        <div className="mt-4 border-t border-emerald-100 pt-4">
+                          <p className="mb-3 text-xs font-bold text-slate-600">
+                            اختر نوع الإعلان:
+                          </p>
+
+                          <div className="flex flex-wrap items-center gap-2">
+                            {storeQuota.remaining > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setRequestedFeatured(false)}
+                                aria-pressed={!requestedFeatured}
+                                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${
+                                  !requestedFeatured
+                                    ? "border-emerald-400 bg-emerald-50 text-emerald-800 shadow-sm"
+                                    : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50/50"
+                                }`}
+                              >
+                                <span
+                                  className={`flex h-4 w-4 items-center justify-center rounded border ${
+                                    !requestedFeatured
+                                      ? "border-emerald-600 bg-emerald-600 text-white"
+                                      : "border-slate-300 bg-white"
+                                  }`}
+                                >
+                                  {!requestedFeatured && (
+                                    <CheckCircle2 size={11} strokeWidth={3} />
+                                  )}
+                                </span>
+                                إعلان عادي
+                              </button>
+                            )}
+
+                            {storeQuota.featuredRemaining > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => setRequestedFeatured(true)}
+                                aria-pressed={requestedFeatured}
+                                className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold transition ${
+                                  requestedFeatured
+                                    ? "border-amber-400 bg-amber-50 text-amber-800 shadow-sm"
+                                    : "border-slate-200 bg-white text-slate-600 hover:border-amber-200 hover:bg-amber-50/50"
+                                }`}
+                              >
+                                <span
+                                  className={`flex h-4 w-4 items-center justify-center rounded border ${
+                                    requestedFeatured
+                                      ? "border-amber-500 bg-amber-500 text-white"
+                                      : "border-slate-300 bg-white"
+                                  }`}
+                                >
+                                  {requestedFeatured && (
+                                    <CheckCircle2 size={11} strokeWidth={3} />
+                                  )}
+                                </span>
+                                <Star
+                                  size={13}
+                                  className={
+                                    requestedFeatured
+                                      ? "fill-amber-500 text-amber-500"
+                                      : "text-amber-500"
+                                  }
+                                />
+                                إعلان مميز
+                              </button>
+                            )}
+                          </div>
+
+                          {storeQuota.remaining <= 0 &&
+                            storeQuota.featuredRemaining <= 0 && (
+                              <p className="mt-2 text-xs font-bold text-red-600">
+                                انتهى رصيد الإعلانات العادية والمميزة.
+                              </p>
+                            )}
+
+                          <p className="mt-2 text-[11px] text-slate-400">
+                            سيتم احتساب الرصيد بعد موافقة الإدارة على الإعلان.
+                          </p>
+                        </div>
                       </>
                     ) : (
                       <div className="flex items-center gap-2 text-sm font-bold text-red-600">
@@ -781,7 +931,6 @@ export default function AddAd() {
             </section>
           )}
 
-          {/* تفاصيل الإعلان */}
           <section className={sectionClass}>
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
@@ -846,7 +995,6 @@ export default function AddAd() {
             </div>
           </section>
 
-          {/* التصنيف والموقع */}
           <section className={sectionClass}>
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
@@ -857,7 +1005,7 @@ export default function AddAd() {
                   التصنيف والموقع
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  حدد القسم والمدينة المناسبة لإعلانك
+                  حدد القسم والمحافظة والمدينة المناسبة لإعلانك
                 </p>
               </div>
             </div>
@@ -899,6 +1047,30 @@ export default function AddAd() {
                 <label className={labelClass}>
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin size={15} className="text-slate-400" />
+                    المحافظة
+                  </span>
+                  <span className="mr-1 text-red-500">*</span>
+                </label>
+
+                <select
+                  required
+                  value={governorateId}
+                  onChange={(e) => handleGovernorateChange(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">اختر المحافظة</option>
+                  {governorates.map((governorate) => (
+                    <option key={governorate.id} value={governorate.id}>
+                      {governorate.name_ar}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className={labelClass}>
+                  <span className="inline-flex items-center gap-1.5">
+                    <MapPin size={15} className="text-slate-400" />
                     المدينة
                   </span>
                   <span className="mr-1 text-red-500">*</span>
@@ -908,10 +1080,18 @@ export default function AddAd() {
                   required
                   value={cityId}
                   onChange={(e) => setCityId(e.target.value)}
-                  className={inputClass}
+                  disabled={!governorateId}
+                  className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  <option value="">اختر المدينة</option>
-                  {cities.map((city) => (
+                  <option value="">
+                    {!governorateId
+                      ? "اختر المحافظة أولاً"
+                      : filteredCities.length > 0
+                        ? "اختر المدينة"
+                        : "لا توجد مدن متاحة في هذه المحافظة"}
+                  </option>
+
+                  {filteredCities.map((city) => (
                     <option key={city.id} value={city.id}>
                       {city.name_ar}
                     </option>
@@ -921,7 +1101,6 @@ export default function AddAd() {
             </div>
           </section>
 
-          {/* السعر والحالة */}
           <section className={sectionClass}>
             <div className="mb-5 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
@@ -1024,7 +1203,6 @@ export default function AddAd() {
             </div>
           </section>
 
-          {/* صور الإعلان */}
           <section className={sectionClass}>
             <div className="mb-5 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
@@ -1112,7 +1290,6 @@ export default function AddAd() {
             </p>
           </section>
 
-          {/* رسائل الخطأ والنجاح */}
           {error && (
             <div className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 p-4 text-sm leading-6 text-red-700">
               <AlertCircle size={19} className="mt-0.5 shrink-0" />
@@ -1132,15 +1309,16 @@ export default function AddAd() {
             </div>
           )}
 
-          {/* زر الإرسال */}
           <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
             <button
               type="submit"
               disabled={
                 saving ||
                 quotaLoading ||
+                !governorateId ||
+                !cityId ||
                 (!!selectedStoreId &&
-                  (!storeQuota?.active || storeQuota.remaining <= 0))
+                  (!storeQuota?.active || selectedQuotaRemaining <= 0))
               }
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-emerald-600/15 transition hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-emerald-700/20 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
             >

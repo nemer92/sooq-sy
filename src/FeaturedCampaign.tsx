@@ -11,6 +11,8 @@ import {
   Eye,
   Megaphone,
   CheckCircle2,
+  Coins,
+  Wallet,
 } from "lucide-react";
 
 type Ad = {
@@ -26,17 +28,17 @@ type Governorate = {
 };
 
 const campaignPrices: Record<number, number> = {
-  1: 3,
-  2: 5,
-  3: 7,
-  4: 8,
-  5: 9,
-  6: 10,
-  7: 11,
-  8: 12,
-  9: 13,
-  10: 14,
-  14: 15,
+  1: 30,
+  2: 50,
+  3: 70,
+  4: 80,
+  5: 90,
+  6: 100,
+  7: 110,
+  8: 120,
+  9: 130,
+  10: 140,
+  14: 150,
 };
 
 export default function FeaturedCampaign() {
@@ -50,9 +52,7 @@ export default function FeaturedCampaign() {
   const [governorates, setGovernorates] = useState<Governorate[]>([]);
   const [selectedGovernorates, setSelectedGovernorates] = useState<number[]>([]);
 
-  const [phone, setPhone] = useState("");
-  const [qrUrl, setQrUrl] = useState("");
-  const [exchangeRate, setExchangeRate] = useState(0);
+  const [pointsBalance, setPointsBalance] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [requestId, setRequestId] = useState("");
 
@@ -67,8 +67,10 @@ export default function FeaturedCampaign() {
       return;
     }
 
-    if (!qrUrl) {
-      alert("رمز الدفع غير متوفر حالياً. يرجى التواصل مع الإدارة.");
+    if (pointsBalance < campaignPoints) {
+      alert(
+        `رصيدك غير كافٍ. تحتاج إلى ${campaignPoints} نقطة، ورصيدك الحالي ${pointsBalance} نقطة.`
+      );
       return;
     }
 
@@ -76,7 +78,7 @@ export default function FeaturedCampaign() {
 
     try {
       const { data, error } = await supabase.rpc(
-        "create_featured_campaign_request",
+        "create_featured_campaign_points_request",
         {
           p_ad_id: ad.id,
           p_governorate_ids: selectedGovernorates,
@@ -85,8 +87,25 @@ export default function FeaturedCampaign() {
 
       if (error) throw error;
 
-      setRequestId(data || "");
-      alert("تم إنشاء طلب الحملة بنجاح. يرجى انتظار مراجعة الإدارة.");
+      if (!data) {
+        throw new Error("لم يتم استلام رقم طلب الحملة.");
+      }
+
+      setRequestId(data);
+
+      // Refresh the balance after successful deduction
+      const { data: walletData, error: walletError } = await supabase
+        .from("user_points")
+        .select("balance")
+        .single();
+
+      if (!walletError && walletData) {
+        setPointsBalance(Number(walletData.balance));
+      } else {
+        setPointsBalance((previous) => previous - campaignPoints);
+      }
+
+      alert("تم إرسال طلب الحملة بنجاح، والنقاط خُصمت من رصيدك. بانتظار موافقة الإدارة.");
     } catch (err) {
       console.error("خطأ إنشاء طلب الحملة:", err);
 
@@ -138,8 +157,7 @@ export default function FeaturedCampaign() {
 
         const [
           { data: governoratesData, error: governoratesError },
-          { data: profileData, error: profileError },
-          { data: settingsData, error: settingsError },
+          { data: walletData, error: walletError },
         ] = await Promise.all([
           supabase
             .from("governorates")
@@ -148,35 +166,18 @@ export default function FeaturedCampaign() {
             .order("id"),
 
           supabase
-            .from("private_profiles")
-            .select("phone")
+            .from("user_points")
+            .select("balance")
             .eq("user_id", user.id)
-            .single(),
-
-          supabase
-            .from("site_settings")
-            .select("sham_cash_qr_url, usd_syp_rate")
-            .eq("id", 1)
-            .single(),
+            .maybeSingle(),
         ]);
 
         if (governoratesError) throw governoratesError;
-        if (profileError) throw profileError;
-        if (settingsError) throw settingsError;
-
-        if (!profileData.phone || !/^09[0-9]{8}$/.test(profileData.phone)) {
-          throw new Error("رقم الهاتف المسجل في حسابك غير صالح.");
-        }
-
-        if (!settingsData.usd_syp_rate || settingsData.usd_syp_rate <= 0) {
-          throw new Error("سعر الصرف غير متوفر حالياً.");
-        }
+        if (walletError) throw walletError;
 
         setAd(adData);
         setGovernorates(governoratesData ?? []);
-        setPhone(profileData.phone);
-        setQrUrl(settingsData.sham_cash_qr_url ?? "");
-        setExchangeRate(Number(settingsData.usd_syp_rate));
+        setPointsBalance(Number(walletData?.balance ?? 0));
       } catch (err) {
         setError(
           err instanceof Error
@@ -207,8 +208,8 @@ export default function FeaturedCampaign() {
   }
 
   const selectedCount = selectedGovernorates.length;
-  const amountUsd = campaignPrices[selectedCount] ?? 0;
-  const amountSyp = Math.floor(amountUsd * exchangeRate);
+  const campaignPoints = campaignPrices[selectedCount] ?? 0;
+  const hasEnoughPoints = pointsBalance >= campaignPoints;
 
   if (loading) {
     return (
@@ -260,7 +261,7 @@ export default function FeaturedCampaign() {
 
       <div className="mx-auto max-w-3xl space-y-5 px-4 py-7">
 
-        {/* بطاقة شرح خدمة تمييز الإعلان */}
+        {/* Campaign explanation */}
         <section className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
           <div className="bg-gradient-to-l from-amber-500 to-yellow-400 p-5 text-white">
             <div className="flex items-center gap-3">
@@ -357,7 +358,8 @@ export default function FeaturedCampaign() {
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-emerald-600" />
                 <p className="text-sm leading-7 text-emerald-800">
-                  تبدأ الحملة بعد موافقة الإدارة وتأكيد الدفع، وتستمر لمدة 10 أيام.
+                  يتم خصم النقاط عند إرسال الطلب، وتبدأ الحملة بعد موافقة الإدارة لمدة 10 أيام.
+                  في حال رفض الطلب، تُعاد النقاط إلى رصيدك.
                 </p>
               </div>
             </div>
@@ -368,8 +370,40 @@ export default function FeaturedCampaign() {
           </div>
         </section>
 
+        {/* Points balance */}
+        <section className="rounded-2xl border border-emerald-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 font-bold text-slate-800">
+                <Wallet size={20} className="text-emerald-600" />
+                رصيد نقاطك
+              </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                النقاط المتاحة في محفظتك
+              </p>
+            </div>
 
+            <div className="text-left">
+              <p className="text-2xl font-black text-emerald-700" dir="ltr">
+                {pointsBalance.toLocaleString("en-US")}
+              </p>
+              <span className="text-xs text-slate-500">نقطة</span>
+            </div>
+          </div>
 
+          <button
+            type="button"
+            onClick={() => navigate("/profile")}
+            className="mt-4 w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700"
+          >
+            <span className="inline-flex items-center justify-center gap-2">
+              <Coins size={17} />
+              شحن النقاط
+            </span>
+          </button>
+        </section>
+
+        {/* Governorates */}
         <section className="rounded-2xl border bg-white p-5">
           <h2 className="flex items-center gap-2 font-bold text-slate-800">
             <MapPin size={19} />
@@ -397,7 +431,7 @@ export default function FeaturedCampaign() {
           >
             {selectedGovernorates.length === 14
               ? "إلغاء تحديد جميع المحافظات"
-              : "تحديد جميع المحافظات الـ14 — 15 دولار"}
+              : "تحديد جميع المحافظات الـ14 — 150 نقطة"}
           </button>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -431,6 +465,7 @@ export default function FeaturedCampaign() {
           </p>
         </section>
 
+        {/* Campaign cost */}
         <section className="rounded-2xl border bg-white p-5">
           <h2 className="font-bold text-slate-800">
             ملخص تكلفة الحملة
@@ -448,86 +483,64 @@ export default function FeaturedCampaign() {
             </div>
 
             <div className="flex justify-between">
-              <span className="text-slate-500">السعر بالدولار</span>
-              <strong>{amountUsd ? `$${amountUsd}` : "—"}</strong>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-slate-500">السعر بالليرة السورية</span>
-              <strong>
-                {amountSyp
-                  ? `${amountSyp.toLocaleString("en-US")} ل.س`
+              <span className="text-slate-500">تكلفة الحملة</span>
+              <strong className="text-emerald-700">
+                {campaignPoints
+                  ? `${campaignPoints.toLocaleString("en-US")} نقطة`
                   : "—"}
               </strong>
             </div>
 
-            <p className="border-t pt-3 text-xs text-slate-400">
-              سعر الصرف: {exchangeRate.toLocaleString("en-US")} ليرة لكل دولار
-            </p>
+            <div className="flex justify-between border-t pt-3">
+              <span className="text-slate-500">رصيدك بعد الخصم</span>
+              <strong className={hasEnoughPoints ? "text-emerald-700" : "text-red-600"}>
+                {campaignPoints
+                  ? `${Math.max(0, pointsBalance - campaignPoints).toLocaleString("en-US")} نقطة`
+                  : "—"}
+              </strong>
+            </div>
           </div>
+
+          {campaignPoints > 0 && !hasEnoughPoints && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm leading-6 text-red-700">
+              رصيدك غير كافٍ. تحتاج إلى{" "}
+              <strong>{campaignPoints.toLocaleString("en-US")} نقطة</strong>،
+              والمتوفر لديك{" "}
+              <strong>{pointsBalance.toLocaleString("en-US")} نقطة</strong>.
+              يرجى شحن رصيدك أولاً.
+            </div>
+          )}
         </section>
 
+        {/* Request submission */}
         <section className="rounded-2xl border bg-white p-5">
           <h2 className="font-bold text-slate-800">
-            بيانات الدفع عبر شام كاش
+            تأكيد طلب الحملة
           </h2>
 
-          {qrUrl ? (
-            <img
-              src={qrUrl}
-              alt="رمز الدفع عبر شام كاش"
-              className="mx-auto mt-4 max-h-64 max-w-full rounded-xl border p-2 object-contain"
-            />
-          ) : (
-            <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-700">
-              رمز الدفع غير متوفر حالياً. يرجى التواصل مع الإدارة.
-            </p>
-          )}
-
-          <div className="mt-4 rounded-xl bg-slate-50 p-4">
-            <p className="text-sm text-slate-500">
-              رقم الهاتف المسجل في حسابك
-            </p>
-
-            <p className="mt-1 text-lg font-black text-slate-800" dir="ltr">
-              {phone}
-            </p>
-          </div>
-
-
-
-          <div className="mt-4 rounded-xl border-2 border-red-500 bg-yellow-50 p-4 shadow-sm">
-            <div className="flex items-center gap-2">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
-                <BellRing size={21} />
-              </span>
-              <h3 className="text-base font-black text-red-700">
-                تنبيه مهم جداً عند تحويل مبلغ تمييز الإعلان
-              </h3>
-            </div>
-
-            <p className="mt-3 text-sm font-medium leading-7 text-slate-800">
-              عند إجراء التحويل عبر شام كاش، يجب كتابة رقم الهاتف المسجل في حسابك على Sooq.Sy ضمن خانة الملاحظات أو وصف الحوالة، حتى تتمكن الإدارة من مطابقة الحوالة مع طلب تمييز الإعلان وتأكيد الدفع.
-            </p>
-
-            <p className="mt-3 rounded-lg border border-red-200 bg-red-100 p-3 text-center text-sm font-black text-red-700">
-              لا تنسَ كتابة رقم هاتفك في ملاحظات الحوالة.
-            </p>
-          </div>
+          <p className="mt-2 text-sm leading-7 text-slate-500">
+            سيتم خصم النقاط من رصيدك عند إرسال الطلب. بعد ذلك تراجعه الإدارة،
+            وتبدأ الحملة بعد الموافقة لمدة 10 أيام.
+          </p>
 
           {requestId ? (
             <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
-              <p className="font-bold text-emerald-800">
+              <CheckCircle2 size={32} className="mx-auto text-emerald-600" />
+
+              <p className="mt-2 font-bold text-emerald-800">
                 تم إرسال طلب الحملة بنجاح
               </p>
+
               <p className="mt-2 text-sm text-slate-600">
                 رقم الطلب:
               </p>
+
               <p className="mt-1 break-all text-xs text-slate-500" dir="ltr">
                 {requestId}
               </p>
+
               <p className="mt-3 text-sm text-slate-600">
-                طلبك بانتظار مراجعة الإدارة وتأكيد الدفع.
+                تم خصم النقاط، وطلبك بانتظار مراجعة الإدارة.
               </p>
             </div>
           ) : (
@@ -536,13 +549,15 @@ export default function FeaturedCampaign() {
               onClick={submitCampaignRequest}
               disabled={
                 submitting ||
-                !amountUsd ||
-                !qrUrl ||
-                selectedCount === 0
+                !campaignPoints ||
+                selectedCount === 0 ||
+                !hasEnoughPoints
               }
               className="mt-5 w-full rounded-xl bg-emerald-600 px-5 py-4 font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {submitting ? "جارٍ إرسال الطلب..." : "أكملت التحويل، إرسال طلب الحملة"}
+              {submitting
+                ? "جارٍ إرسال الطلب..."
+                : `إرسال طلب الحملة — ${campaignPoints ? `${campaignPoints} نقطة` : "اختر المحافظات"}`}
             </button>
           )}
         </section>

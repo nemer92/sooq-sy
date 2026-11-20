@@ -39,6 +39,28 @@ type VerificationRequest = {
   created_at: string;
 };
 
+type PointPackage = {
+  id: string;
+  name: string;
+  price_usd: number;
+  points: number;
+  is_active: boolean;
+  sort_order: number;
+};
+
+type PointTopupRequest = {
+  id: string;
+  package_id: string;
+  amount_usd: number;
+  points: number;
+  phone: string;
+  exchange_rate: number;
+  amount_syp: number;
+  status: "pending" | "approved" | "rejected";
+  admin_note: string | null;
+  created_at: string;
+};
+
 export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [savingName, setSavingName] = useState(false);
@@ -51,6 +73,10 @@ export default function Profile() {
   const [userId, setUserId] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [pointsBalance, setPointsBalance] = useState(0);
+  const [pointPackages, setPointPackages] = useState<PointPackage[]>([]);
+const [pointTopupRequests, setPointTopupRequests] = useState<PointTopupRequest[]>([]);
+const [selectedPointPackageId, setSelectedPointPackageId] = useState("");
+const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -214,6 +240,33 @@ export default function Profile() {
     );
   }
 
+  async function loadPointTopupData(id: string) {
+  const [
+    { data: packagesData, error: packagesError },
+    { data: requestsData, error: requestsError },
+  ] = await Promise.all([
+    supabase
+      .from("point_packages")
+      .select("id, name, price_usd, points, is_active, sort_order")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true }),
+
+    supabase
+      .from("point_topup_requests")
+      .select(
+        "id, package_id, amount_usd, points, phone, exchange_rate, amount_syp, status, admin_note, created_at"
+      )
+      .eq("user_id", id)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (packagesError) throw packagesError;
+  if (requestsError) throw requestsError;
+
+  setPointPackages((packagesData || []) as PointPackage[]);
+  setPointTopupRequests((requestsData || []) as PointTopupRequest[]);
+}
+
   async function refreshVerificationData() {
     if (!userId) return;
 
@@ -294,6 +347,7 @@ export default function Profile() {
         loadLocations(profile.city_id ?? null),
         loadSubscription(id),
         loadVerificationData(id),
+        loadPointTopupData(id),
       ]);
     } catch (err) {
       setError(
@@ -358,6 +412,71 @@ export default function Profile() {
       setSubmittingVerification(false);
     }
   }
+
+
+
+async function submitPointTopupRequest() {
+  if (pointTopupSubmitting) return;
+
+  setError("");
+  setMessage("");
+
+  if (!selectedPointPackageId) {
+    setError("يرجى اختيار باقة النقاط.");
+    return;
+  }
+
+  if (!/^09[0-9]{8}$/.test(phone.trim())) {
+    setError("يرجى التأكد من رقم الهاتف المسجل في حسابك.");
+    return;
+  }
+
+  if (exchangeRate <= 0) {
+    setError("سعر الصرف غير متوفر حالياً. يرجى المحاولة لاحقاً.");
+    return;
+  }
+
+  if (pointTopupRequests.some((request) => request.status === "pending")) {
+    setError("لديك طلب شحن قيد المراجعة بالفعل.");
+    return;
+  }
+
+  setPointTopupSubmitting(true);
+
+  try {
+    const { data, error: requestError } = await supabase.rpc(
+      "create_point_topup_request",
+      {
+        p_package_id: selectedPointPackageId,
+      }
+    );
+
+    if (requestError) throw requestError;
+
+    if (!data) {
+      throw new Error("لم يتم إنشاء طلب الشحن. يرجى المحاولة مجدداً.");
+    }
+
+    await loadPointTopupData(userId);
+    setSelectedPointPackageId("");
+
+    setMessage(
+      "تم إرسال طلب شحن النقاط بنجاح. ستتم إضافة النقاط بعد مراجعة الإدارة."
+    );
+  } catch (err: any) {
+    console.error("Point topup submission failed:", err);
+    setError(
+      err?.message ||
+      err?.details ||
+      err?.hint ||
+      "تعذر إرسال طلب الشحن. حاول مرة أخرى."
+    );
+  } finally {
+    setPointTopupSubmitting(false);
+  }
+}
+
+
 
   async function saveProfileDetails() {
     setError("");
@@ -676,7 +795,7 @@ export default function Profile() {
   (!activeVerification || verificationDaysRemaining <= 30);
 
 
-  const verificationAmountSyp = Math.floor(20 * exchangeRate);
+
 
   const inputClass =
     "w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10";
@@ -881,17 +1000,19 @@ export default function Profile() {
             </div>
 
             <div className="p-4 sm:p-5">
-              <div className="mb-4 rounded-xl bg-blue-50 p-4">
-                <p className="text-xs font-semibold text-blue-600">
-                  قيمة الاشتراك
-                </p>
-                <p className="mt-1 text-2xl font-black text-blue-900">
-                  ${subscription.plan.price_usd}
-                  <span className="mr-1 text-sm font-medium text-blue-600">
-                    / شهرياً
-                  </span>
-                </p>
-              </div>
+
+<div className="mb-4 rounded-xl bg-emerald-50 p-4">
+  <p className="text-xs font-semibold text-emerald-700">
+    تكلفة الاشتراك بالنقاط
+  </p>
+  <p className="mt-1 text-2xl font-black text-emerald-900">
+    {Math.round(Number(subscription.plan.price_usd) * 10)}
+    <span className="mr-1 text-sm font-medium text-emerald-700">
+      نقطة / شهرياً
+    </span>
+  </p>
+</div>
+
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
@@ -1194,50 +1315,6 @@ export default function Profile() {
               </div>
             )}
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <h3 className="font-bold text-slate-800">
-                الدفع عبر شام كاش
-              </h3>
-
-              {qrUrl ? (
-                <img
-                  src={qrUrl}
-                  alt="رمز الدفع عبر شام كاش"
-                  className="mx-auto mt-3 max-h-48 max-w-full rounded-lg object-contain"
-                />
-              ) : (
-                <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-                  رمز الدفع غير متوفر حالياً. يرجى مراجعة الإدارة قبل التحويل.
-                </p>
-              )}
-
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <span className="text-sm text-slate-600">
-                  المبلغ المطلوب
-                </span>
-                <strong className="text-lg font-black text-slate-900">
-                  $20
-                </strong>
-              </div>
-
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <span className="text-sm text-slate-600">
-                  ما يعادله بالليرة السورية
-                </span>
-                <strong className="text-base font-bold text-emerald-700">
-                  {exchangeRate > 0
-                    ? `${verificationAmountSyp.toLocaleString("en-US")} ل.س`
-                    : "سعر الصرف غير مضبوط"}
-                </strong>
-              </div>
-
-              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
-                يرجى كتابة رقم الهاتف المسجل في حسابك على Sooq.Sy ضمن ملاحظات
-                الحوالة، حتى تتمكن الإدارة من مطابقة التحويل مع طلب التوثيق.
-                إرسال الطلب لا يعني تفعيل التوثيق تلقائياً؛ التفعيل يتم بعد
-                مراجعة الإدارة.
-              </p>
-            </div>
 
 
             {verificationPending ? (
@@ -1327,7 +1404,230 @@ export default function Profile() {
               يمكنك جمع النقاط من مشاركة الإعلانات ودعوة الأصدقاء.
             </p>
           </div>
+{/* شحن النقاط */}
 
+<div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
+
+  <div className="mb-4 flex items-center gap-2">
+    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+      <Coins size={21} />
+    </div>
+    <div>
+      <h3 className="font-black text-slate-800">شحن رصيد النقاط</h3>
+      <p className="mt-1 text-xs text-slate-500">
+        اختر باقة واشحن رصيدك عبر شام كاش
+      </p>
+    </div>
+  </div>
+
+  {pointPackages.length === 0 ? (
+    <p className="rounded-xl bg-white p-4 text-center text-sm text-slate-500">
+      لا توجد باقات شحن متاحة حالياً.
+    </p>
+  ) : (
+    <>
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        {pointPackages.map((pkg) => {
+          const selected = selectedPointPackageId === pkg.id;
+
+          return (
+            <button
+              key={pkg.id}
+              type="button"
+              onClick={() => setSelectedPointPackageId(pkg.id)}
+              className={`relative flex min-h-[68px] flex-col items-center justify-center rounded-xl border px-2 py-2 text-center transition-all duration-200 active:scale-95 ${
+                selected
+                  ? "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm ring-2 ring-emerald-500/10"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/40"
+              }`}
+            >
+              {selected && (
+                <span className="absolute right-1.5 top-1.5 text-emerald-600">
+                  <CheckCircle2 size={13} />
+                </span>
+              )}
+
+              <span className="max-w-full truncate text-[11px] font-bold">
+                {pkg.name}
+              </span>
+
+              <span className="mt-1 text-base font-black leading-tight text-emerald-700">
+                {Number(pkg.points).toLocaleString("en-US")}
+              </span>
+
+              <span className="mt-0.5 text-[10px] font-semibold text-slate-500">
+                نقطة · ${Number(pkg.price_usd).toFixed(2)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {selectedPointPackageId && (() => {
+        const selectedPackage = pointPackages.find(
+          (pkg) => pkg.id === selectedPointPackageId
+        );
+
+        if (!selectedPackage) return null;
+
+        const amountSyp = Math.floor(
+          Number(selectedPackage.price_usd) * exchangeRate
+        );
+
+        return (
+          <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">الباقة المختارة</span>
+              <strong className="text-slate-800">
+                {selectedPackage.name}
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">النقاط</span>
+              <strong className="text-emerald-700">
+                {selectedPackage.points} نقطة
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">المبلغ بالدولار</span>
+              <strong>${Number(selectedPackage.price_usd).toFixed(2)}</strong>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">المبلغ بالليرة</span>
+              <strong className="text-emerald-700">
+                {amountSyp.toLocaleString("en-US")} ل.س
+              </strong>
+            </div>
+
+            <div className="border-t border-slate-100 pt-3">
+              <h4 className="mb-2 font-bold text-slate-800">
+                الدفع عبر شام كاش
+              </h4>
+
+              {qrUrl ? (
+                <img
+                  src={qrUrl}
+                  alt="رمز الدفع شام كاش"
+                  className="mx-auto max-h-48 max-w-full rounded-xl object-contain"
+                />
+              ) : (
+                <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+                  رمز شام كاش غير متوفر حالياً.
+                </p>
+              )}
+
+              <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs leading-6 text-amber-900">
+                بعد تحويل المبلغ، اكتب رقم الهاتف المسجل في حسابك ضمن ملاحظات
+                حوالة شام كاش حتى تتمكن الإدارة من مطابقة التحويل.
+                لا تحتاج إلى رفع صورة إثبات الدفع.
+              </p>
+
+              <label className="mb-2 mt-3 block text-xs font-bold text-slate-600">
+                رقم الهاتف المسجل في حسابك
+              </label>
+
+              <input
+                type="tel"
+                value={phone}
+                readOnly
+                dir="ltr"
+                className={`${inputClass} bg-slate-100 text-left`}
+              />
+
+              <button
+                type="button"
+                onClick={submitPointTopupRequest}
+                disabled={
+                  pointTopupSubmitting ||
+                  !qrUrl ||
+                  exchangeRate <= 0 ||
+                  !/^09[0-9]{8}$/.test(phone.trim()) ||
+                  pointTopupRequests.some(
+                    (request) => request.status === "pending"
+                  )
+                }
+                className={`${buttonClass} mt-4`}
+              >
+                {pointTopupSubmitting ? (
+                  <LoaderCircle size={18} className="animate-spin" />
+                ) : (
+                  <Coins size={18} />
+                )}
+                {pointTopupSubmitting
+                  ? "جارٍ إرسال الطلب..."
+                  : "تأكيد التحويل وإرسال طلب الشحن"}
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+    </>
+  )}
+</div>
+
+
+{/* سجل طلبات الشحن */}
+<div className="mt-4">
+  <h3 className="mb-3 font-bold text-slate-800">
+    سجل طلبات شحن النقاط
+  </h3>
+
+  {pointTopupRequests.length === 0 ? (
+    <p className="rounded-xl bg-slate-50 p-4 text-center text-xs text-slate-500">
+      لم ترسل أي طلب شحن حتى الآن.
+    </p>
+  ) : (
+    <div className="space-y-2">
+      {pointTopupRequests.map((request) => (
+        <div
+          key={request.id}
+          className="rounded-xl border border-slate-100 bg-white p-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <strong className="text-sm text-slate-800">
+              {request.points} نقطة
+            </strong>
+
+            <span
+              className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                request.status === "approved"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : request.status === "rejected"
+                    ? "bg-red-50 text-red-700"
+                    : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {request.status === "approved"
+                ? "تمت الموافقة"
+                : request.status === "rejected"
+                  ? "مرفوض"
+                  : "قيد المراجعة"}
+            </span>
+          </div>
+
+          <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
+            <span>
+              {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+            </span>
+            <span>
+              {new Date(request.created_at).toLocaleDateString("ar-SY")}
+            </span>
+          </div>
+
+          {request.admin_note && (
+            <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
+              ملاحظة الإدارة: {request.admin_note}
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
           <label className="mb-2 mt-5 block text-sm font-bold text-slate-600">
             رمز الإحالة الخاص بك
           </label>
@@ -1351,7 +1651,7 @@ export default function Profile() {
           </div>
 
           <p className="mt-3 text-xs leading-6 text-slate-500">
-            ادعُ أصدقاءك للتسجيل باستخدام رابطك، واحصل على 20 نقطة عند إنشاء
+            ادعُ أصدقاءك للتسجيل باستخدام رابطك، واحصل على 10 نقطة عند إنشاء
             كل صديق لحسابه بنجاح.
           </p>
         </section>

@@ -19,6 +19,7 @@ import {
   LogOut,
   Gift,
    Share2,
+   Mail,
     Heart,
     Star,
     Trash2,
@@ -106,6 +107,8 @@ export default function Home() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showHelpModal, setShowHelpModal] = useState(false);
+const [helpTab, setHelpTab] = useState<"guide" | "developer">("guide");
 
 const [deleteTarget, setDeleteTarget] = useState<{
   type: "one" | "all";
@@ -1241,22 +1244,43 @@ const matchesCondition = selectedConditions.includes(
       )}
     </div>
 
-    {/* زر قائمة الموبايل */}
-    <button
-      onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-      aria-label="فتح القائمة"
-      aria-expanded={isMobileMenuOpen}
-      className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 md:hidden ${
-        isMobileMenuOpen
-          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-          : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-      }`}
-    >
-      {isMobileMenuOpen ? <X size={21} /> : <Menu size={21} />}
-      {(unreadMessagesCount > 0 || unreadNotificationsCount > 0) && (
-        <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-rose-500" />
-      )}
-    </button>
+{/* أزرار الموبايل: المساعدة والقائمة */}
+<div className="flex items-center justify-end gap-2 md:hidden">
+
+  {/* زر معلومات التطبيق */}
+  <button
+    type="button"
+    onClick={() => {
+      setHelpTab("guide");
+      setShowHelpModal(true);
+      setIsMobileMenuOpen(false);
+    }}
+    aria-label="معلومات التطبيق"
+    title="معلومات التطبيق"
+    className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm transition-all hover:bg-emerald-100 active:scale-95"
+  >
+    <span className="text-xl font-black">؟</span>
+  </button>
+
+  {/* زر قائمة الموبايل */}
+  <button
+    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+    aria-label="فتح القائمة"
+    aria-expanded={isMobileMenuOpen}
+    className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-all duration-200 ${
+      isMobileMenuOpen
+        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+        : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+    }`}
+  >
+    {isMobileMenuOpen ? <X size={21} /> : <Menu size={21} />}
+
+    {(unreadMessagesCount > 0 || unreadNotificationsCount > 0) && (
+      <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-white bg-rose-500" />
+    )}
+  </button>
+
+</div>
 
     {/* البحث والفلاتر - الكمبيوتر */}
     <div className="hidden min-w-0 items-center gap-3 md:col-span-2 md:row-start-2 md:flex">
@@ -1998,7 +2022,252 @@ onClick={(e) => {
 
 </header>
 
+{/* نافذة معلومات التطبيق */}
+{showHelpModal && (
+  <div
+    className="fixed inset-0 z-[99990] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm"
+    onClick={() => setShowHelpModal(false)}
+  >
+    <div
+      dir="rtl"
+      onClick={(e) => e.stopPropagation()}
+      className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl"
+    >
+      {/* رأس النافذة */}
+      <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-l from-emerald-50 to-white px-5 py-4">
+        <div>
+          <h2 className="text-lg font-black text-slate-900">
+            معلومات  Sooq.SY
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            دليلك لاستخدام المنصة والتعرف على خدماتها
+          </p>
+        </div>
 
+        <button
+          type="button"
+          onClick={() => setShowHelpModal(false)}
+          aria-label="إغلاق"
+          className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-slate-500 shadow-sm transition hover:bg-red-50 hover:text-red-600"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* التبويبات */}
+      <div className="flex gap-2 border-b border-slate-100 px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setHelpTab("guide")}
+          className={`flex-1 rounded-xl px-3 py-3 text-sm font-bold transition ${
+            helpTab === "guide"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <span className="ml-1">؟</span>
+          دليل الاستخدام
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setHelpTab("developer")}
+          className={`flex-1 rounded-xl px-3 py-3 text-sm font-bold transition ${
+            helpTab === "developer"
+              ? "bg-emerald-600 text-white shadow-sm"
+              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+          }`}
+        >
+          <span className="ml-1">♙</span>
+          عن المبرمج
+        </button>
+      </div>
+
+      {/* محتوى النافذة */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+
+        {helpTab === "guide" ? (
+          <div className="space-y-4">
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+              <h3 className="font-black text-emerald-800">
+                أهلاً بك في Sooq.SY
+              </h3>
+              <p className="mt-2 text-sm leading-7 text-slate-700">
+                Sooq.SY منصة للإعلانات المبوبة تساعدك على عرض المنتجات
+                والخدمات والعثور على ما تبحث عنه بسهولة.
+              </p>
+            </div>
+
+            {[
+              {
+                title: "البحث عن الإعلانات",
+                description:
+                  "تصفح أحدث الإعلانات، وابحث باستخدام الكلمات المفتاحية، وحدد التصنيف والمحافظة والمدينة وحالة المنتج للوصول إلى النتائج المناسبة."
+              },
+              {
+                title: "إضافة إعلان جديد",
+                description:
+                  "من زر أضف إعلانك يمكنك إدخال عنوان الإعلان ووصفه وصوره وسعره وتحديد التصنيف والموقع وحالة المنتج، ثم إرسال الإعلان للمراجعة."
+              },
+              {
+                title: "الإعلانات المميزة ⭐",
+                description:
+                  "الإعلان المميز يحصل على تمييز بصري يساعد على إبراز الإعلان. تتوفر خيارات التمييز وفق الرصيد والاشتراك المتاح."
+              },
+              {
+                title: "المتاجر",
+                description:
+                  "يمكنك إنشاء متجر وعرض إعلاناتك من خلاله وإدارة إعلانات المتجر ومتابعة حالة المتجر واشتراكه."
+              },
+              {
+                title: "إدارة إعلاناتك",
+                description:
+                  "من قسم إعلاناتي يمكنك متابعة إعلاناتك وتعديلها وإدارة حالتها، وتمييز الإعلانات المؤهلة أو أرشفتها."
+              },
+              {
+                title: "المفضلة",
+                description:
+                  "أضف الإعلانات التي تهمك إلى المفضلة حتى تتمكن من الرجوع إليها بسهولة لاحقاً."
+              },
+              {
+                title: "الرسائل والمراسلات",
+                description:
+                  "تواصل مع أصحاب الإعلانات من خلال الرسائل، وتابع محادثاتك والتنبيهات الخاصة بالرسائل الجديدة."
+              },
+              {
+                title: "الإشعارات",
+                description:
+                  "تابع إشعارات حسابك لمعرفة التحديثات والتنبيهات المتعلقة بنشاطك وإعلاناتك."
+              },
+              {
+                title: "التبرعات",
+                description:
+                  "يمكنك تصفح إعلانات التبرعات أو إضافة إعلان تبرع من خلال خيار تبرع الآن."
+              },
+              {
+                title: "إيقاف المتجر وإعلاناته",
+                description:
+                  "يمكن لمالك المتجر إيقاف متجره وفق الخيارات المتاحة، مع إمكانية تحديد ظهور إعلانات المتجر أو إخفائها بحسب وضع الإيقاف."
+              },
+              {
+                title: "الأمان والاستخدام",
+                description:
+                  "تأكد من صحة معلومات الإعلان، وتواصل بحذر، ولا تشارك كلمات المرور أو بياناتك السرية مع أي شخص."
+              }
+            ].map((section, index) => (
+              <div
+                key={index}
+                className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+              >
+                <h3 className="font-black text-slate-800">
+                  {section.title}
+                </h3>
+                <p className="mt-2 text-sm leading-7 text-slate-600">
+                  {section.description}
+                </p>
+              </div>
+            ))}
+
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="text-sm font-bold text-slate-700">
+                شكراً لاستخدامك Sooq SY ❤️
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                نتمنى لك تجربة سهلة ومميزة.
+              </p>
+            </div>
+
+          </div>
+        ) : (
+          <div className="space-y-5">
+
+            <div className="rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-6 text-center">
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-600 text-3xl font-black text-white shadow-lg shadow-emerald-200">
+                أ
+              </div>
+
+              <h3 className="mt-4 text-xl font-black text-slate-900">
+                أحمد وليد النمر
+              </h3>
+
+              <p className="mt-2 text-sm font-medium text-emerald-700">
+                مبرمج ومطور Sooq.Sy
+              </p>
+
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                أعمل على تطوير وتحسين منصة Sooq.Sy لتوفير تجربة استخدام
+                سهلة ومنظمة، ومساعدة المستخدمين على التواصل ونشر الإعلانات
+                وإدارة متاجرهم.
+              </p>
+            </div>
+
+            {/* البريد الإلكتروني */}
+            <a
+              href="mailto:ahvip92@gmail.com"
+              className="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 transition hover:border-emerald-200 hover:bg-emerald-50"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                <Mail size={21} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-slate-400">
+                  البريد الإلكتروني
+                </p>
+                <p className="mt-1 break-all text-sm font-bold text-slate-800">
+                  ahvip92@gmail.com
+                </p>
+              </div>
+            </a>
+
+            {/* واتساب */}
+            <a
+              href="https://wa.me/963936534195"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 transition hover:border-green-200 hover:bg-green-50"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-green-100 text-green-700">
+                <MessageCircle size={21} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-slate-400">
+                  الهاتف والواتساب
+                </p>
+                <p dir="ltr" className="mt-1 text-right text-sm font-bold text-slate-800">
+                  0936534195
+                </p>
+              </div>
+
+              <span className="text-xs font-bold text-green-700">
+                تواصل
+              </span>
+            </a>
+
+            <p className="rounded-2xl bg-slate-50 p-4 text-center text-xs leading-6 text-slate-500">
+              شكراً لثقتكم ب Sooq.SY، ونسعد دائماً باقتراحاتكم وملاحظاتكم
+              لتطوير المنصة.
+            </p>
+
+          </div>
+        )}
+      </div>
+
+      {/* أسفل النافذة */}
+      <div className="border-t border-slate-100 bg-white px-4 py-3">
+        <button
+          type="button"
+          onClick={() => setShowHelpModal(false)}
+          className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 active:scale-[0.99]"
+        >
+          إغلاق
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
 
       <main className="mx-auto max-w-7xl px-5 pb-16">

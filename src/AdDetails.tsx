@@ -4,6 +4,9 @@ import { useLocation, useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { Device } from "@capacitor/device";
 import { Capacitor } from "@capacitor/core";
+
+import { PlayIntegrity } from "@capacitor-community/play-integrity";
+
 import {
   MapPin,
   ArrowRight,
@@ -80,51 +83,78 @@ export default function AdDetails() {
         setAd(data);
 
 
-        const shareToken = new URLSearchParams(
-          window.location.search
-        ).get("share");
 
-        if (shareToken) {
-          try {
-            let visitorId: string;
+const shareToken = new URLSearchParams(
+  window.location.search
+).get("share");
 
-            if (Capacitor.isNativePlatform()) {
-              const deviceInfo = await Device.getId();
-              visitorId = `android:${deviceInfo.identifier}`;
-            } else {
-              visitorId =
-                localStorage.getItem("sooqsy_visitor_id") || "";
+if (shareToken) {
+  try {
+    // المكافأة متاحة لتطبيق Android فقط
+    if (Capacitor.getPlatform() !== "android") {
+      console.log("مكافأة المشاركة متاحة عبر تطبيق Android فقط.");
+    } else {
+      // معرّف ثابت للتطبيق على الجهاز نفسه
+      const deviceInfo = await Device.getId();
+      const visitorId = `android:${deviceInfo.identifier}`;
 
-              if (!visitorId) {
-                visitorId = crypto.randomUUID();
-                localStorage.setItem("sooqsy_visitor_id", visitorId);
-              }
-            }
+      // طلب تحدي تحقق جديد من الخادم
+      const { data: challenge, error: challengeError } =
+        await supabase.functions.invoke("verify-play-integrity", {
+          body: {
+            action: "create_challenge",
+            share_token: shareToken,
+            visitor_id: visitorId,
+          },
+        });
 
-            if (!visitorId) {
-              visitorId = crypto.randomUUID();
-              localStorage.setItem("sooqsy_visitor_id", visitorId);
-            }
+      if (challengeError) throw challengeError;
 
-            const {
-              data: visitRecorded,
-              error: visitError,
-            } = await supabase.rpc("record_ad_share_visit", {
-              p_token: shareToken,
-              p_visitor_id: visitorId,
-            });
+      if (!challenge?.success || !challenge?.nonce) {
+        throw new Error("تعذر إنشاء تحدي التحقق.");
+      }
 
+      // طلب رمز سلامة الجهاز من Google
+      const integrityResult =
+        await PlayIntegrity.requestIntegrityToken({
+          nonce: challenge.nonce,
+          googleCloudProjectNumber: 171150571192,
+        });
 
+      if (!integrityResult?.token) {
+        throw new Error("لم يتم الحصول على رمز التحقق من Google.");
+      }
 
-            if (visitError) {
-              console.error("خطأ تسجيل زيارة المشاركة:", visitError);
-            } else if (visitRecorded) {
-              console.log("تم تسجيل زيارة المشاركة ومنح النقطة.");
-            }
-          } catch (error) {
-            console.error("تعذر تسجيل زيارة المشاركة:", error);
-          }
-        }
+      // إرسال الرمز للخادم للتحقق وتسجيل الزيارة
+      const { data: verification, error: verificationError } =
+        await supabase.functions.invoke("verify-play-integrity", {
+          body: {
+            action: "verify",
+            token: integrityResult.token,
+            share_token: shareToken,
+            visitor_id: visitorId,
+          },
+        });
+
+      if (verificationError) throw verificationError;
+
+      if (!verification?.success) {
+        throw new Error(
+          verification?.error || "فشل التحقق من سلامة الجهاز."
+        );
+      }
+
+      if (verification.visit_recorded) {
+        console.log("تم تسجيل الزيارة ومنح نقطة المشاركة.");
+      } else {
+        console.log("هذه الزيارة مسجلة سابقاً، لم تُمنح نقطة إضافية.");
+      }
+    }
+  } catch (error) {
+    console.error("تعذر التحقق من مشاركة الإعلان:", error);
+  }
+}
+
 
         const {
           data: { user },

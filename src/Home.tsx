@@ -3450,21 +3450,25 @@ onClick={(e) => {
 
 
 
-<footer className="relative mt-8 overflow-hidden bg-slate-950 px-4 pb-4 pt-7 text-white md:mt-12 md:px-5 md:pb-6 md:pt-12">
-  {/* لمسات جمالية */}
-  <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
-  <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl" />
+
+<footer className="relative mt-6 overflow-hidden bg-slate-950 px-3 py-4 text-white md:mt-8 md:px-5 md:py-5">
+  <div className="pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-emerald-500/10 blur-3xl" />
+  <div className="pointer-events-none absolute -bottom-16 -left-16 h-36 w-36 rounded-full bg-emerald-400/10 blur-3xl" />
 
   <div className="relative mx-auto max-w-6xl">
-    <div className="grid gap-5 text-center md:grid-cols-3 md:gap-8 md:text-right">
+
+    {/* الأقسام بجانب بعضها */}
+    <div className="grid grid-cols-2 items-center gap-x-3 gap-y-4 sm:grid-cols-3 sm:gap-5">
 
       {/* هوية الموقع */}
-      <div>
-        <h2 className="text-xl font-black tracking-wide text-white md:text-2xl">
+      <div className="col-span-2 text-center sm:col-span-1 sm:text-right">
+        <h2 className="text-lg font-black tracking-wide text-white">
           {siteName}
         </h2>
-        <div className="mx-auto mt-2 h-1 w-12 rounded-full bg-emerald-500 md:mt-3 md:md:mx-0" />
-        <p className="mt-2 text-xs leading-6 text-slate-400 md:mt-4 md:text-sm md:leading-7">
+
+        <div className="mx-auto mt-1 h-0.5 w-9 rounded-full bg-emerald-500 sm:mr-0" />
+
+        <p className="mt-1 text-[10px] leading-5 text-slate-400">
           السوق السوري للإعلانات المبوبة
           <br />
           مكانك للبيع والشراء والتبرع.
@@ -3472,32 +3476,28 @@ onClick={(e) => {
       </div>
 
       {/* التواصل */}
-      <div>
-        <h3 className="mb-2 text-sm font-black text-white md:mb-4 md:text-base">
+      <div className="text-center sm:text-right">
+        <h3 className="mb-2 text-xs font-black text-white">
           تواصل معنا
         </h3>
 
-        <div className="flex flex-wrap items-center justify-center gap-3 md:flex-col md:items-start">
+        <div className="flex flex-col items-center gap-2 sm:items-start">
           {contactEmail && (
             <a
               href={`mailto:${contactEmail}`}
-              className="flex items-center gap-2 text-xs text-slate-400 transition hover:text-emerald-400 md:text-sm"
+              className="flex max-w-full items-center gap-1.5 text-[10px] text-slate-400 transition hover:text-emerald-400"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-emerald-400">
-                ✉
-              </span>
-              <span dir="ltr">{contactEmail}</span>
+              <span className="text-emerald-400">✉</span>
+              <span dir="ltr" className="break-all">{contactEmail}</span>
             </a>
           )}
 
           {contactPhone && (
             <a
               href={`tel:${contactPhone}`}
-              className="flex items-center gap-2 text-xs text-slate-400 transition hover:text-emerald-400 md:text-sm"
+              className="flex items-center gap-1.5 text-[10px] text-slate-400 transition hover:text-emerald-400"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-emerald-400">
-                ☎
-              </span>
+              <span className="text-emerald-400">☎</span>
               <span dir="ltr">{contactPhone}</span>
             </a>
           )}
@@ -3505,25 +3505,25 @@ onClick={(e) => {
       </div>
 
       {/* تحميل التطبيق */}
-      <div>
-        <h3 className="mb-2 text-sm font-black text-white md:mb-3 md:text-base">
+      <div className="flex flex-col items-center text-center sm:items-start sm:text-right">
+        <h3 className="mb-1.5 text-xs font-black text-white">
           حمّل تطبيق Sooq Sy
         </h3>
 
-        <p className="text-xs leading-6 text-slate-400 md:text-sm md:leading-7">
+        <p className="text-[10px] text-slate-400">
           تابع إعلاناتك بسهولة من موبايلك.
         </p>
 
         <a
           href="https://sooq-sy.pages.dev/app.apk"
           download="Sooq-SY.apk"
-          className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-400 shadow-sm transition hover:bg-emerald-500/20 hover:text-emerald-300 md:mt-4 md:px-5 md:py-2.5 md:text-sm"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-bold text-emerald-400 transition hover:bg-emerald-500/20 active:scale-95"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
             fill="currentColor"
-            className="h-5 w-5"
+            className="h-4 w-4"
           >
             <path d="M17.6 9.48 19.44 6.3a.5.5 0 0 0-.86-.5l-1.86 3.22a11.3 11.3 0 0 0-9.44 0L5.42 5.8a.5.5 0 1 0-.86.5L6.4 9.48A10.2 10.2 0 0 0 2 17h20a10.2 10.2 0 0 0-4.4-7.52ZM7.5 13.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm9 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
             <path d="M4 18h16v1a2 2 0 0 1-2 2h-1v2h-2v-2H9v2H7v-2H6a2 2 0 0 1-2-2v-1Z" />
@@ -3531,23 +3531,28 @@ onClick={(e) => {
           تحميل التطبيق ↓
         </a>
 
-        <p className="mt-1 text-[10px] text-slate-500">
+        <p className="mt-1 text-[9px] text-slate-500">
           متوفر لأجهزة Android بصيغة APK
         </p>
       </div>
     </div>
 
-    {/* الحقوق */}
-    <div className="mt-6 border-t border-white/10 pt-3 text-center md:mt-10 md:pt-5">
-      <p className="text-[10px] text-slate-500 md:text-xs">
+    {/* الحقوق بسطرين مختصرين */}
+    <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-white/10 pt-3 text-center">
+      <p className="text-[9px] text-slate-500">
         © {new Date().getFullYear()} {siteName} - جميع الحقوق محفوظة
       </p>
-      <p className="mt-1 text-[10px] font-medium text-slate-600 md:mt-2 md:text-[11px]">
-        صنع بكل محبة لخدمة المجتمع السوري
+
+      <span className="text-slate-700">•</span>
+
+      <p className="text-[9px] font-medium text-slate-500">
+        صنع بكل محبة لخدمة المجتمع السوري ❤️
       </p>
     </div>
+
   </div>
 </footer>
+
 
 
     </div>

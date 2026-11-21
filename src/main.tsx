@@ -311,6 +311,57 @@ function CustomAlertHost() {
   );
 }
 
+function AppUrlListener() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let active = true;
+    let listener: { remove: () => Promise<void> } | undefined;
+
+    const openUrl = (url: string) => {
+      try {
+        const parsed = new URL(url);
+
+        if (parsed.host !== "sooq-sy.pages.dev") return;
+
+        navigate(
+          `${parsed.pathname}${parsed.search}${parsed.hash}`,
+          { replace: true }
+        );
+      } catch (error) {
+        console.error("Invalid app link:", error);
+      }
+    };
+
+    const setup = async () => {
+      listener = await CapacitorApp.addListener(
+        "appUrlOpen",
+        ({ url }) => openUrl(url)
+      );
+
+      if (!active) {
+        await listener.remove();
+        return;
+      }
+
+      const launch = await CapacitorApp.getLaunchUrl();
+
+      if (active && launch?.url) {
+        openUrl(launch.url);
+      }
+    };
+
+    void setup();
+
+    return () => {
+      active = false;
+      void listener?.remove();
+    };
+  }, [navigate]);
+
+  return null;
+}
+
 // ==========================================
 // حفظ واستعادة موضع التمرير على أندرويد فقط
 // ==========================================
@@ -549,6 +600,7 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter
       basename="/"
     >
+      <AppUrlListener />
       <MobileScrollRestoration />
       <MobileBackButtonHandler />
 
@@ -587,6 +639,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/user/:id" element={<PublicProfile />} />
           <Route path="/my-sales" element={<MySales />} />
           <Route path="/wallet" element={<WalletPage />} />
+          
           <Route path="/store-subscription/:id" element={<StoreSubscription />} />
 <Route path="/store-subscription" element={<StoreSubscription />} />
           <Route

@@ -8,7 +8,8 @@
       "namespace": "android_app",
       "package_name": "com.sooqsy.app",
       "sha256_cert_fingerprints": [
-        "6E:9D:FA:48:D9:8F:F8:15:03:EA:4A:17:39:90:E8:9F:A0:72:63:F9:0B:6B:F3:1F:11:D9:DC:18:25:E2:86:DB"
+        "6E:9D:FA:48:D9:8F:F8:15:03:EA:4A:17:39:90:E8:9F:A0:72:63:F9:0B:6B:F3:1F:11:D9:DC:18:25:E2:86:DB",
+        "64:03:50:13:AD:24:CC:EC:E0:C0:A3:F2:5E:7C:FA:E5:E3:69:03:7B:FB:5D:E6:60:E8:7F:43:FC:0C:62:5E:9C"
       ]
     }
   }

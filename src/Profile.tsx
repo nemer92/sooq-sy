@@ -83,6 +83,7 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
   const [bio, setBio] = useState("");
   const [showPhone, setShowPhone] = useState(false);
 
@@ -301,7 +302,7 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
       const { data: profile, error: profileError } =
         await supabase
           .from("profiles")
-          .select("display_name, city_id, avatar_url, bio, show_phone")
+          .select("display_name, city_id, avatar_url, bio, show_phone, last_seen_at")
           .eq("id", id)
           .single();
 
@@ -340,6 +341,7 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
       setName(profile.display_name || "");
       setPhone(privateProfile.phone || "");
       setAvatarUrl(profile.avatar_url || "");
+      setLastSeenAt(profile.last_seen_at || null);
       setBio(profile.bio || "");
       setShowPhone(profile.show_phone ?? false);
 
@@ -436,10 +438,16 @@ async function submitPointTopupRequest() {
     return;
   }
 
-  if (pointTopupRequests.some((request) => request.status === "pending")) {
-    setError("لديك طلب شحن قيد المراجعة بالفعل.");
-    return;
-  }
+const pendingRequest = pointTopupRequests.find(
+  (request) => request.status === "pending"
+);
+
+if (pendingRequest) {
+  window.alert(
+    `لديك طلب شحن سابق قيد المراجعة.\n\nرقم الطلب: ${pendingRequest.id}\n\nلا يمكنك تقديم طلب شحن جديد قبل قبول أو رفض الطلب السابق من الإدارة.`
+  );
+  return;
+}
 
   setPointTopupSubmitting(true);
 
@@ -858,7 +866,7 @@ async function submitPointTopupRequest() {
 
 </div>
 
-          <div className="px-5 pb-5 sm:px-7">
+          <div className="relative z-20 px-5 pb-5 sm:px-7">
             <div className="-mt-12 flex flex-wrap items-end gap-4">
               <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-emerald-50 shadow-md">
                 {avatarUrl ? (
@@ -908,6 +916,28 @@ async function submitPointTopupRequest() {
 )}
 
                   </div>
+
+<p className="mt-1 text-xs text-emerald-600">
+  {!lastSeenAt
+    ? "آخر ظهور غير متاح"
+    : (() => {
+        const diff = Math.max(
+          0,
+          Date.now() - new Date(lastSeenAt).getTime()
+        );
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+
+        if (minutes < 2) return "متصل الآن";
+        if (minutes < 60) return `آخر ظهور منذ ${minutes} دقيقة`;
+        if (hours < 24) return `آخر ظهور منذ ${hours} ساعة`;
+        if (days < 30) return `آخر ظهور منذ ${days} يوم`;
+
+        return `آخر ظهور بتاريخ ${new Date(lastSeenAt).toLocaleDateString("ar-SY")}`;
+      })()}
+</p>
+
                 <p className="mt-1 text-xs text-slate-500">
                   إدارة معلوماتك الشخصية وإعدادات حسابك
                 </p>
@@ -1248,19 +1278,21 @@ async function submitPointTopupRequest() {
           </div>
 
           <div className="space-y-3 p-3.5 sm:p-4">
-            <div className="flex items-center justify-between rounded-xl bg-blue-50 p-4">
-              <div>
-                <p className="text-sm font-bold text-slate-700">
-                  رسوم التوثيق لمدة سنة
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  صلاحية التوثيق 365 يوماً
-                </p>
-              </div>
-              <strong className="text-2xl font-black text-blue-700">
-                $20
-              </strong>
-            </div>
+
+<div className="flex items-center justify-between rounded-xl bg-emerald-50 p-4">
+  <div>
+    <p className="text-sm font-bold text-slate-700">
+      تكلفة توثيق الحساب بالنقاط
+    </p>
+    <p className="mt-1 text-xs text-slate-500">
+      صلاحية التوثيق 365 يوماً
+    </p>
+  </div>
+  <strong className="text-2xl font-black text-emerald-700">
+    200 نقطة
+  </strong>
+</div>
+
 
             {activeVerification && (
               <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
@@ -1538,18 +1570,12 @@ async function submitPointTopupRequest() {
                 className={`${inputClass} bg-slate-100 text-left`}
               />
 
+
+
               <button
                 type="button"
                 onClick={submitPointTopupRequest}
-                disabled={
-                  pointTopupSubmitting ||
-                  !qrUrl ||
-                  exchangeRate <= 0 ||
-                  !/^09[0-9]{8}$/.test(phone.trim()) ||
-                  pointTopupRequests.some(
-                    (request) => request.status === "pending"
-                  )
-                }
+
                 className={`${buttonClass} mt-4`}
               >
                 {pointTopupSubmitting ? (
@@ -1581,51 +1607,51 @@ async function submitPointTopupRequest() {
       لم ترسل أي طلب شحن حتى الآن.
     </p>
   ) : (
-    <div className="space-y-2">
-      {pointTopupRequests.map((request) => (
-        <div
-          key={request.id}
-          className="rounded-xl border border-slate-100 bg-white p-3"
+<div className="max-h-[180px] overflow-y-auto space-y-2 pr-1">
+  {pointTopupRequests.map((request) => (
+    <div
+      key={request.id}
+      className="rounded-xl border border-slate-100 bg-white p-3"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <strong className="text-sm text-slate-800">
+          {request.points} نقطة
+        </strong>
+
+        <span
+          className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+            request.status === "approved"
+              ? "bg-emerald-50 text-emerald-700"
+              : request.status === "rejected"
+                ? "bg-red-50 text-red-700"
+                : "bg-amber-50 text-amber-700"
+          }`}
         >
-          <div className="flex items-center justify-between gap-2">
-            <strong className="text-sm text-slate-800">
-              {request.points} نقطة
-            </strong>
+          {request.status === "approved"
+            ? "تمت الموافقة"
+            : request.status === "rejected"
+              ? "مرفوض"
+              : "قيد المراجعة"}
+        </span>
+      </div>
 
-            <span
-              className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                request.status === "approved"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : request.status === "rejected"
-                    ? "bg-red-50 text-red-700"
-                    : "bg-amber-50 text-amber-700"
-              }`}
-            >
-              {request.status === "approved"
-                ? "تمت الموافقة"
-                : request.status === "rejected"
-                  ? "مرفوض"
-                  : "قيد المراجعة"}
-            </span>
-          </div>
+      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
+        <span>
+          {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+        </span>
+        <span>
+          {new Date(request.created_at).toLocaleDateString("ar-SY")}
+        </span>
+      </div>
 
-          <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
-            <span>
-              {Number(request.amount_syp).toLocaleString("en-US")} ل.س
-            </span>
-            <span>
-              {new Date(request.created_at).toLocaleDateString("ar-SY")}
-            </span>
-          </div>
-
-          {request.admin_note && (
-            <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
-              ملاحظة الإدارة: {request.admin_note}
-            </p>
-          )}
-        </div>
-      ))}
+      {request.admin_note && (
+        <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
+          ملاحظة الإدارة: {request.admin_note}
+        </p>
+      )}
     </div>
+  ))}
+</div>
   )}
 </div>
           <label className="mb-2 mt-5 block text-sm font-bold text-slate-600">

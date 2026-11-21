@@ -1956,3 +1956,151 @@ button {
     transform: scale(1);
   }
 }
+
+
+/* =====================================
+   الوضع الليلي - لوحة الإدارة
+===================================== */
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background: #111827;
+  color: #e5e7eb;
+}
+
+html.dark .app {
+  background: #111827;
+  color: #e5e7eb;
+}
+
+html.dark .sidebar,
+html.dark .topbar,
+html.dark .stat-card,
+html.dark .ad-card,
+html.dark .empty-state,
+html.dark .category-card,
+html.dark .user-card,
+html.dark .report-stat-card,
+html.dark .admin-ad-card,
+html.dark .modal-content,
+html.dark .ad-modal,
+html.dark .login-card {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-color: #374151;
+}
+
+html.dark .content {
+  color: #e5e7eb;
+}
+
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark strong,
+html.dark .topbar h1,
+html.dark .section-heading h2,
+html.dark .ad-modal-title,
+html.dark .ad-modal-header h2,
+html.dark .category-card-info h3,
+html.dark .user-info h3,
+html.dark .user-details-heading h3,
+html.dark .admin-ad-card h3 {
+  color: #f3f4f6;
+}
+
+html.dark p,
+html.dark span,
+html.dark label,
+html.dark .ad-details p,
+html.dark .ad-meta,
+html.dark .section-heading p,
+html.dark .menu-item {
+  color: #cbd5e1;
+}
+
+html.dark .menu-item:hover,
+html.dark .menu-item.active {
+  background: #263b30;
+  color: #86efac;
+}
+
+html.dark .icon-button,
+html.dark .refresh-button,
+html.dark .view-all-button,
+html.dark .users-search,
+html.dark .login-input,
+html.dark .category-form-field input,
+html.dark .category-form-field select,
+html.dark .ad-info-item,
+html.dark .ban-history-card,
+html.dark .user-count,
+html.dark .subcategories-list,
+html.dark .subcategory-item {
+  background: #273449;
+  color: #e5e7eb;
+  border-color: #475569;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #273449;
+  color: #f3f4f6;
+  border-color: #475569;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #94a3b8;
+}
+
+html.dark .ad-modal-header,
+html.dark .ad-modal-footer,
+html.dark .sidebar-footer,
+html.dark .brand,
+html.dark .category-card-actions {
+  border-color: #374151;
+}
+
+html.dark .ad-modal-footer {
+  background: #1f2937;
+}
+
+html.dark .ad-modal-close {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+html.dark .ad-modal-description,
+html.dark .ad-info-item strong,
+html.dark .ban-history-details p,
+html.dark .ban-history-details p span,
+html.dark .user-ad-item strong {
+  color: #e5e7eb;
+}
+
+html.dark .user-ad-item {
+  background: #273449;
+  border-color: #475569;
+}
+
+html.dark .login-page {
+  background: linear-gradient(135deg, #111827, #1f2937);
+}
+
+html.dark .login-card h1 {
+  color: #86efac;
+}
+
+html.dark .login-input input {
+  color: #f3f4f6;
+}
+
+html.dark .ad-modal-overlay,
+html.dark .modal-overlay {
+  background: rgba(0, 0, 0, 0.78);
+}

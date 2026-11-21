@@ -98,7 +98,7 @@ export default function PublicProfile() {
         const { data: profileData, error: profileError } =
           await supabase
             .from("profiles")
-            .select("id, display_name, avatar_url, bio, city_id, created_at, show_phone")
+            .select("id, display_name, avatar_url, bio, city_id, created_at, show_phone, last_seen_at")
             .eq("id", id)
             .maybeSingle();
 
@@ -336,6 +336,27 @@ export default function PublicProfile() {
     }
   }
 
+
+function formatLastSeen(value: string | null | undefined) {
+  if (!value) return "آخر ظهور غير متاح";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "آخر ظهور غير متاح";
+
+  const diff = Math.max(0, Date.now() - date.getTime());
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+
+  if (minutes < 2) return "متصل الآن";
+  if (minutes < 60) return `آخر ظهور منذ ${minutes} دقيقة`;
+  if (hours < 24) return `آخر ظهور منذ ${hours} ساعة`;
+  if (days < 30) return `آخر ظهور منذ ${days} يوم`;
+
+  return `آخر ظهور بتاريخ ${date.toLocaleDateString("ar-SY")}`;
+}
+
+
   async function handleFollow() {
     if (!id || followLoading) return;
 
@@ -507,26 +528,34 @@ export default function PublicProfile() {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="break-words text-xl font-black text-slate-900">
-                  {profile.display_name || "مستخدم Sooq.sy"}
-                </h1>
 
-                {isVerified ? (
-                  <span
-                    title="حساب موثّق"
-                    className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold text-blue-700"
-                  >
-                    <ShieldCheck size={14} />
-                    حساب موثّق
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">
-                    <ShieldCheck size={14} />
-                    حساب غير موثّق
-                  </span>
-                )}
+              <div className="flex flex-col items-start gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="break-words text-xl font-black text-slate-900">
+                    {profile.display_name || "مستخدم Sooq.sy"}
+                  </h1>
+
+                  {isVerified ? (
+                    <span
+                      title="حساب موثّق"
+                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold text-blue-700"
+                    >
+                      <ShieldCheck size={14} />
+                      حساب موثّق
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-500">
+                      <ShieldCheck size={14} />
+                      حساب غير موثّق
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs font-medium text-slate-500">
+                  {formatLastSeen(profile.last_seen_at)}
+                </p>
               </div>
+
             </div>
 
             {publicPhone && (

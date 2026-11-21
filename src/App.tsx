@@ -532,13 +532,18 @@ const handlePointTopupAction = async (
 
     setPointTopupAdminNote("");
     await loadPointTopupRequests();
-  } catch (err) {
-    setPointTopupRequestsError(
-      err instanceof Error ? err.message : "تعذر تنفيذ العملية."
-    );
-  } finally {
-    setPointTopupActionLoading(null);
-  }
+} catch (err: any) {
+  console.error("Point topup admin action failed:", err);
+
+  setPointTopupRequestsError(
+    err?.message ||
+    err?.details ||
+    err?.hint ||
+    "تعذر تنفيذ العملية."
+  );
+} finally {
+  setPointTopupActionLoading(null);
+}
 };
 
   // التحقق من صلاحيات المدير

@@ -365,29 +365,77 @@ const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
 
 useEffect(() => {
+  let lastSeenInterval: ReturnType<typeof setInterval> | null = null;
+
+
+  const updateLastSeen = async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+
+    console.log("مستخدم آخر ظهور:", sessionData.session?.user?.id);
+
+    const { data, error } = await supabase.rpc("update_my_last_seen");
+
+    console.log("نتيجة تحديث آخر ظهور:", { data, error });
+
+    if (error) {
+      console.error("خطأ تحديث آخر ظهور:", error);
+    }
+  };
+
+
+  const startLastSeen = () => {
+    if (lastSeenInterval) {
+      clearInterval(lastSeenInterval);
+    }
+
+    updateLastSeen();
+
+    lastSeenInterval = setInterval(() => {
+      updateLastSeen();
+    }, 60 * 1000);
+  };
+
   async function checkLogin() {
     const { data } = await supabase.auth.getSession();
+
     setIsLoggedIn(!!data.session);
+
+    if (data.session?.user) {
+      startLastSeen();
+    }
   }
 
   checkLogin();
 
   const {
     data: { subscription },
-} = supabase.auth.onAuthStateChange((_event, session) => {
-  setIsLoggedIn(!!session);
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    setIsLoggedIn(!!session);
 
-  if (session?.user) {
-    setTimeout(() => {
-  loadNotifications(session.user.id);
-}, 0);
-  } else {
-    setNotifications([]);
-    setUnreadNotificationsCount(0);
-  }
-});
+    if (session?.user) {
+      setTimeout(() => {
+        loadNotifications(session.user.id);
+      }, 0);
 
-return () => subscription.unsubscribe();
+      startLastSeen();
+    } else {
+      setNotifications([]);
+      setUnreadNotificationsCount(0);
+
+      if (lastSeenInterval) {
+        clearInterval(lastSeenInterval);
+        lastSeenInterval = null;
+      }
+    }
+  });
+
+  return () => {
+    subscription.unsubscribe();
+
+    if (lastSeenInterval) {
+      clearInterval(lastSeenInterval);
+    }
+  };
 }, []);
 useEffect(() => {
   async function loadSiteSettings() {

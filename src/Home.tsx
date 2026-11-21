@@ -1000,21 +1000,40 @@ const matchesCondition = selectedConditions.includes(
       href="/"
       className="group flex min-w-0 items-center gap-2.5 md:col-start-1 md:row-start-1"
     >
-      <div className="shrink-0 rounded-2xl bg-emerald-50 p-1 shadow-sm ring-1 ring-emerald-100/80 transition duration-300 group-hover:scale-[1.03] group-hover:shadow-md">
-        <img
-          src={siteIcon}
-          alt="Sooq.Sy"
-          className="h-10 w-10 rounded-xl object-contain sm:h-11 sm:w-11"
-        />
-      </div>
-      <div className="min-w-0">
-        <h1 className="truncate text-xl font-black tracking-tight text-slate-900 sm:text-2xl">
-          {siteName}
-        </h1>
-        <p className="mt-0.5 truncate text-[9px] font-medium text-slate-400 sm:text-[10px]">
-          السوق السوري للإعلانات المبوبة
-        </p>
-      </div>
+
+<div className="group flex shrink-0 items-center gap-3">
+
+  {/* اللوغو على اليسار */}
+  <div className="order-1 shrink-0 rounded-2xl bg-emerald-50 p-1 shadow-sm ring-1 ring-emerald-100/80 transition duration-300 group-hover:scale-[1.03] group-hover:shadow-md">
+    <img
+      src={siteIcon}
+      alt="Sooq.Sy"
+      className="h-10 w-10 rounded-xl object-contain sm:h-11 sm:w-11"
+    />
+  </div>
+
+  {/* اسم الموقع والوصف */}
+  <div className="order-2 flex min-w-0 flex-col justify-center">
+    <div className="group relative inline-flex w-fit items-center">
+      <span className="absolute -inset-2 rounded-2xl bg-emerald-400/10 blur-lg animate-pulse" />
+
+      <h1
+        dir="ltr"
+        className="relative bg-gradient-to-r from-emerald-700 via-teal-500 to-emerald-700 bg-clip-text text-xl font-black tracking-tight text-transparent drop-shadow-sm animate-[softFloat_3s_ease-in-out_infinite] sm:text-2xl"
+      >
+        {siteName}
+      </h1>
+
+      <span className="absolute -right-2 -top-1 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.7)] animate-ping" />
+    </div>
+
+    <p className="mt-0.5 truncate text-[9px] font-medium text-slate-400 sm:text-[10px]">
+      السوق السوري للإعلانات المبوبة
+    </p>
+  </div>
+
+</div>
+
     </a>
 
     {/* روابط الحساب - الكمبيوتر */}
@@ -2743,59 +2762,57 @@ onClick={(e) => {
 </section>
 
 
-<section
-  dir="rtl"
-  className="mt-5 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:mt-6 sm:rounded-3xl sm:p-4"
->
-  <div className="mb-3 flex items-center gap-2">
-    <SlidersHorizontal size={18} className="text-emerald-600" />
-    <h3 className="text-sm font-black text-slate-800">
-      حالة الإعلان
-    </h3>
-    <span className="text-[10px] text-slate-400">
-      يمكنك اختيار الحالتين معاً
+
+<section className="rounded-2xl border border-slate-200 bg-white p-3">
+  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+    <div className="flex items-center gap-2">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+        <SlidersHorizontal size={16} />
+      </div>
+      <h3 className="text-sm font-extrabold text-slate-800">
+        حالة الإعلان
+      </h3>
+    </div>
+
+    <span className="text-[10px] font-medium text-slate-400">
+      يمكنك اختيار أكثر من حالة
     </span>
   </div>
 
-  <div className="grid grid-cols-2 gap-3">
+  <div className="grid grid-cols-2 gap-2">
     <label
-      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
+      className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 py-2.5 transition-all duration-200 ${
         selectedConditions.includes("new")
-          ? "border-emerald-400 bg-emerald-50"
-          : "border-slate-200 bg-slate-50"
+          ? "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm"
+          : "border-slate-200 bg-slate-50/70 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50/50"
       }`}
     >
       <input
         type="checkbox"
         checked={selectedConditions.includes("new")}
         onChange={() => toggleCondition("new")}
-        className="h-5 w-5 accent-emerald-600"
+        className="h-4 w-4 accent-emerald-600"
       />
-      <span className="text-sm font-bold text-slate-700">
-        جديد
-      </span>
+      <span className="text-sm font-bold">جديد</span>
     </label>
 
     <label
-      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
+      className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border px-3 py-2.5 transition-all duration-200 ${
         selectedConditions.includes("used")
-          ? "border-emerald-400 bg-emerald-50"
-          : "border-slate-200 bg-slate-50"
+          ? "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm"
+          : "border-slate-200 bg-slate-50/70 text-slate-600 hover:border-emerald-200 hover:bg-emerald-50/50"
       }`}
     >
       <input
         type="checkbox"
         checked={selectedConditions.includes("used")}
         onChange={() => toggleCondition("used")}
-        className="h-5 w-5 accent-emerald-600"
+        className="h-4 w-4 accent-emerald-600"
       />
-      <span className="text-sm font-bold text-slate-700">
-        مستعمل
-      </span>
+      <span className="text-sm font-bold">مستعمل</span>
     </label>
   </div>
 </section>
-
 
 
 {/* الإعلانات المميزة */}

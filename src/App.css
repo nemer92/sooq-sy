@@ -2104,3 +2104,13 @@ html.dark .ad-modal-overlay,
 html.dark .modal-overlay {
   background: rgba(0, 0, 0, 0.78);
 }
+
+
+@keyframes softFloat {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-5px);
+  }
+}

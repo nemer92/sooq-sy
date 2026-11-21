@@ -30,6 +30,7 @@ import EditAd from "./EditAd.tsx";
 import Messages from "./Messages.tsx";
 import Favorites from "./Favorites.tsx";
 import Profile from "./Profile";
+import WalletPage from "./Wallet.tsx";
 import AdminConversation from "./AdminConversation";
 import PushNotificationsSetup from "./PushNotificationsSetup";
 import LiveUpdateReady from "./LiveUpdateReady";
@@ -585,6 +586,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/manage-store/:id" element={<ManageStore />} />
           <Route path="/user/:id" element={<PublicProfile />} />
           <Route path="/my-sales" element={<MySales />} />
+          <Route path="/wallet" element={<WalletPage />} />
           <Route path="/store-subscription/:id" element={<StoreSubscription />} />
 <Route path="/store-subscription" element={<StoreSubscription />} />
           <Route

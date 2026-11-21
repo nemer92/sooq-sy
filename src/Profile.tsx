@@ -39,28 +39,6 @@ type VerificationRequest = {
   created_at: string;
 };
 
-type PointPackage = {
-  id: string;
-  name: string;
-  price_usd: number;
-  points: number;
-  is_active: boolean;
-  sort_order: number;
-};
-
-type PointTopupRequest = {
-  id: string;
-  package_id: string;
-  amount_usd: number;
-  points: number;
-  phone: string;
-  exchange_rate: number;
-  amount_syp: number;
-  status: "pending" | "approved" | "rejected";
-  admin_note: string | null;
-  created_at: string;
-};
-
 export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [savingName, setSavingName] = useState(false);
@@ -73,10 +51,7 @@ export default function Profile() {
   const [userId, setUserId] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [pointsBalance, setPointsBalance] = useState(0);
-  const [pointPackages, setPointPackages] = useState<PointPackage[]>([]);
-const [pointTopupRequests, setPointTopupRequests] = useState<PointTopupRequest[]>([]);
-const [selectedPointPackageId, setSelectedPointPackageId] = useState("");
-const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
+
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -101,8 +76,6 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
   const [verificationRequests, setVerificationRequests] = useState<
     VerificationRequest[]
   >([]);
-  const [qrUrl, setQrUrl] = useState("");
-  const [exchangeRate, setExchangeRate] = useState(0);
   const [paymentReference, setPaymentReference] = useState("");
   const [submittingVerification, setSubmittingVerification] = useState(false);
 
@@ -123,12 +96,11 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
 
     if (governoratesError) throw governoratesError;
 
-    const { data: citiesData, error: citiesError } =
-      await supabase
-        .from("cities")
-        .select("id, governorate_id, name_ar")
-        .eq("is_active", true)
-        .order("name_ar");
+    const { data: citiesData, error: citiesError } = await supabase
+      .from("cities")
+      .select("id, governorate_id, name_ar")
+      .eq("is_active", true)
+      .order("name_ar");
 
     if (citiesError) throw citiesError;
 
@@ -212,61 +184,18 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
   }
 
   async function loadVerificationData(id: string) {
-    const [
-      { data: settingsData, error: settingsError },
-      { data: verificationData, error: verificationError },
-    ] = await Promise.all([
-      supabase
-        .from("site_settings")
-        .select("sham_cash_qr_url, usd_syp_rate")
-        .eq("id", 1)
-        .single(),
-
-      supabase
-        .from("account_verifications")
-        .select(
-          "id, status, phone, payment_reference, admin_note, start_at, end_at, created_at"
-        )
-        .eq("user_id", id)
-        .order("created_at", { ascending: false }),
-    ]);
-
-    if (settingsError) throw settingsError;
-    if (verificationError) throw verificationError;
-
-    setQrUrl(settingsData?.sham_cash_qr_url || "");
-    setExchangeRate(Number(settingsData?.usd_syp_rate || 0));
-    setVerificationRequests(
-      (verificationData || []) as VerificationRequest[]
-    );
-  }
-
-  async function loadPointTopupData(id: string) {
-  const [
-    { data: packagesData, error: packagesError },
-    { data: requestsData, error: requestsError },
-  ] = await Promise.all([
-    supabase
-      .from("point_packages")
-      .select("id, name, price_usd, points, is_active, sort_order")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true }),
-
-    supabase
-      .from("point_topup_requests")
+    const { data, error: verificationError } = await supabase
+      .from("account_verifications")
       .select(
-        "id, package_id, amount_usd, points, phone, exchange_rate, amount_syp, status, admin_note, created_at"
+        "id, status, phone, payment_reference, admin_note, start_at, end_at, created_at"
       )
       .eq("user_id", id)
-      .order("created_at", { ascending: false }),
-  ]);
+      .order("created_at", { ascending: false });
 
-  if (packagesError) throw packagesError;
-  if (requestsError) throw requestsError;
+    if (verificationError) throw verificationError;
 
-  setPointPackages((packagesData || []) as PointPackage[]);
-  setPointTopupRequests((requestsData || []) as PointTopupRequest[]);
-}
+    setVerificationRequests((data || []) as VerificationRequest[]);
+  }
 
   async function refreshVerificationData() {
     if (!userId) return;
@@ -299,39 +228,37 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
       const id = authData.user.id;
       setUserId(id);
 
-      const { data: profile, error: profileError } =
-        await supabase
-          .from("profiles")
-          .select("display_name, city_id, avatar_url, bio, show_phone, last_seen_at")
-          .eq("id", id)
-          .single();
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select(
+          "display_name, city_id, avatar_url, bio, show_phone, last_seen_at"
+        )
+        .eq("id", id)
+        .single();
 
       if (profileError) throw profileError;
 
-      const { data: privateProfile, error: phoneError } =
-        await supabase
-          .from("private_profiles")
-          .select("phone")
-          .eq("user_id", id)
-          .single();
+      const { data: privateProfile, error: phoneError } = await supabase
+        .from("private_profiles")
+        .select("phone")
+        .eq("user_id", id)
+        .single();
 
       if (phoneError) throw phoneError;
 
-      const { data: referralData, error: referralError } =
-        await supabase
-          .from("referral_codes")
-          .select("code")
-          .eq("user_id", id)
-          .single();
+      const { data: referralData, error: referralError } = await supabase
+        .from("referral_codes")
+        .select("code")
+        .eq("user_id", id)
+        .single();
 
       if (referralError) throw referralError;
 
-      const { data: pointsData, error: pointsError } =
-        await supabase
-          .from("user_points")
-          .select("balance")
-          .eq("user_id", id)
-          .single();
+      const { data: pointsData, error: pointsError } = await supabase
+        .from("user_points")
+        .select("balance")
+        .eq("user_id", id)
+        .single();
 
       if (pointsError) throw pointsError;
 
@@ -349,7 +276,6 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
         loadLocations(profile.city_id ?? null),
         loadSubscription(id),
         loadVerificationData(id),
-        loadPointTopupData(id),
       ]);
     } catch (err) {
       setError(
@@ -401,6 +327,7 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
 
       setPaymentReference("");
       await refreshVerificationData();
+
       setMessage(
         "تم إرسال طلب توثيق الحساب بنجاح. سيبقى الطلب قيد المراجعة حتى موافقة الإدارة."
       );
@@ -414,77 +341,6 @@ const [pointTopupSubmitting, setPointTopupSubmitting] = useState(false);
       setSubmittingVerification(false);
     }
   }
-
-
-
-async function submitPointTopupRequest() {
-  if (pointTopupSubmitting) return;
-
-  setError("");
-  setMessage("");
-
-  if (!selectedPointPackageId) {
-    setError("يرجى اختيار باقة النقاط.");
-    return;
-  }
-
-  if (!/^09[0-9]{8}$/.test(phone.trim())) {
-    setError("يرجى التأكد من رقم الهاتف المسجل في حسابك.");
-    return;
-  }
-
-  if (exchangeRate <= 0) {
-    setError("سعر الصرف غير متوفر حالياً. يرجى المحاولة لاحقاً.");
-    return;
-  }
-
-const pendingRequest = pointTopupRequests.find(
-  (request) => request.status === "pending"
-);
-
-if (pendingRequest) {
-  window.alert(
-    `لديك طلب شحن سابق قيد المراجعة.\n\nرقم الطلب: ${pendingRequest.id}\n\nلا يمكنك تقديم طلب شحن جديد قبل قبول أو رفض الطلب السابق من الإدارة.`
-  );
-  return;
-}
-
-  setPointTopupSubmitting(true);
-
-  try {
-    const { data, error: requestError } = await supabase.rpc(
-      "create_point_topup_request",
-      {
-        p_package_id: selectedPointPackageId,
-      }
-    );
-
-    if (requestError) throw requestError;
-
-    if (!data) {
-      throw new Error("لم يتم إنشاء طلب الشحن. يرجى المحاولة مجدداً.");
-    }
-
-    await loadPointTopupData(userId);
-    setSelectedPointPackageId("");
-
-    setMessage(
-      "تم إرسال طلب شحن النقاط بنجاح. ستتم إضافة النقاط بعد مراجعة الإدارة."
-    );
-  } catch (err: any) {
-    console.error("Point topup submission failed:", err);
-    setError(
-      err?.message ||
-      err?.details ||
-      err?.hint ||
-      "تعذر إرسال طلب الشحن. حاول مرة أخرى."
-    );
-  } finally {
-    setPointTopupSubmitting(false);
-  }
-}
-
-
 
   async function saveProfileDetails() {
     setError("");
@@ -786,33 +642,29 @@ if (pendingRequest) {
     (request) => request.status === "pending"
   );
 
-
   const verificationDaysRemaining = activeVerification?.end_at
-  ? Math.max(
-      0,
-      Math.ceil(
-        (new Date(activeVerification.end_at).getTime() -
-          Date.now()) /
-          (1000 * 60 * 60 * 24)
+    ? Math.max(
+        0,
+        Math.ceil(
+          (new Date(activeVerification.end_at).getTime() -
+            Date.now()) /
+            (1000 * 60 * 60 * 24)
+        )
       )
-    )
-  : 0;
+    : 0;
 
   const canRenewVerification =
-  !verificationPending &&
-  (!activeVerification || verificationDaysRemaining <= 30);
-
-
-
+    !verificationPending &&
+    (!activeVerification || verificationDaysRemaining <= 30);
 
   const inputClass =
-    "w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10";
+    "w-full min-w-0 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/10";
 
   const buttonClass =
-    "flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50";
+    "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50";
 
   const sectionClass =
-    "overflow-hidden rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm sm:p-4";
+    "overflow-hidden rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm sm:p-4";
 
   if (loading) {
     return (
@@ -820,8 +672,8 @@ if (pendingRequest) {
         dir="rtl"
         className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50"
       >
-        <LoaderCircle className="animate-spin text-emerald-600" size={38} />
-        <p className="text-sm font-medium text-slate-500">
+        <LoaderCircle className="animate-spin text-emerald-600" size={32} />
+        <p className="text-xs font-medium text-slate-500">
           جارٍ تحميل بيانات حسابك...
         </p>
       </div>
@@ -831,44 +683,38 @@ if (pendingRequest) {
   return (
     <main
       dir="rtl"
-      className="min-h-screen bg-[#f5f7f6] px-3 pb-10 pt-4 sm:px-5 sm:py-8"
+      className="min-h-screen bg-[#f5f7f6] px-3 pb-6 pt-3 sm:px-5 sm:py-6"
     >
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-2xl">
         <Link
           to="/"
-          className="mb-5 inline-flex min-h-10 items-center gap-2 rounded-full bg-white px-4 text-sm font-bold text-slate-600 shadow-sm transition hover:text-emerald-700"
+          className="mb-3 inline-flex min-h-8 items-center gap-1.5 rounded-full bg-white px-3 text-xs font-bold text-slate-600 shadow-sm transition hover:text-emerald-700"
         >
-          <ArrowRight size={18} />
+          <ArrowRight size={15} />
           العودة إلى السوق
         </Link>
 
+        {/* بطاقة الملف الشخصي */}
+        <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="relative h-20 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-400 sm:h-24">
+            <div className="absolute left-3 top-3 z-10">
+              <div className="flex items-center gap-2 rounded-lg border border-white/40 bg-white/95 px-2.5 py-1.5 shadow-sm">
+                <Coins size={16} className="text-emerald-700" />
+                <div>
+                  <p className="text-[9px] font-semibold text-slate-500">
+                    رصيد نقاطك
+                  </p>
+                  <p className="text-xs font-black text-emerald-900">
+                    {pointsBalance.toLocaleString("en-US")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-
-        <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          
-         {/* <div className="h-24 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-32" /> */}
-          <div className="relative h-20 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-300 sm:h-32">
-
-  {/* رصيد النقاط */}
-  <div className="absolute left-3 top-3 z-10">
-    <div className="flex items-center gap-2 rounded-xl border border-white/30 bg-white/95 px-3 py-2 shadow-lg backdrop-blur-sm">
-      <Coins size={18} className="text-emerald-700" />
-      <div>
-        <p className="text-[10px] font-semibold text-slate-500">
-          رصيد نقاطك
-        </p>
-        <p className="text-sm font-black text-emerald-900">
-          {pointsBalance.toLocaleString("en-US")}
-        </p>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-          <div className="relative z-20 px-5 pb-5 sm:px-7">
-            <div className="-mt-12 flex flex-wrap items-end gap-4">
-              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-4 border-white bg-emerald-50 shadow-md">
+          <div className="relative z-20 px-3 pb-3 sm:px-4">
+            <div className="-mt-9 flex flex-wrap items-end gap-3">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border-[3px] border-white bg-emerald-50 shadow-sm">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
@@ -877,76 +723,82 @@ if (pendingRequest) {
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-emerald-700">
-                    <UserRound size={42} />
+                    <UserRound size={34} />
                   </div>
                 )}
               </div>
 
               <div className="min-w-0 flex-1 pb-1">
-<p className="text-sm font-extrabold text-[#145B50] tracking-wide">
-  أهلاً بك في Sooq.Sy
-</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <h1 className="truncate text-xl font-black text-slate-900 sm:text-2xl">
-                      {name || "الملف الشخصي"}
-                    </h1>
+                <p className="text-xs font-extrabold text-emerald-800">
+                  أهلاً بك في Sooq.Sy
+                </p>
 
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <h1 className="truncate text-lg font-black text-slate-900">
+                    {name || "الملف الشخصي"}
+                  </h1>
 
-{activeVerification ? (
-  <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1">
-    <span
-      title="حساب موثّق"
-      className="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-blue-500 text-white"
-    >
-      <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor">
-        <path d="M9.2 16.2 4.9 12l-1.4 1.4 5.7 5.7L21 7.3l-1.4-1.4z" />
-      </svg>
-    </span>
-    <span className="text-[10px] font-extrabold text-blue-700">
-      حساب موثّق
-    </span>
-  </span>
-) : (
-  <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1">
-    <ShieldCheck size={15} className="text-slate-400" />
-    <span className="text-[10px] font-bold text-slate-500">
-      حساب غير موثّق
-    </span>
-  </span>
-)}
+                  {activeVerification ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5">
+                      <span
+                        title="حساب موثّق"
+                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-2.5 w-2.5"
+                          fill="currentColor"
+                        >
+                          <path d="M9.2 16.2 4.9 12l-1.4 1.4 5.7 5.7L21 7.3l-1.4-1.4z" />
+                        </svg>
+                      </span>
+                      <span className="text-[9px] font-extrabold text-blue-700">
+                        حساب موثّق
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5">
+                      <ShieldCheck size={12} className="text-slate-400" />
+                      <span className="text-[9px] font-bold text-slate-500">
+                        حساب غير موثّق
+                      </span>
+                    </span>
+                  )}
+                </div>
 
-                  </div>
+                <p className="mt-1 text-[11px] text-emerald-700">
+                  {!lastSeenAt
+                    ? "آخر ظهور غير متاح"
+                    : (() => {
+                        const diff = Math.max(
+                          0,
+                          Date.now() - new Date(lastSeenAt).getTime()
+                        );
+                        const minutes = Math.floor(diff / 60000);
+                        const hours = Math.floor(diff / 3600000);
+                        const days = Math.floor(diff / 86400000);
 
-<p className="mt-1 text-xs text-emerald-600">
-  {!lastSeenAt
-    ? "آخر ظهور غير متاح"
-    : (() => {
-        const diff = Math.max(
-          0,
-          Date.now() - new Date(lastSeenAt).getTime()
-        );
-        const minutes = Math.floor(diff / 60000);
-        const hours = Math.floor(diff / 3600000);
-        const days = Math.floor(diff / 86400000);
+                        if (minutes < 2) return "متصل الآن";
+                        if (minutes < 60)
+                          return `آخر ظهور منذ ${minutes} دقيقة`;
+                        if (hours < 24)
+                          return `آخر ظهور منذ ${hours} ساعة`;
+                        if (days < 30)
+                          return `آخر ظهور منذ ${days} يوم`;
 
-        if (minutes < 2) return "متصل الآن";
-        if (minutes < 60) return `آخر ظهور منذ ${minutes} دقيقة`;
-        if (hours < 24) return `آخر ظهور منذ ${hours} ساعة`;
-        if (days < 30) return `آخر ظهور منذ ${days} يوم`;
-
-        return `آخر ظهور بتاريخ ${new Date(lastSeenAt).toLocaleDateString("ar-SY")}`;
-      })()}
-</p>
-
-                <p className="mt-1 text-xs text-slate-500">
-                  إدارة معلوماتك الشخصية وإعدادات حسابك
+                        return `آخر ظهور بتاريخ ${new Date(
+                          lastSeenAt
+                        ).toLocaleDateString("ar-SY")}`;
+                      })()}
                 </p>
               </div>
             </div>
 
-            <label className="mt-4 flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-800 transition hover:bg-emerald-100">
-              <Camera size={18} />
-              {uploadingAvatar ? "جارٍ رفع الصورة..." : "تغيير الصورة الشخصية"}
+            <label className="mt-3 inline-flex min-h-9 w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100">
+              <Camera size={15} />
+              {uploadingAvatar
+                ? "جارٍ رفع الصورة..."
+                : "تغيير الصورة الشخصية"}
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -955,110 +807,127 @@ if (pendingRequest) {
                 onChange={uploadAvatar}
               />
             </label>
-
           </div>
         </div>
 
         {message && (
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
-            <CheckCircle2 className="mt-0.5 shrink-0" size={18} />
+          <div className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-800">
+            <CheckCircle2 className="mt-0.5 shrink-0" size={16} />
             <span>{message}</span>
           </div>
         )}
 
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700">
             {error}
           </div>
         )}
 
+        {/* روابط سريعة */}
         <Link
           to="/my-stores"
-          className="mb-3 flex items-center gap-2.5 rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm transition hover:border-emerald-300 hover:shadow-md active:scale-[0.99]"
+          className="mb-2 flex items-center gap-2.5 rounded-xl border border-emerald-100 bg-white p-3 shadow-sm transition hover:border-emerald-300 hover:shadow-md active:scale-[0.99]"
         >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-            <Store size={25} />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+            <Store size={19} />
           </div>
           <div className="min-w-0 flex-1">
-            <strong className="block text-base font-black text-slate-800">
+            <strong className="block text-sm font-extrabold text-slate-800">
               إدارة متاجري
             </strong>
-            <span className="mt-1 block text-xs text-slate-500">
+            <span className="mt-0.5 block text-[10px] text-slate-500">
               عرض المتاجر والاشتراكات وأرصدة الإعلانات
             </span>
           </div>
-          <ArrowRight className="shrink-0 text-emerald-600" size={21} />
+          <ArrowRight className="shrink-0 text-emerald-600" size={17} />
         </Link>
 
         <Link
           to="/my-sales"
-          className="mb-3 flex items-center gap-2.5 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md active:scale-[0.99]"
+          className="mb-2 flex items-center gap-2.5 rounded-xl border border-blue-100 bg-white p-3 shadow-sm transition hover:border-blue-300 hover:shadow-md active:scale-[0.99]"
         >
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-            <Gift size={25} />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+            <Gift size={19} />
           </div>
           <div className="min-w-0 flex-1">
-            <strong className="block text-base font-black text-slate-800">
+            <strong className="block text-sm font-extrabold text-slate-800">
               مبيعاتي وطلبات الشراء
             </strong>
-            <span className="mt-1 block text-xs text-slate-500">
-              متابعة طلبات الشراء والمبيعات وتأكيد إتمام الصفقات والتقييمات
+            <span className="mt-0.5 block text-[10px] text-slate-500">
+              متابعة الطلبات والمبيعات وتأكيد الصفقات والتقييمات
             </span>
           </div>
-          <ArrowRight className="shrink-0 text-blue-600" size={21} />
+          <ArrowRight className="shrink-0 text-blue-600" size={17} />
         </Link>
 
+        <Link
+          to="/wallet"
+          className="mb-3 flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-white p-3 text-emerald-800 shadow-sm transition hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md active:scale-[0.99]"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+            <Coins size={19} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <strong className="block text-sm font-extrabold">
+              المحفظة وشحن النقاط
+            </strong>
+            <span className="mt-0.5 block text-[10px] text-emerald-700">
+              شحن رصيدك ومتابعة عمليات النقاط
+            </span>
+          </div>
+          <ArrowRight className="shrink-0" size={17} />
+        </Link>
+
+        {/* الاشتراك الإعلاني */}
         {subscriptionIsActive && subscription?.plan && (
-          <section className="mb-5 overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
-            <div className="bg-gradient-to-l from-blue-700 to-indigo-600 p-4 text-white sm:p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15">
-                    <Crown size={24} />
+          <section className="mb-3 overflow-hidden rounded-xl border border-blue-100 bg-white shadow-sm">
+            <div className="bg-gradient-to-l from-blue-800 to-indigo-600 p-3 text-white">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
+                    <Crown size={19} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-black">اشتراكي الإعلاني</h2>
-                    <p className="mt-1 text-xs text-blue-100">
+                    <h2 className="text-sm font-black">اشتراكي الإعلاني</h2>
+                    <p className="mt-0.5 text-[10px] text-blue-100">
                       {subscription.plan.name}
                     </p>
                   </div>
                 </div>
-                <span className="shrink-0 rounded-full bg-emerald-400/20 px-3 py-1.5 text-xs font-bold text-white">
+                <span className="rounded-full bg-emerald-400/20 px-2.5 py-1 text-[10px] font-bold text-white">
                   نشط
                 </span>
               </div>
             </div>
 
-            <div className="p-4 sm:p-5">
+            <div className="p-3">
+              <div className="mb-3 rounded-lg bg-emerald-50 p-3">
+                <p className="text-[10px] font-semibold text-emerald-700">
+                  تكلفة الاشتراك بالنقاط
+                </p>
+                <p className="mt-0.5 text-xl font-black text-emerald-900">
+                  {Math.round(Number(subscription.plan.price_usd) * 10)}
+                  <span className="mr-1 text-xs font-medium text-emerald-700">
+                    نقطة / شهرياً
+                  </span>
+                </p>
+              </div>
 
-<div className="mb-4 rounded-xl bg-emerald-50 p-4">
-  <p className="text-xs font-semibold text-emerald-700">
-    تكلفة الاشتراك بالنقاط
-  </p>
-  <p className="mt-1 text-2xl font-black text-emerald-900">
-    {Math.round(Number(subscription.plan.price_usd) * 10)}
-    <span className="mr-1 text-sm font-medium text-emerald-700">
-      نقطة / شهرياً
-    </span>
-  </p>
-</div>
-
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="mb-2 flex items-center gap-2 text-slate-500">
-                    <Megaphone size={17} />
-                    <span className="text-xs font-semibold">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+                  <div className="mb-1.5 flex items-center gap-1.5 text-slate-500">
+                    <Megaphone size={14} />
+                    <span className="text-[10px] font-semibold">
                       الإعلانات العادية
                     </span>
                   </div>
-                  <p className="text-xl font-black text-slate-800">
+                  <p className="text-lg font-black text-slate-800">
                     {subscriptionUsage.ordinary}
-                    <span className="text-sm font-medium text-slate-400">
+                    <span className="text-xs font-medium text-slate-400">
                       {" "}/ {ordinaryLimit}
                     </span>
                   </p>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-200">
                     <div
                       className="h-full rounded-full bg-blue-600 transition-all"
                       style={{
@@ -1074,25 +943,25 @@ if (pendingRequest) {
                       }}
                     />
                   </div>
-                  <p className="mt-2 text-xs font-bold text-emerald-700">
+                  <p className="mt-1.5 text-[10px] font-bold text-emerald-700">
                     المتبقي {ordinaryRemaining}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <div className="mb-2 flex items-center gap-2 text-slate-500">
-                    <Star size={17} />
-                    <span className="text-xs font-semibold">
+                <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+                  <div className="mb-1.5 flex items-center gap-1.5 text-slate-500">
+                    <Star size={14} />
+                    <span className="text-[10px] font-semibold">
                       الإعلانات المميزة
                     </span>
                   </div>
-                  <p className="text-xl font-black text-slate-800">
+                  <p className="text-lg font-black text-slate-800">
                     {subscriptionUsage.featured}
-                    <span className="text-sm font-medium text-slate-400">
+                    <span className="text-xs font-medium text-slate-400">
                       {" "}/ {featuredLimit}
                     </span>
                   </p>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-200">
                     <div
                       className="h-full rounded-full bg-amber-500 transition-all"
                       style={{
@@ -1108,18 +977,18 @@ if (pendingRequest) {
                       }}
                     />
                   </div>
-                  <p className="mt-2 text-xs font-bold text-emerald-700">
+                  <p className="mt-1.5 text-[10px] font-bold text-emerald-700">
                     المتبقي {featuredRemaining}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
-                  <CalendarDays className="shrink-0 text-blue-600" size={19} />
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-2 rounded-lg bg-slate-50 p-2.5">
+                  <CalendarDays className="shrink-0 text-blue-600" size={16} />
                   <div className="min-w-0">
-                    <p className="text-[11px] text-slate-500">تاريخ البداية</p>
-                    <p className="mt-1 truncate text-xs font-bold text-slate-800">
+                    <p className="text-[10px] text-slate-500">تاريخ البداية</p>
+                    <p className="mt-0.5 truncate text-[11px] font-bold text-slate-800">
                       {subscription.start_at
                         ? new Date(subscription.start_at).toLocaleDateString(
                             "ar-SY"
@@ -1128,11 +997,11 @@ if (pendingRequest) {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
-                  <CalendarDays className="shrink-0 text-red-500" size={19} />
+                <div className="flex items-center gap-2 rounded-lg bg-slate-50 p-2.5">
+                  <CalendarDays className="shrink-0 text-red-500" size={16} />
                   <div className="min-w-0">
-                    <p className="text-[11px] text-slate-500">تاريخ الانتهاء</p>
-                    <p className="mt-1 truncate text-xs font-bold text-slate-800">
+                    <p className="text-[10px] text-slate-500">تاريخ الانتهاء</p>
+                    <p className="mt-0.5 truncate text-[11px] font-bold text-slate-800">
                       {subscription.end_at
                         ? new Date(subscription.end_at).toLocaleDateString(
                             "ar-SY"
@@ -1146,22 +1015,23 @@ if (pendingRequest) {
           </section>
         )}
 
-        <section className={`${sectionClass} mb-3`}>
-          <div className="mb-3 flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-              <UserRound size={21} />
+        {/* المعلومات الشخصية */}
+        <section className={`${sectionClass} mb-2`}>
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700">
+              <UserRound size={17} />
             </div>
             <div>
-              <h2 className="font-black text-slate-800">
+              <h2 className="text-sm font-black text-slate-800">
                 المعلومات الشخصية
               </h2>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-[10px] text-slate-400">
                 الاسم الظاهر في حسابك
               </p>
             </div>
           </div>
 
-          <label className="mb-2 block text-sm font-bold text-slate-600">
+          <label className="mb-1.5 block text-xs font-bold text-slate-600">
             الاسم
           </label>
           <input
@@ -1176,56 +1046,57 @@ if (pendingRequest) {
             type="button"
             onClick={saveName}
             disabled={savingName}
-            className={`${buttonClass} mt-4`}
+            className={`${buttonClass} mt-3`}
           >
-            <Save size={18} />
+            <Save size={14} />
             {savingName ? "جارٍ الحفظ..." : "حفظ الاسم"}
           </button>
         </section>
 
-        <section className={`${sectionClass} mb-3`}>
-          <div className="mb-3 flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-700">
-              <UserRound size={21} />
+        {/* معلومات البروفايل */}
+        <section className={`${sectionClass} mb-2`}>
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-700">
+              <UserRound size={17} />
             </div>
             <div>
-              <h2 className="font-black text-slate-800">
+              <h2 className="text-sm font-black text-slate-800">
                 معلومات البروفايل
               </h2>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-0.5 text-[10px] text-slate-400">
                 المعلومات التي يمكن أن تظهر للزوار
               </p>
             </div>
           </div>
 
-          <label className="mb-2 block text-sm font-bold text-slate-600">
+          <label className="mb-1.5 block text-xs font-bold text-slate-600">
             نبذة عنك
           </label>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             maxLength={300}
-            rows={4}
+            rows={3}
             className={`${inputClass} resize-y`}
             placeholder="اكتب نبذة مختصرة عنك..."
           />
 
-          <p className="mt-1 text-left text-xs text-slate-400">
+          <p className="mt-1 text-left text-[10px] text-slate-400">
             {bio.length}/300
           </p>
 
-          <div className="mt-4 flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3">
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-slate-50 p-2.5">
             <div className="flex items-center gap-2">
               {showPhone ? (
-                <Eye size={19} className="text-emerald-600" />
+                <Eye size={16} className="text-emerald-600" />
               ) : (
-                <EyeOff size={19} className="text-slate-500" />
+                <EyeOff size={16} className="text-slate-500" />
               )}
               <div>
-                <p className="text-sm font-bold text-slate-800">
+                <p className="text-xs font-bold text-slate-800">
                   إظهار رقم الهاتف في البروفايل
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-0.5 text-[10px] text-slate-500">
                   يمكنك تغيير هذا الخيار في أي وقت
                 </p>
               </div>
@@ -1236,13 +1107,13 @@ if (pendingRequest) {
               onClick={() => setShowPhone(!showPhone)}
               role="switch"
               aria-checked={showPhone}
-              className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+              className={`relative h-6 w-10 shrink-0 rounded-full transition ${
                 showPhone ? "bg-emerald-600" : "bg-slate-300"
               }`}
             >
               <span
-                className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${
-                  showPhone ? "right-1" : "right-6"
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                  showPhone ? "right-0.5" : "right-[18px]"
                 }`}
               />
             </button>
@@ -1252,9 +1123,9 @@ if (pendingRequest) {
             type="button"
             onClick={saveProfileDetails}
             disabled={savingProfileDetails}
-            className={`${buttonClass} mt-4`}
+            className={`${buttonClass} mt-3`}
           >
-            <Save size={18} />
+            <Save size={14} />
             {savingProfileDetails
               ? "جارٍ الحفظ..."
               : "حفظ معلومات البروفايل"}
@@ -1262,49 +1133,47 @@ if (pendingRequest) {
         </section>
 
         {/* توثيق الحساب */}
-        <section className="mb-4 overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
-          <div className="bg-gradient-to-l from-blue-800 to-blue-600 p-4 text-white">
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15">
-                <ShieldCheck size={27} />
+        <section className="mb-2 overflow-hidden rounded-xl border border-blue-100 bg-white shadow-sm">
+          <div className="bg-gradient-to-l from-blue-800 to-blue-600 p-3 text-white">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
+                <ShieldCheck size={20} />
               </div>
               <div>
-                <h2 className="text-lg font-black">توثيق الحساب</h2>
-                <p className="mt-1 text-xs text-blue-100">
+                <h2 className="text-sm font-black">توثيق الحساب</h2>
+                <p className="mt-0.5 text-[10px] text-blue-100">
                   شارة توثيق بعد مراجعة وموافقة الإدارة
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-3 p-3.5 sm:p-4">
-
-<div className="flex items-center justify-between rounded-xl bg-emerald-50 p-4">
-  <div>
-    <p className="text-sm font-bold text-slate-700">
-      تكلفة توثيق الحساب بالنقاط
-    </p>
-    <p className="mt-1 text-xs text-slate-500">
-      صلاحية التوثيق 365 يوماً
-    </p>
-  </div>
-  <strong className="text-2xl font-black text-emerald-700">
-    200 نقطة
-  </strong>
-</div>
-
+          <div className="space-y-2.5 p-3">
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-emerald-50 p-3">
+              <div>
+                <p className="text-xs font-bold text-slate-700">
+                  تكلفة توثيق الحساب بالنقاط
+                </p>
+                <p className="mt-1 text-[10px] text-slate-500">
+                  صلاحية التوثيق 365 يوماً
+                </p>
+              </div>
+              <strong className="shrink-0 text-xl font-black text-emerald-700">
+                200 نقطة
+              </strong>
+            </div>
 
             {activeVerification && (
-              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
                 <div className="flex items-center gap-2 text-blue-800">
-                  <BadgeCheck size={22} />
-                  <strong>حسابك موثّق حالياً</strong>
+                  <BadgeCheck size={18} />
+                  <strong className="text-xs">حسابك موثّق حالياً</strong>
                 </div>
-                <p className="mt-2 text-sm text-blue-900">
+                <p className="mt-1.5 text-xs text-blue-900">
                   متبقي {verificationDaysRemaining} يوم على انتهاء التوثيق.
                 </p>
-                <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
-                  <div className="rounded-lg bg-white p-3">
+                <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
+                  <div className="rounded-lg bg-white p-2">
                     <span className="text-slate-500">بداية التوثيق</span>
                     <strong className="mt-1 block text-slate-800">
                       {activeVerification.start_at
@@ -1314,7 +1183,7 @@ if (pendingRequest) {
                         : "—"}
                     </strong>
                   </div>
-                  <div className="rounded-lg bg-white p-3">
+                  <div className="rounded-lg bg-white p-2">
                     <span className="text-slate-500">انتهاء التوثيق</span>
                     <strong className="mt-1 block text-slate-800">
                       {activeVerification.end_at
@@ -1328,36 +1197,37 @@ if (pendingRequest) {
               </div>
             )}
 
-
-
             {latestVerification?.status === "rejected" && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
                 <div className="flex items-center gap-2 text-red-700">
-                  <XCircle size={20} />
-                  <strong className="text-sm">تم رفض طلب التوثيق السابق</strong>
+                  <XCircle size={17} />
+                  <strong className="text-xs">
+                    تم رفض طلب التوثيق السابق
+                  </strong>
                 </div>
                 {latestVerification.admin_note && (
-                  <p className="mt-2 text-sm leading-6 text-red-800">
+                  <p className="mt-1.5 text-xs leading-5 text-red-800">
                     سبب الرفض: {latestVerification.admin_note}
                   </p>
                 )}
-                <p className="mt-2 text-xs text-red-700">
+                <p className="mt-1.5 text-[10px] text-red-700">
                   يمكنك إرسال طلب جديد بعد معالجة سبب الرفض.
                 </p>
               </div>
             )}
 
-
-
             {verificationPending ? (
-              <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
-                <CalendarDays size={17} className="mt-0.5 shrink-0" />
-                <span>لديك طلب توثيق قيد المراجعة حالياً. سيظهر خيار الطلب مجدداً بعد انتهاء المراجعة.</span>
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] leading-5 text-amber-800">
+                <CalendarDays size={15} className="mt-0.5 shrink-0" />
+                <span>
+                  لديك طلب توثيق قيد المراجعة حالياً. سيظهر خيار الطلب مجدداً
+                  بعد انتهاء المراجعة.
+                </span>
               </div>
             ) : (
-              <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="space-y-2.5 rounded-lg border border-slate-200 bg-white p-2.5">
                 <div>
-                  <label className="mb-1.5 block text-xs font-bold text-slate-600">
+                  <label className="mb-1 block text-[11px] font-bold text-slate-600">
                     رقم الهاتف المسجل في الحساب
                   </label>
                   <input
@@ -1370,8 +1240,9 @@ if (pendingRequest) {
                 </div>
 
                 {activeVerification && verificationDaysRemaining > 30 && (
-                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs leading-5 text-amber-800">
-                    يتاح تجديد التوثيق عند بقاء 30 يوماً أو أقل. المتبقي حالياً {verificationDaysRemaining} يوماً.
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[10px] leading-5 text-amber-800">
+                    يتاح تجديد التوثيق عند بقاء 30 يوماً أو أقل. المتبقي
+                    حالياً {verificationDaysRemaining} يوماً.
                   </p>
                 )}
 
@@ -1379,282 +1250,53 @@ if (pendingRequest) {
                   type="button"
                   onClick={submitVerificationRequest}
                   disabled={submittingVerification || !canRenewVerification}
-                  className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submittingVerification ? (
-                    <LoaderCircle className="animate-spin" size={17} />
-                  ) : activeVerification || latestVerification?.status === "approved" ? (
-                    <RefreshCw size={17} />
+                    <LoaderCircle className="animate-spin" size={14} />
+                  ) : activeVerification ||
+                    latestVerification?.status === "approved" ? (
+                    <RefreshCw size={14} />
                   ) : (
-                    <ShieldCheck size={17} />
+                    <ShieldCheck size={14} />
                   )}
+
                   {submittingVerification
                     ? "جارٍ إرسال الطلب..."
                     : activeVerification && verificationDaysRemaining > 30
                       ? "التجديد غير متاح حالياً"
-                      : activeVerification || latestVerification?.status === "approved"
+                      : activeVerification ||
+                          latestVerification?.status === "approved"
                         ? "طلب تجديد التوثيق"
                         : "إرسال طلب التوثيق"}
                 </button>
               </div>
             )}
-            <p className="text-center text-[11px] leading-5 text-slate-400">
+
+            <p className="text-center text-[10px] leading-5 text-slate-400">
               التوثيق هو شارة اعتماد داخل منصة Sooq.Sy بعد مراجعة الإدارة،
               ولا يُعد بحد ذاته إثباتاً قانونياً للهوية.
             </p>
           </div>
         </section>
 
-        <section className={`${sectionClass} mb-3`}>
-          <div className="mb-3 flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-              <Gift size={22} />
+        {/* دعوة الأصدقاء */}
+        <section className={`${sectionClass} mb-2`}>
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
+              <Gift size={18} />
             </div>
             <div>
-              <h2 className="font-black text-slate-800">
-                نقاطي ودعوة الأصدقاء
+              <h2 className="text-sm font-black text-slate-800">
+                دعوة الأصدقاء
               </h2>
-              <p className="mt-0.5 text-xs text-slate-400">
-                اجمع النقاط وشارك رابط دعوتك
+              <p className="mt-0.5 text-[10px] text-slate-400">
+                شارك رابط دعوتك واكسب النقاط
               </p>
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl bg-gradient-to-l from-emerald-700 to-teal-500 p-5 text-white">
-            <p className="text-sm font-medium text-emerald-50">
-              رصيد نقاطك الحالي
-            </p>
-            <div className="mt-2 flex items-end gap-2">
-              <span className="text-4xl font-black tabular-nums">
-                {pointsBalance}
-              </span>
-              <span className="mb-1 text-sm font-bold text-emerald-50">
-                نقطة
-              </span>
-            </div>
-            <p className="mt-2 text-xs text-emerald-50">
-              يمكنك جمع النقاط من مشاركة الإعلانات ودعوة الأصدقاء.
-            </p>
-          </div>
-{/* شحن النقاط */}
-
-<div className="mt-5 rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
-
-  <div className="mb-4 flex items-center gap-2">
-    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-      <Coins size={21} />
-    </div>
-    <div>
-      <h3 className="font-black text-slate-800">شحن رصيد النقاط</h3>
-      <p className="mt-1 text-xs text-slate-500">
-        اختر باقة واشحن رصيدك عبر شام كاش
-      </p>
-    </div>
-  </div>
-
-  {pointPackages.length === 0 ? (
-    <p className="rounded-xl bg-white p-4 text-center text-sm text-slate-500">
-      لا توجد باقات شحن متاحة حالياً.
-    </p>
-  ) : (
-    <>
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-        {pointPackages.map((pkg) => {
-          const selected = selectedPointPackageId === pkg.id;
-
-          return (
-            <button
-              key={pkg.id}
-              type="button"
-              onClick={() => setSelectedPointPackageId(pkg.id)}
-              className={`relative flex min-h-[68px] flex-col items-center justify-center rounded-xl border px-2 py-2 text-center transition-all duration-200 active:scale-95 ${
-                selected
-                  ? "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm ring-2 ring-emerald-500/10"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/40"
-              }`}
-            >
-              {selected && (
-                <span className="absolute right-1.5 top-1.5 text-emerald-600">
-                  <CheckCircle2 size={13} />
-                </span>
-              )}
-
-              <span className="max-w-full truncate text-[11px] font-bold">
-                {pkg.name}
-              </span>
-
-              <span className="mt-1 text-base font-black leading-tight text-emerald-700">
-                {Number(pkg.points).toLocaleString("en-US")}
-              </span>
-
-              <span className="mt-0.5 text-[10px] font-semibold text-slate-500">
-                نقطة · ${Number(pkg.price_usd).toFixed(2)}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {selectedPointPackageId && (() => {
-        const selectedPackage = pointPackages.find(
-          (pkg) => pkg.id === selectedPointPackageId
-        );
-
-        if (!selectedPackage) return null;
-
-        const amountSyp = Math.floor(
-          Number(selectedPackage.price_usd) * exchangeRate
-        );
-
-        return (
-          <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">الباقة المختارة</span>
-              <strong className="text-slate-800">
-                {selectedPackage.name}
-              </strong>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">النقاط</span>
-              <strong className="text-emerald-700">
-                {selectedPackage.points} نقطة
-              </strong>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">المبلغ بالدولار</span>
-              <strong>${Number(selectedPackage.price_usd).toFixed(2)}</strong>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-500">المبلغ بالليرة</span>
-              <strong className="text-emerald-700">
-                {amountSyp.toLocaleString("en-US")} ل.س
-              </strong>
-            </div>
-
-            <div className="border-t border-slate-100 pt-3">
-              <h4 className="mb-2 font-bold text-slate-800">
-                الدفع عبر شام كاش
-              </h4>
-
-              {qrUrl ? (
-                <img
-                  src={qrUrl}
-                  alt="رمز الدفع شام كاش"
-                  className="mx-auto max-h-48 max-w-full rounded-xl object-contain"
-                />
-              ) : (
-                <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-                  رمز شام كاش غير متوفر حالياً.
-                </p>
-              )}
-
-              <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs leading-6 text-amber-900">
-                بعد تحويل المبلغ، اكتب رقم الهاتف المسجل في حسابك ضمن ملاحظات
-                حوالة شام كاش حتى تتمكن الإدارة من مطابقة التحويل.
-                لا تحتاج إلى رفع صورة إثبات الدفع.
-              </p>
-
-              <label className="mb-2 mt-3 block text-xs font-bold text-slate-600">
-                رقم الهاتف المسجل في حسابك
-              </label>
-
-              <input
-                type="tel"
-                value={phone}
-                readOnly
-                dir="ltr"
-                className={`${inputClass} bg-slate-100 text-left`}
-              />
-
-
-
-              <button
-                type="button"
-                onClick={submitPointTopupRequest}
-
-                className={`${buttonClass} mt-4`}
-              >
-                {pointTopupSubmitting ? (
-                  <LoaderCircle size={18} className="animate-spin" />
-                ) : (
-                  <Coins size={18} />
-                )}
-                {pointTopupSubmitting
-                  ? "جارٍ إرسال الطلب..."
-                  : "تأكيد التحويل وإرسال طلب الشحن"}
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-    </>
-  )}
-</div>
-
-
-{/* سجل طلبات الشحن */}
-<div className="mt-4">
-  <h3 className="mb-3 font-bold text-slate-800">
-    سجل طلبات شحن النقاط
-  </h3>
-
-  {pointTopupRequests.length === 0 ? (
-    <p className="rounded-xl bg-slate-50 p-4 text-center text-xs text-slate-500">
-      لم ترسل أي طلب شحن حتى الآن.
-    </p>
-  ) : (
-<div className="max-h-[180px] overflow-y-auto space-y-2 pr-1">
-  {pointTopupRequests.map((request) => (
-    <div
-      key={request.id}
-      className="rounded-xl border border-slate-100 bg-white p-3"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <strong className="text-sm text-slate-800">
-          {request.points} نقطة
-        </strong>
-
-        <span
-          className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-            request.status === "approved"
-              ? "bg-emerald-50 text-emerald-700"
-              : request.status === "rejected"
-                ? "bg-red-50 text-red-700"
-                : "bg-amber-50 text-amber-700"
-          }`}
-        >
-          {request.status === "approved"
-            ? "تمت الموافقة"
-            : request.status === "rejected"
-              ? "مرفوض"
-              : "قيد المراجعة"}
-        </span>
-      </div>
-
-      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
-        <span>
-          {Number(request.amount_syp).toLocaleString("en-US")} ل.س
-        </span>
-        <span>
-          {new Date(request.created_at).toLocaleDateString("ar-SY")}
-        </span>
-      </div>
-
-      {request.admin_note && (
-        <p className="mt-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
-          ملاحظة الإدارة: {request.admin_note}
-        </p>
-      )}
-    </div>
-  ))}
-</div>
-  )}
-</div>
-          <label className="mb-2 mt-5 block text-sm font-bold text-slate-600">
+          <label className="mb-1.5 block text-xs font-bold text-slate-600">
             رمز الإحالة الخاص بك
           </label>
 
@@ -1669,35 +1311,36 @@ if (pendingRequest) {
             <button
               type="button"
               onClick={copyReferralLink}
-              className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-slate-800 px-4 text-sm font-bold text-white transition hover:bg-slate-700 active:scale-95"
+              className="inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-slate-800 px-3 text-xs font-bold text-white transition hover:bg-slate-700 active:scale-95"
             >
-              <Copy size={17} />
+              <Copy size={14} />
               نسخ
             </button>
           </div>
 
-          <p className="mt-3 text-xs leading-6 text-slate-500">
-            ادعُ أصدقاءك للتسجيل باستخدام رابطك، واحصل على 10 نقطة عند إنشاء
+          <p className="mt-2 text-[11px] leading-5 text-slate-500">
+            ادعُ أصدقاءك للتسجيل باستخدام رابطك، واحصل على 10 نقاط عند إنشاء
             كل صديق لحسابه بنجاح.
           </p>
         </section>
 
-        <section className={`${sectionClass} mb-3`}>
-          <div className="mb-3 flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
-              <MapPin size={21} />
+        {/* المحافظة والمدينة */}
+        <section className={`${sectionClass} mb-2`}>
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-600">
+              <MapPin size={17} />
             </div>
             <div>
-              <h2 className="font-black text-slate-800">
+              <h2 className="text-sm font-black text-slate-800">
                 المحافظة والمدينة
               </h2>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-[10px] text-slate-400">
                 حدد موقعك لعرض الإعلانات المناسبة
               </p>
             </div>
           </div>
 
-          <label className="mb-2 block text-sm font-bold text-slate-600">
+          <label className="mb-1.5 block text-xs font-bold text-slate-600">
             المحافظة
           </label>
           <select
@@ -1706,7 +1349,7 @@ if (pendingRequest) {
               setSelectedGovernorate(e.target.value);
               setSelectedCity("");
             }}
-            className={`${inputClass} mb-4`}
+            className={`${inputClass} mb-3`}
           >
             <option value="">اختر المحافظة</option>
             {governorates.map((governorate) => (
@@ -1716,7 +1359,7 @@ if (pendingRequest) {
             ))}
           </select>
 
-          <label className="mb-2 block text-sm font-bold text-slate-600">
+          <label className="mb-1.5 block text-xs font-bold text-slate-600">
             المدينة
           </label>
           <select
@@ -1742,21 +1385,24 @@ if (pendingRequest) {
             type="button"
             onClick={saveLocation}
             disabled={savingLocation}
-            className={`${buttonClass} mt-4`}
+            className={`${buttonClass} mt-3`}
           >
-            <Save size={18} />
+            <Save size={14} />
             {savingLocation ? "جارٍ الحفظ..." : "حفظ الموقع"}
           </button>
         </section>
 
-        <section className={`${sectionClass} mb-3`}>
-          <div className="mb-3 flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-              <Phone size={21} />
+        {/* رقم الموبايل */}
+        <section className={`${sectionClass} mb-2`}>
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-600">
+              <Phone size={17} />
             </div>
             <div>
-              <h2 className="font-black text-slate-800">رقم الموبايل</h2>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <h2 className="text-sm font-black text-slate-800">
+                رقم الموبايل
+              </h2>
+              <p className="mt-0.5 text-[10px] text-slate-400">
                 رقم الهاتف المرتبط بتسجيل الدخول
               </p>
             </div>
@@ -1775,7 +1421,7 @@ if (pendingRequest) {
             placeholder="09XXXXXXXX"
           />
 
-          <div className="mt-3 rounded-xl bg-amber-50 p-3 text-xs leading-6 text-amber-800">
+          <div className="mt-2 rounded-lg bg-amber-50 p-2.5 text-[10px] leading-5 text-amber-800">
             تغيير الرقم سيغيّر أيضاً الرقم المستخدم لتسجيل الدخول.
           </div>
 
@@ -1783,29 +1429,30 @@ if (pendingRequest) {
             type="button"
             onClick={savePhone}
             disabled={savingPhone}
-            className={`${buttonClass} mt-4`}
+            className={`${buttonClass} mt-3`}
           >
-            <Save size={18} />
+            <Save size={14} />
             {savingPhone ? "جارٍ التحديث..." : "تحديث رقم الموبايل"}
           </button>
         </section>
 
+        {/* تغيير كلمة المرور */}
         <section className={sectionClass}>
-          <div className="mb-3 flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-600">
-              <LockKeyhole size={21} />
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+              <LockKeyhole size={17} />
             </div>
             <div>
-              <h2 className="font-black text-slate-800">
+              <h2 className="text-sm font-black text-slate-800">
                 تغيير كلمة المرور
               </h2>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 text-[10px] text-slate-400">
                 حافظ على أمان حسابك
               </p>
             </div>
           </div>
 
-          <label className="mb-2 block text-sm font-bold text-slate-600">
+          <label className="mb-1.5 block text-xs font-bold text-slate-600">
             كلمة المرور الجديدة
           </label>
           <input
@@ -1813,11 +1460,11 @@ if (pendingRequest) {
             minLength={6}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className={`${inputClass} mb-4`}
+            className={`${inputClass} mb-3`}
             placeholder="أدخل كلمة المرور الجديدة"
           />
 
-          <label className="mb-2 block text-sm font-bold text-slate-600">
+          <label className="mb-1.5 block text-xs font-bold text-slate-600">
             تأكيد كلمة المرور
           </label>
           <input
@@ -1833,14 +1480,14 @@ if (pendingRequest) {
             type="button"
             onClick={savePassword}
             disabled={savingPassword}
-            className={`${buttonClass} mt-4`}
+            className={`${buttonClass} mt-3`}
           >
-            <LockKeyhole size={18} />
+            <LockKeyhole size={14} />
             {savingPassword ? "جارٍ التحديث..." : "تغيير كلمة المرور"}
           </button>
         </section>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="mt-4 text-center text-[10px] text-slate-400">
           Sooq Sy · حسابك بأمان
         </p>
       </div>

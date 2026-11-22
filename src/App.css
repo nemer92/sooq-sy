@@ -60,6 +60,8 @@ button {
   background: #23633e;
   color: white;
   font-weight: 800;
+  object-fit: contain;
+background: transparent;
 }
 
 .login-logo {
@@ -67,7 +69,8 @@ button {
   height: 65px;
   border-radius: 18px;
   margin: 0 auto 18px;
-  font-size: 30px;
+  object-fit: contain;
+  background: transparent;
 }
 
 .login-card h1 {

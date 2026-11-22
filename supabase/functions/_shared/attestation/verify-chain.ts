@@ -170,7 +170,7 @@ function bytesToBase64(value: string): Uint8Array {
   );
 
   const normalized = btoa(
-    String.fromCharCode(...bytes),
+    Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""),
   );
 
   if (normalized !== value) {
@@ -197,7 +197,7 @@ function validateLeaf(certificate: X509Certificate): void {
   }
 }
 
-function validateCa(certificate: X509Certificate): void {
+function validateCa(certificate: X509Certificate): number | null {
   const constraints = parseBasicConstraints(certificate);
   const usage = parseKeyUsage(certificate);
 
@@ -208,6 +208,18 @@ function validateCa(certificate: X509Certificate): void {
   if (!usage.keyCertSign) {
     throw new Error("CA_KEY_CERT_SIGN_REQUIRED");
   }
+
+  return constraints.pathLength;
+}
+
+async function certificateFingerprint(
+  certificate: X509Certificate,
+): Promise<string> {
+  const digest = await certificate.getThumbprint("SHA-256");
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 export async function verifyCertificateChain(
@@ -235,24 +247,27 @@ export async function verifyCertificateChain(
       bytesToBase64,
     );
 
-    const fingerprints = new Set<string>();
+    const certificates = certificateBytes.map(
+      (bytes) =>
+        new X509Certificate(
+          bytes.buffer.slice(
+            bytes.byteOffset,
+            bytes.byteOffset + bytes.byteLength,
+          ) as ArrayBuffer,
+        ),
+    );
 
-    for (const bytes of certificateBytes) {
-      const digest = await crypto.subtle.digest("SHA-256", bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
-      const fingerprint = Array.from(new Uint8Array(digest))
-        .map((byte) => byte.toString(16).padStart(2, "0"))
-        .join("");
+    const suppliedFingerprints = new Set<string>();
 
-      if (fingerprints.has(fingerprint)) {
+    for (const certificate of certificates) {
+      const fingerprint = await certificateFingerprint(certificate);
+
+      if (suppliedFingerprints.has(fingerprint)) {
         throw new Error("DUPLICATE_CERTIFICATE");
       }
 
-      fingerprints.add(fingerprint);
+      suppliedFingerprints.add(fingerprint);
     }
-
-    const certificates = certificateBytes.map(
-      (bytes) => new X509Certificate(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer),
-    );
 
     const roots = trustedRootsPem.map((pem) => {
       if (
@@ -265,6 +280,12 @@ export async function verifyCertificateChain(
 
       return new X509Certificate(pem);
     });
+
+    const rootFingerprints = new Set<string>();
+
+    for (const root of roots) {
+      rootFingerprints.add(await certificateFingerprint(root));
+    }
 
     validateLeaf(certificates[0]);
 
@@ -287,7 +308,28 @@ export async function verifyCertificateChain(
       throw new Error("INVALID_VERIFIED_CHAIN_LENGTH");
     }
 
+    const usedFingerprints = new Set<string>();
+
+    for (const certificate of chain) {
+      usedFingerprints.add(await certificateFingerprint(certificate));
+    }
+
+    for (const fingerprint of suppliedFingerprints) {
+      if (!usedFingerprints.has(fingerprint)) {
+        throw new Error("UNUSED_CERTIFICATE_SUPPLIED");
+      }
+    }
+
+    const terminalFingerprint = await certificateFingerprint(
+      chain[chain.length - 1],
+    );
+
+    if (!rootFingerprints.has(terminalFingerprint)) {
+      throw new Error("CHAIN_DOES_NOT_END_AT_TRUSTED_ROOT");
+    }
+
     const now = Date.now();
+    const caPathLengths: Array<number | null> = [];
 
     for (let index = 0; index < chain.length; index++) {
       const certificate = chain[index];
@@ -306,10 +348,22 @@ export async function verifyCertificateChain(
       }
 
       if (index > 0) {
-        validateCa(certificate);
+        caPathLengths.push(validateCa(certificate));
       }
 
       subjectNames.push(certificate.subject);
+    }
+
+    for (let index = 0; index < caPathLengths.length; index++) {
+      const limit = caPathLengths[index];
+
+      if (limit === null) continue;
+
+      const subordinateCaCount = index;
+
+      if (subordinateCaCount > limit) {
+        throw new Error("CA_PATH_LENGTH_EXCEEDED");
+      }
     }
 
     return {

@@ -265,6 +265,9 @@ const [password, setPassword] = useState("");
   const [subscriptionsEnabled, setSubscriptionsEnabled] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
+const [logoUploading, setLogoUploading] = useState(false);
   const [heroImageUrl, setHeroImageUrl] = useState("");
   const [heroImageFile, setHeroImageFile] = useState<File | null>(null);
 const [heroImageUploading, setHeroImageUploading] = useState(false);
@@ -2428,6 +2431,48 @@ const uploadShamCashQr = async () => {
     setShamCashQrUploading(false);
   }
 };
+const uploadLogo = async () => {
+  if (!logoFile) {
+    setSettingsError("يرجى اختيار صورة الشعار أولاً.");
+    return;
+  }
+
+  setLogoUploading(true);
+  setSettingsError("");
+  setSettingsSuccess("");
+
+  try {
+    const fileExt = logoFile.name.split(".").pop() || "png";
+    const filePath = `site-logo-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("site-images")
+      .upload(filePath, logoFile, {
+        upsert: true,
+        contentType: logoFile.type,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from("site-images")
+      .getPublicUrl(filePath);
+
+    setLogoUrl(data.publicUrl);
+    setLogoFile(null);
+    setLogoPreviewUrl("");
+
+    setSettingsSuccess(
+      "تم رفع الشعار بنجاح. اضغط حفظ الإعدادات لتثبيت الشعار."
+    );
+  } catch (err) {
+    setSettingsError(
+      err instanceof Error ? err.message : "تعذر رفع الشعار."
+    );
+  } finally {
+    setLogoUploading(false);
+  }
+};
 const saveSettings = useCallback(async () => {
   setSettingsSaving(true);
   setSettingsError("");
@@ -3384,7 +3429,11 @@ function getSubCategories(categoryId: number) {
     return (
       <div className="login-page" dir="rtl">
         <div className="login-card">
-          <div className="login-logo">س</div>
+<img
+  src="/logo.png?v=3"
+  alt="Sooq.Sy"
+  className="login-logo"
+/>
 
           <h1>Sooq.Sy</h1>
 
@@ -5629,16 +5678,53 @@ onClick={() => {
         />
       </div>
 
-      <div>
-        <label>رابط الشعار</label>
-        <input
-          type="text"
-          value={logoUrl}
-          onChange={(e) => setLogoUrl(e.target.value)}
-          className="w-full border rounded-lg p-3 mt-1"
-          placeholder="رابط صورة الشعار"
-        />
-      </div>
+<div className="border rounded-xl p-4">
+  <label className="block font-semibold mb-3">
+    شعار الموقع
+  </label>
+
+  {(logoPreviewUrl || logoUrl) && (
+    <div className="mb-3">
+      <img
+        src={logoPreviewUrl || logoUrl}
+        alt="معاينة شعار الموقع"
+        className="w-24 h-24 object-contain rounded-xl border p-2 bg-white"
+      />
+    </div>
+  )}
+
+  <input
+    type="file"
+    accept="image/*"
+    onChange={(e) => {
+      const file = e.target.files?.[0] || null;
+      setLogoFile(file);
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setLogoPreviewUrl(String(reader.result));
+        };
+        reader.readAsDataURL(file);
+      }
+    }}
+    className="w-full border rounded-lg p-3"
+  />
+
+  <button
+    type="button"
+    onClick={uploadLogo}
+    disabled={!logoFile || logoUploading}
+    className="mt-3 px-5 py-2 rounded-lg bg-emerald-700 text-white disabled:opacity-50"
+  >
+    {logoUploading ? "جارٍ رفع الشعار..." : "رفع الشعار"}
+  </button>
+
+  <p className="text-sm text-gray-500 mt-2">
+    اختر صورة من جهازك، ثم ارفعها واضغط حفظ الإعدادات لتثبيتها.
+  </p>
+</div>
+
 <div className="border rounded-xl p-4">
   <label className="block font-semibold mb-2">
     صورة الواجهة الرئيسية

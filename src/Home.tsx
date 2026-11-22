@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import { useNavigate } from "react-router-dom";
+import { Share } from "@capacitor/share";
+import { Capacitor } from "@capacitor/core";
 import siteIcon from "../assets/icon.png";
 import {
   Search,
@@ -348,7 +350,7 @@ const toggleCondition = (condition: "new" | "used") => {
   );
 };
 const [siteName, setSiteName] = useState("Sooq.Sy");
-const [, setLogoUrl] = useState("");
+const [logoUrl, setLogoUrl] = useState("");
 const [heroImageUrl, setHeroImageUrl] = useState("");
 const [contactEmail, setContactEmail] = useState("");
 const [contactPhone, setContactPhone] = useState("");
@@ -956,13 +958,13 @@ const matchesCondition = selectedConditions.includes(
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#f7f8fa] text-slate-800">
-
+{/* 
       <button
   onClick={() => navigate("/device-key-test")}
   className="fixed bottom-24 right-4 z-[99999] rounded-xl bg-red-600 px-4 py-3 font-bold text-white shadow-lg"
 >
   فحص مفتاح الجهاز
-</button>
+</button> */}
       
       {messageNotification && (
   <div className="fixed bottom-5 left-5 z-[99999] w-[calc(100%-2.5rem)] max-w-sm rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xl">
@@ -1012,11 +1014,11 @@ const matchesCondition = selectedConditions.includes(
 
   {/* اللوغو على اليسار */}
   <div className="order-1 shrink-0 rounded-2xl bg-emerald-50 p-1 shadow-sm ring-1 ring-emerald-100/80 transition duration-300 group-hover:scale-[1.03] group-hover:shadow-md">
-    <img
-      src={siteIcon}
-      alt="Sooq.Sy"
-      className="h-10 w-10 rounded-xl object-contain sm:h-11 sm:w-11"
-    />
+<img
+  src={logoUrl || siteIcon}
+  alt="Sooq.Sy"
+  className="h-10 w-10 rounded-xl object-contain sm:h-11 sm:w-11"
+/>
   </div>
 
   {/* اسم الموقع والوصف */}
@@ -1063,21 +1065,85 @@ const matchesCondition = selectedConditions.includes(
             الملف الشخصي
           </button>
 
-          <button
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              navigate("/messages");
-            }}
-            className="group flex items-center gap-2 whitespace-nowrap rounded-xl px-2.5 py-2.5 text-sm font-semibold text-slate-600 transition-all duration-200 hover:bg-emerald-50 hover:text-emerald-700 lg:px-3"
-          >
-            <MessageCircle size={17} className="transition-transform group-hover:scale-110" />
-            رسائلي
-            {unreadMessagesCount > 0 && (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-sm shadow-rose-200">
-                {unreadMessagesCount}
-              </span>
-            )}
-          </button>
+
+<button
+  onClick={async () => {
+    setIsMobileMenuOpen(false);
+
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        alert("يرجى تسجيل الدخول أولاً.");
+        return;
+      }
+
+      const { data: referralData, error: referralError } =
+        await supabase
+          .from("referral_codes")
+          .select("code")
+          .eq("user_id", user.id)
+          .single();
+
+      if (referralError || !referralData?.code) {
+        alert("تعذر تحميل رابط الدعوة، حاول مرة أخرى.");
+        return;
+      }
+
+      const basePath = window.location.pathname.startsWith("/sooq-sy")
+        ? "/sooq-sy"
+        : "";
+
+      const link = `${window.location.origin}${basePath}/auth?ref=${encodeURIComponent(referralData.code)}`;
+
+      const shareTitle = "انضم إلى Sooq.Sy";
+      const shareText =
+        "شارك تطبيق سوق سوريا مع أصدقائك وادعهم للانضمام، واربح النقاط!";
+
+      if (Capacitor.isNativePlatform()) {
+        await Share.share({
+          title: shareTitle,
+          text: `${shareText}\n${link}`,
+          url: link,
+          dialogTitle: "مشاركة رابط الدعوة",
+        });
+      } else if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: link,
+        });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+        alert("تم نسخ رابط الدعوة. يمكنك إرساله لأصدقائك.");
+      } else {
+        window.prompt("انسخ رابط الدعوة:", link);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+
+      alert("تعذرت مشاركة الرابط. حاول مرة أخرى.");
+    }
+  }}
+  className="mt-1 flex w-full items-center gap-3 rounded-xl border border-emerald-100 bg-gradient-to-l from-emerald-50 to-white px-3 py-3 text-right text-sm font-bold text-emerald-800 transition hover:border-emerald-200 hover:bg-emerald-50 active:scale-[0.99]"
+>
+  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+    <Gift size={19} />
+  </span>
+
+  <span className="flex-1">
+    <span className="block">شارك التطبيق واربح نقاط</span>
+    <span className="mt-0.5 block text-[10px] font-medium text-emerald-600">
+      ادعُ أصدقاءك واكسب المكافآت
+    </span>
+  </span>
+
+  <Share2 size={17} className="text-emerald-600" />
+</button>
+
 
           {/* الإشعارات */}
           <div className="relative">
@@ -1629,22 +1695,31 @@ const matchesCondition = selectedConditions.includes(
       }
 
       const basePath = window.location.pathname.startsWith("/sooq-sy")
-        ? "/sooq-sy"
+  
+      ? "/sooq-sy"
         : "";
 
       const link = `${window.location.origin}${basePath}/auth?ref=${encodeURIComponent(referralData.code)}`;
 
-if (navigator.share) {
-  await navigator.share({
-    title: "انضم إلى Sooq.Sy",
-    text: "شارك تطبيق سوق سوريا مع أصدقائك وادعهم للانضمام، واربح النقاط!",
-    url: link,
-  });
-} else {
-  alert(
-    "المشاركة المباشرة غير مدعومة في هذا المتصفح. افتح Sooq.Sy من متصفح الهاتف مثل Chrome أو Safari لتظهر لك تطبيقات المشاركة."
-  );
-}
+      if (Capacitor.isNativePlatform()) {
+        await Share.share({
+          title: "انضم إلى Sooq.Sy",
+          text: "شارك تطبيق سوق سوريا مع أصدقائك وادعهم للانضمام، واربح النقاط!",
+          url: link,
+          dialogTitle: "مشاركة رابط الدعوة",
+        });
+      } else if (navigator.share) {
+        await navigator.share({
+          title: "انضم إلى Sooq.Sy",
+          text: "شارك تطبيق سوق سوريا مع أصدقائك وادعهم للانضمام، واربح النقاط!",
+          url: link,
+        });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+        alert("تم نسخ رابط الدعوة.");
+      } else {
+        window.prompt("انسخ رابط الدعوة:", link);
+      }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") return;
 

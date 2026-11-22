@@ -17,7 +17,6 @@ import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.Signature;
 import java.security.cert.Certificate;
-
 import java.nio.charset.StandardCharsets;
 import java.security.spec.ECGenParameterSpec;
 
@@ -27,20 +26,43 @@ public class DeviceKeyPlugin extends Plugin {
     private static final String KEY_ALIAS = "sooq_sy_referral_device_key";
     private static final String ATTESTED_KEY_ALIAS = "sooq_sy_referral_attested_key_v1";
 
-@PluginMethod
-public void hasAttestedKey(PluginCall call) {
-    try {
-        KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
-        keyStore.load(null);
+    @PluginMethod
+    public void hasAttestedKey(PluginCall call) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+            keyStore.load(null);
 
-        JSObject result = new JSObject();
-        result.put("exists", keyStore.containsAlias(ATTESTED_KEY_ALIAS));
+            JSObject result = new JSObject();
+            result.put("exists", keyStore.containsAlias(ATTESTED_KEY_ALIAS));
 
-        call.resolve(result);
-    } catch (Exception e) {
-        call.reject("DEVICE_KEY_CHECK_ERROR: " + e.getMessage());
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("DEVICE_KEY_CHECK_ERROR: " + e.getMessage());
+        }
     }
-}
+
+    // Deletes only the attested referral key.
+    // The ordinary KEY_ALIAS is never deleted here.
+    @PluginMethod
+    public void deleteAttestedKey(PluginCall call) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+            keyStore.load(null);
+
+            boolean existed = keyStore.containsAlias(ATTESTED_KEY_ALIAS);
+
+            if (existed) {
+                keyStore.deleteEntry(ATTESTED_KEY_ALIAS);
+            }
+
+            JSObject result = new JSObject();
+            result.put("deleted", existed);
+            call.resolve(result);
+
+        } catch (Exception e) {
+            call.reject("ATTESTED_KEY_DELETE_ERROR: " + e.getMessage());
+        }
+    }
 
     @PluginMethod
     public void getAttestedKeyMaterial(PluginCall call) {
@@ -118,10 +140,13 @@ public void hasAttestedKey(PluginCall call) {
             Certificate certificate = keyStore.getCertificate(KEY_ALIAS);
 
             JSObject result = new JSObject();
-            result.put("publicKey", Base64.encodeToString(
-                certificate.getPublicKey().getEncoded(),
-                Base64.NO_WRAP
-            ));
+            result.put(
+                "publicKey",
+                Base64.encodeToString(
+                    certificate.getPublicKey().getEncoded(),
+                    Base64.NO_WRAP
+                )
+            );
 
             call.resolve(result);
 
@@ -158,10 +183,10 @@ public void hasAttestedKey(PluginCall call) {
             KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
             keyStore.load(null);
 
-if (keyStore.containsAlias(ATTESTED_KEY_ALIAS)) {
-    call.reject("ATTESTED_KEY_ALREADY_EXISTS");
-    return;
-}
+            if (keyStore.containsAlias(ATTESTED_KEY_ALIAS)) {
+                call.reject("ATTESTED_KEY_ALREADY_EXISTS");
+                return;
+            }
 
             KeyPairGenerator generator = KeyPairGenerator.getInstance(
                 KeyProperties.KEY_ALGORITHM_EC,
@@ -202,10 +227,13 @@ if (keyStore.containsAlias(ATTESTED_KEY_ALIAS)) {
             Certificate leaf = chain[0];
 
             JSObject result = new JSObject();
-            result.put("publicKey", Base64.encodeToString(
-                leaf.getPublicKey().getEncoded(),
-                Base64.NO_WRAP
-            ));
+            result.put(
+                "publicKey",
+                Base64.encodeToString(
+                    leaf.getPublicKey().getEncoded(),
+                    Base64.NO_WRAP
+                )
+            );
             result.put("certificateChain", certificateChain);
 
             call.resolve(result);

@@ -175,6 +175,15 @@ export default function StoreSubscription() {
 
     setRequestError("");
 
+    // فحص الرصيد قبل أي عملية إنشاء أو إرسال
+    if (pointsBalance < SUBSCRIPTION_POINTS) {
+      setRequestError(
+        `رصيدك غير كافٍ. تحتاج إلى ${SUBSCRIPTION_POINTS} نقطة، ورصيدك الحالي ${pointsBalance} نقطة.`
+      );
+      return;
+    }
+
+    // التحقق من معلومات المتجر الجديد
     if (!selectedStoreId) {
       if (!storeName.trim()) {
         setRequestError("يرجى إدخال اسم المتجر.");
@@ -200,6 +209,7 @@ export default function StoreSubscription() {
       let storeId = selectedStoreId;
 
       if (!storeId) {
+        // إنشاء متجر جديد وطلب اشتراك ضمن عملية واحدة في قاعدة البيانات
         const { data: sessionData } = await supabase.auth.getSession();
         const user = sessionData.session?.user;
 
@@ -218,29 +228,47 @@ export default function StoreSubscription() {
           (item) => item.id === Number(selectedCity)
         )?.name_ar;
 
-        const { data: newStore, error: createError } = await supabase
-          .from("stores")
-          .insert({
-            owner_id: user.id,
-            name: storeName.trim(),
-            business_type: businessType.trim() || null,
-            description: storeDescription.trim() || null,
-            governorate: governorateName ?? "",
-            city: cityName ?? "",
-            phone: storePhone.trim(),
-            whatsapp: storeWhatsapp.trim() || null,
-            status: "pending",
-          })
-          .select("id, name, status")
-          .single();
+        const { data: result, error: createError } = await supabase.rpc(
+          "create_store_and_subscription_request",
+          {
+            p_name: storeName.trim(),
+            p_business_type: businessType.trim() || null,
+            p_description: storeDescription.trim() || null,
+            p_governorate: governorateName ?? "",
+            p_city: cityName ?? "",
+            p_phone: storePhone.trim(),
+            p_whatsapp: storeWhatsapp.trim() || null,
+          }
+        );
 
         if (createError) throw createError;
 
-        storeId = newStore.id;
+        const created = Array.isArray(result) ? result[0] : result;
 
-        setStores((previous) => [newStore as Store, ...previous]);
+        if (!created?.store_id || !created?.request_id) {
+          throw new Error(
+            "لم يتم استلام تأكيد إنشاء المتجر وطلب الاشتراك."
+          );
+        }
+
+        storeId = created.store_id;
+
+        setStores((previous) => [
+          {
+            id: created.store_id,
+            name: storeName.trim(),
+            status: "pending",
+          },
+          ...previous,
+        ]);
+
         setSelectedStoreId(storeId);
+
+        // الطلب أُنشئ بالفعل ضمن الدالة الجديدة، فلا نستدعي الدالة القديمة مرة ثانية
+        setRequestSent(true);
+        return;
       } else {
+        // التحقق من ملكية المتجر الموجود
         const { data: sessionData } = await supabase.auth.getSession();
         const user = sessionData.session?.user;
 
@@ -267,6 +295,7 @@ export default function StoreSubscription() {
         }
       }
 
+      // طلب اشتراك لمتجر موجود مسبقاً
       const { data, error: requestErrorFromServer } = await supabase.rpc(
         "create_store_subscription_request",
         {
@@ -281,7 +310,6 @@ export default function StoreSubscription() {
       }
 
       setRequestSent(true);
-
     } catch (err: unknown) {
       const errorMessage =
         typeof err === "object" &&
@@ -296,7 +324,6 @@ export default function StoreSubscription() {
       setSubmitting(false);
     }
   };
-
 
   if (loading) {
     return (
@@ -497,8 +524,8 @@ export default function StoreSubscription() {
                     {(SUBSCRIPTION_POINTS - pointsBalance).toLocaleString(
                       "en-US"
                     )}{" "}
-                    نقطة إضافية لإكمال تكلفة الاشتراك. يمكنك إرسال الطلب،
-                    لكن لن تتمكن الإدارة من الموافقة عليه قبل توفر الرصيد.
+                    نقطة إضافية لإكمال تكلفة الاشتراك. لا يمكنك إرسال طلب
+                    إنشاء المتجر أو الاشتراك قبل توفر الرصيد المطلوب.
                   </p>
                 )}
               </div>
@@ -761,7 +788,11 @@ export default function StoreSubscription() {
               <button
                 type="button"
                 onClick={submitStoreSubscriptionRequest}
-                disabled={!subscriptionsEnabled || submitting}
+                disabled={
+                  !subscriptionsEnabled ||
+                  submitting ||
+                  pointsBalance < SUBSCRIPTION_POINTS
+                }
                 className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-emerald-700 to-emerald-600 px-5 py-4 font-black text-white shadow-md shadow-emerald-100 transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
               >
                 {submitting ? (

@@ -351,7 +351,7 @@ export default function MyStores() {
 
           <button
             type="button"
-            onClick={() => navigate("/subscriptions")}
+            onClick={() => navigate("/store-subscription")}
             className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700"
           >
             <Plus size={18} />

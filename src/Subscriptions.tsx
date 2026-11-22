@@ -226,7 +226,7 @@ export default function Subscriptions() {
           </div>
           <button
             type="button"
-            onClick={() => navigate("/profile")}
+            onClick={() => navigate("/wallet")}
             className="shrink-0 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-bold text-white transition hover:bg-amber-600"
           >
             <Coins size={14} className="ml-1 inline" />

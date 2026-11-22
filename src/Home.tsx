@@ -31,6 +31,7 @@ import {
   Megaphone,
   X,
   MessageCircle,
+  Headset,
   Store as StoreIcon
 } from "lucide-react";
 
@@ -93,6 +94,17 @@ type Ad = {
 
 export default function Home() {
     const navigate = useNavigate();
+
+    const openCustomerSupport = async () => {
+      setIsMobileMenuOpen(false);
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        alert("يرجى تسجيل الدخول أولاً للتواصل مع خدمة العملاء.");
+        navigate("/auth");
+        return;
+      }
+      navigate("/support");
+    };
     const [categories, setCategories] = useState<Category[]>([]);
     const [cities, setCities] = useState<City[]>([]);
     const [governorates, setGovernorates] = useState<Governorate[]>([]);
@@ -111,7 +123,7 @@ export default function Home() {
     const [showNotifications, setShowNotifications] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
 const [helpTab, setHelpTab] = useState<"guide" | "developer">("guide");
-
+const [hasUnreadSupport, setHasUnreadSupport] = useState(false);
 const [deleteTarget, setDeleteTarget] = useState<{
   type: "one" | "all";
   id?: string;
@@ -365,6 +377,103 @@ const [messageNotification, setMessageNotification] = useState<{
 } | null>(null);
 const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+useEffect(() => {
+  let active = true;
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+
+  const checkUnreadSupport = async () => {
+    
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError) {
+        console.error("SUPPORT AUTH ERROR:", authError);
+        return;
+      }
+
+      if (!user || !active) {
+        if (active) setHasUnreadSupport(false);
+        return;
+      }
+
+      const { data: conversation, error: conversationError } =
+        await supabase
+          .from("support_conversations")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+      if (conversationError) {
+        console.error("SUPPORT CONVERSATION ERROR:", conversationError);
+        return;
+      }
+
+      if (!conversation || !active) {
+        if (active) setHasUnreadSupport(false);
+        return;
+      }
+
+      const { count, error: messagesError } = await supabase
+        .from("support_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("conversation_id", conversation.id)
+        .neq("sender_id", user.id)
+        .eq("is_read", false);
+
+      console.log("SUPPORT UNREAD:", {
+        userId: user.id,
+        conversationId: conversation.id,
+        count,
+        error: messagesError,
+      });
+
+      if (messagesError) {
+        console.error("SUPPORT MESSAGES ERROR:", messagesError);
+        return;
+      }
+
+      if (active) {
+        setHasUnreadSupport((count ?? 0) > 0);
+      }
+
+      if (!channel) {
+        channel = supabase
+          .channel(`home-support-${user.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "support_messages",
+              filter: `conversation_id=eq.${conversation.id}`,
+            },
+            () => {
+              void checkUnreadSupport();
+            }
+          )
+          .subscribe((status) => {
+            console.log("SUPPORT REALTIME STATUS:", status);
+          });
+      }
+    } catch (error) {
+      console.error("SUPPORT CHECK ERROR:", error);
+    }
+  };
+  console.log("SUPPORT CHECK STARTED");
+
+  void checkUnreadSupport();
+
+  return () => {
+    active = false;
+
+    if (channel) {
+      void supabase.removeChannel(channel);
+    }
+  };
+}, []);
 
 useEffect(() => {
   let lastSeenInterval: ReturnType<typeof setInterval> | null = null;
@@ -1145,6 +1254,17 @@ const matchesCondition = selectedConditions.includes(
 </button>
 
 
+<button
+  type="button"
+  onClick={openCustomerSupport}
+  className="group relative flex items-center gap-2 whitespace-nowrap rounded-xl border border-sky-100 bg-sky-50 px-3 py-2.5 text-sm font-bold text-sky-700 transition-all hover:bg-sky-100"
+>
+  {hasUnreadSupport && (
+    <span className="absolute -top-1 -left-1 z-50 h-3.5 w-3.5 rounded-full border-2 border-white bg-red-600" />
+  )}
+  <Headset size={17} />
+  خدمة العملاء
+</button>
           {/* الإشعارات */}
           <div className="relative">
             <button
@@ -1402,6 +1522,20 @@ const matchesCondition = selectedConditions.includes(
     <span className="text-xl font-black">؟</span>
   </button>
 
+  {/* زر خدمة العملاء */}
+<button
+  type="button"
+  onClick={openCustomerSupport}
+  aria-label="خدمة العملاء"
+  title="خدمة العملاء"
+  className="relative flex h-10 items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-2.5 text-sky-700 shadow-sm transition-all hover:bg-sky-100 active:scale-95"
+>
+  {hasUnreadSupport && (
+    <span className="absolute -top-1 -left-1 z-50 h-3.5 w-3.5 rounded-full border-2 border-white bg-red-600" />
+  )}
+  <Headset size={18} />
+</button>
+
   {/* زر قائمة الموبايل */}
   <button
     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -1585,6 +1719,20 @@ const matchesCondition = selectedConditions.includes(
                 </span>
               )}
             </button>
+
+<button
+  type="button"
+  onClick={openCustomerSupport}
+  className="relative flex w-full items-center gap-3 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-3 text-right text-sm font-bold text-sky-800 transition hover:bg-sky-100"
+>
+  {hasUnreadSupport && (
+    <span className="absolute -top-1 -left-1 z-50 h-3.5 w-3.5 rounded-full border-2 border-white bg-red-600" />
+  )}
+  <span className="rounded-xl bg-sky-100 p-2 text-sky-700">
+    <Headset size={18} />
+  </span>
+  <span className="flex-1">خدمة العملاء</span>
+</button>
 
             <button
               onClick={() => {

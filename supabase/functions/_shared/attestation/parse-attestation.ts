@@ -31,7 +31,7 @@ const TAG = {
 
 const ANDROID_ATTESTATION_OID = "1.3.6.1.4.1.11129.2.1.17";
 const RELEASE_SIGNING_DIGEST =
-  "9b065a12ef33cc64cf73adb5e8e56b737ee4471d98c09c424c56f5353dd6bb21";
+  "6e9dfa48d98ff81503ea4a173990e89fa07263f90b6bf31f11d9dc1825e286db";
 
 function children(node: any): any[] {
   const value = node?.valueBlock?.value;

@@ -213,6 +213,27 @@ type Ad = {
   ad_images: AdImage[] | null;
 };
 
+type SupportConversation = {
+  id: string;
+  user_id: string;
+  status: "open" | "closed";
+  created_at: string;
+  updated_at: string;
+  last_message_at: string;
+  user_name?: string;
+  unread_count?: number;
+  last_message?: string;
+};
+
+type SupportMessage = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  is_read: boolean;
+  created_at: string;
+};
+
 type AdminStore = {
   id: string;
   owner_id: string | null;
@@ -283,6 +304,14 @@ const [shamCashQrUploading, setShamCashQrUploading] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState("");
 
   const [activeMenu, setActiveMenu] = useState("الرئيسية");
+  const [supportConversations, setSupportConversations] = useState<SupportConversation[]>([]);
+  const [supportConversationsLoading, setSupportConversationsLoading] = useState(false);
+  const [supportError, setSupportError] = useState("");
+  const [selectedSupportConversationId, setSelectedSupportConversationId] = useState<string | null>(null);
+  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
+  const [supportMessagesLoading, setSupportMessagesLoading] = useState(false);
+  const [supportReply, setSupportReply] = useState("");
+  const [supportSending, setSupportSending] = useState(false);
 
   const [stats, setStats] = useState({
 
@@ -2938,6 +2967,191 @@ async function openReportedUser(userId: string) {
     alert("تعذر فتح ملف المستخدم.");
   }
 }
+// تحميل محادثات خدمة العملاء
+const loadSupportConversations = async () => {
+  if (!admin) return;
+
+  setSupportConversationsLoading(true);
+  setSupportError("");
+
+  try {
+    const { data, error } = await supabase
+      .from("support_conversations")
+      .select("id,user_id,status,created_at,updated_at,last_message_at")
+      .order("last_message_at", { ascending: false });
+
+    if (error) throw error;
+
+    const conversations = (data ?? []) as SupportConversation[];
+    const userIds = [...new Set(conversations.map((item) => item.user_id))];
+    const conversationIds = conversations.map((item) => item.id);
+
+    const [profilesResult, messagesResult] = await Promise.all([
+      userIds.length
+        ? supabase.from("profiles").select("id,display_name").in("id", userIds)
+        : Promise.resolve({ data: [], error: null }),
+      conversationIds.length
+        ? supabase
+            .from("support_messages")
+            .select("conversation_id,sender_id,is_read,body,created_at")
+            .in("conversation_id", conversationIds)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (profilesResult.error) throw profilesResult.error;
+    if (messagesResult.error) throw messagesResult.error;
+
+    const names = new Map(
+      (profilesResult.data ?? []).map((profile) => [
+        profile.id,
+        profile.display_name || "مستخدم",
+      ])
+    );
+
+    const messageStats = new Map<string, { unread: number; lastMessage: string }>();
+    (messagesResult.data ?? []).forEach((message) => {
+      const current = messageStats.get(message.conversation_id) ?? {
+        unread: 0,
+        lastMessage: message.body,
+      };
+      if (message.sender_id !== admin.id && !message.is_read) {
+        current.unread += 1;
+      }
+      messageStats.set(message.conversation_id, current);
+    });
+
+    setSupportConversations(
+      conversations.map((conversation) => {
+        const stats = messageStats.get(conversation.id);
+        return {
+          ...conversation,
+          user_name: names.get(conversation.user_id) ?? "مستخدم",
+          unread_count: stats?.unread ?? 0,
+          last_message: stats?.lastMessage ?? "لا توجد رسائل",
+        };
+      })
+    );
+  } catch (err) {
+    console.error("Error loading support conversations:", err);
+    setSupportError(
+      err instanceof Error ? err.message : "تعذر تحميل محادثات خدمة العملاء."
+    );
+  } finally {
+    setSupportConversationsLoading(false);
+  }
+};
+
+const loadSupportMessages = async (conversationId: string) => {
+  setSupportMessagesLoading(true);
+  setSupportError("");
+
+  try {
+    const { data, error } = await supabase
+      .from("support_messages")
+      .select("id,conversation_id,sender_id,body,is_read,created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    setSupportMessages((data ?? []) as SupportMessage[]);
+
+    if (admin) {
+      const { error: readError } = await supabase
+        .from("support_messages")
+        .update({ is_read: true })
+        .eq("conversation_id", conversationId)
+        .neq("sender_id", admin.id)
+        .eq("is_read", false);
+
+      if (readError) throw readError;
+      await loadSupportConversations();
+    }
+  } catch (err) {
+    console.error("Error loading support messages:", err);
+    setSupportError(
+      err instanceof Error ? err.message : "تعذر تحميل رسائل المحادثة."
+    );
+  } finally {
+    setSupportMessagesLoading(false);
+  }
+};
+
+const handleSelectSupportConversation = (conversationId: string) => {
+  setSelectedSupportConversationId(conversationId);
+  setSupportReply("");
+};
+
+const handleSendSupportReply = async () => {
+  const body = supportReply.trim();
+  if (!body || !admin || !selectedSupportConversationId || supportSending) return;
+
+  setSupportSending(true);
+  setSupportError("");
+
+  try {
+    const { error } = await supabase.from("support_messages").insert({
+      conversation_id: selectedSupportConversationId,
+      sender_id: admin.id,
+      body,
+    });
+
+    if (error) throw error;
+
+    setSupportReply("");
+    await Promise.all([
+      loadSupportMessages(selectedSupportConversationId),
+      loadSupportConversations(),
+    ]);
+  } catch (err) {
+    console.error("Error sending support reply:", err);
+    setSupportError(
+      err instanceof Error ? err.message : "تعذر إرسال الرد."
+    );
+  } finally {
+    setSupportSending(false);
+  }
+};
+
+const handleToggleSupportStatus = async (conversation: SupportConversation) => {
+  const nextStatus = conversation.status === "open" ? "closed" : "open";
+  const confirmed = window.confirm(
+    nextStatus === "closed"
+      ? "هل تريد إغلاق طلب خدمة العملاء؟"
+      : "هل تريد إعادة فتح طلب خدمة العملاء؟"
+  );
+  if (!confirmed) return;
+
+  setSupportError("");
+  try {
+    const { error } = await supabase
+      .from("support_conversations")
+      .update({ status: nextStatus, updated_at: new Date().toISOString() })
+      .eq("id", conversation.id);
+
+    if (error) throw error;
+    await loadSupportConversations();
+  } catch (err) {
+    console.error("Error updating support conversation:", err);
+    setSupportError(
+      err instanceof Error ? err.message : "تعذر تحديث حالة المحادثة."
+    );
+  }
+};
+
+useEffect(() => {
+  if (admin && activeMenu === "خدمة العملاء") {
+    loadSupportConversations();
+  }
+}, [admin, activeMenu]);
+
+useEffect(() => {
+  if (activeMenu === "خدمة العملاء" && selectedSupportConversationId) {
+    loadSupportMessages(selectedSupportConversationId);
+  }
+}, [activeMenu, selectedSupportConversationId]);
+
 // تحميل المستخدمين عند فتح قسم المستخدمين
 useEffect(() => {
   if (admin && activeMenu === "المستخدمون") {
@@ -3557,6 +3771,10 @@ function getSubCategories(categoryId: number) {
   label: "إدارة المدن",
   icon: MapPin,
 },
+{
+  label: "خدمة العملاء",
+  icon: Mail,
+},
     {
       label: "البلاغات",
       icon: Flag,
@@ -3572,7 +3790,143 @@ function getSubCategories(categoryId: number) {
   ];
 
   return (
-    <div className="app" dir="rtl">
+    <div className="app admin-app-scroll-layout" dir="rtl">
+      <style>{`
+        .admin-app-scroll-layout {
+          display: flex !important;
+          width: 100%;
+          height: 100vh;
+          height: 100dvh;
+          min-height: 0;
+          overflow: hidden !important;
+          background: #f5f7fb;
+        }
+
+        .admin-app-scroll-layout > .sidebar {
+          display: flex !important;
+          flex-direction: column !important;
+          height: 100%;
+          min-height: 0;
+          overflow: hidden !important;
+          flex-shrink: 0;
+          background: #fff;
+          border-left: 1px solid #e8edf4;
+        }
+
+        .admin-app-scroll-layout > .sidebar > .brand,
+        .admin-app-scroll-layout > .sidebar > .menu-title,
+        .admin-app-scroll-layout > .sidebar > .sidebar-footer {
+          flex-shrink: 0;
+        }
+
+        .admin-app-scroll-layout > .sidebar > nav {
+          display: flex;
+          flex: 1 1 auto;
+          flex-direction: column;
+          min-height: 0;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain;
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+          padding: 6px 10px 14px;
+          gap: 4px;
+        }
+
+        .admin-app-scroll-layout > .sidebar > nav::-webkit-scrollbar,
+        .admin-app-scroll-layout > .main > .content::-webkit-scrollbar {
+          width: 7px;
+        }
+
+        .admin-app-scroll-layout > .sidebar > nav::-webkit-scrollbar-thumb,
+        .admin-app-scroll-layout > .main > .content::-webkit-scrollbar-thumb {
+          background: #cbd5e1;
+          border-radius: 20px;
+        }
+
+        .admin-app-scroll-layout > .sidebar > nav .menu-item {
+          flex: 0 0 auto;
+          width: 100%;
+          min-height: 44px;
+          border-radius: 12px;
+          transition: background .18s ease, color .18s ease, transform .18s ease;
+        }
+
+        .admin-app-scroll-layout > .sidebar > nav .menu-item:hover {
+          transform: translateX(-2px);
+        }
+
+        .admin-app-scroll-layout > .sidebar > .sidebar-footer {
+          margin-top: auto;
+          background: #fff;
+          border-top: 1px solid #edf1f6;
+          padding-top: 12px;
+          padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+
+        .admin-app-scroll-layout > .main {
+          display: flex !important;
+          flex: 1 1 0%;
+          flex-direction: column !important;
+          min-width: 0;
+          min-height: 0;
+          height: 100%;
+          overflow: hidden !important;
+        }
+
+        .admin-app-scroll-layout > .main > .topbar {
+          position: relative;
+          z-index: 5;
+          flex: 0 0 auto;
+          background: rgba(255,255,255,.94);
+          border-bottom: 1px solid #e8edf4;
+          box-shadow: 0 3px 14px rgba(15,23,42,.035);
+          backdrop-filter: blur(12px);
+        }
+
+        .admin-app-scroll-layout > .main > .content {
+          display: block;
+          flex: 1 1 auto;
+          min-width: 0;
+          min-height: 0;
+          height: auto;
+          overflow-x: hidden !important;
+          overflow-y: auto !important;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+          scrollbar-color: #cbd5e1 transparent;
+          padding: clamp(14px, 2vw, 26px);
+          background: #f5f7fb;
+        }
+
+        .admin-app-scroll-layout .content > * {
+          max-width: 100%;
+        }
+
+        .admin-app-scroll-layout .welcome-card,
+        .admin-app-scroll-layout .stat-card,
+        .admin-app-scroll-layout .category-card,
+        .admin-app-scroll-layout .admin-section,
+        .admin-app-scroll-layout .admin-ad-card {
+          border-radius: 18px;
+        }
+
+        @media (max-width: 768px) {
+          .admin-app-scroll-layout {
+            min-height: 100dvh;
+          }
+          .admin-app-scroll-layout > .sidebar {
+            max-height: 100dvh;
+          }
+          .admin-app-scroll-layout > .sidebar > nav {
+            padding-inline: 7px;
+          }
+          .admin-app-scroll-layout > .main > .content {
+            padding: 12px;
+          }
+        }
+      `}</style>
       {/* القائمة الجانبية */}
       <aside className="sidebar">
         <div className="brand">
@@ -5083,11 +5437,10 @@ function getSubCategories(categoryId: number) {
 )}
 
 
-
-                    {/* قسم التبرعات */}
+ {/* قسم التبرعات */}
           {activeMenu === "التبرعات" && (
             <Donations />
-          )}
+ )}
 {/* قسم المستخدمين */}
 {activeMenu === "المستخدمون" && (
   <>
@@ -5329,7 +5682,6 @@ function getSubCategories(categoryId: number) {
     )}
   </>
 )}
-
 {/* قسم إدارة المدن */}
 {activeMenu === "إدارة المدن" && (
   <>
@@ -5435,7 +5787,235 @@ function getSubCategories(categoryId: number) {
     )}
   </>
 )}
+{/* قسم خدمة العملاء */}
+{activeMenu === "خدمة العملاء" && (
+  <>
+    <div className="section-heading">
+      <div>
+        <h2>خدمة العملاء</h2>
+        <p>استقبال رسائل المستخدمين والرد عليها من داخل لوحة الإدارة</p>
+      </div>
+      <button
+        type="button"
+        className="refresh-button"
+        onClick={loadSupportConversations}
+        disabled={supportConversationsLoading}
+      >
+        <RefreshCw size={17} />
+        تحديث
+      </button>
+    </div>
 
+    {supportError && (
+      <div className="data-error mb-4">{supportError}</div>
+    )}
+
+<div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 items-start">
+
+  {/* قائمة المحادثات */}
+  <div className="category-card h-[650px] max-h-[80vh] min-h-0 p-0 flex flex-col overflow-hidden">
+
+    {/* عنوان القائمة - ثابت */}
+    <div className="shrink-0 border-b p-4">
+      <h3 className="font-bold">طلبات الدعم</h3>
+      <p className="text-xs text-slate-500 mt-1">
+        {supportConversations.length} محادثة
+      </p>
+    </div>
+
+    {/* محتوى القائمة */}
+    {supportConversationsLoading ? (
+      <div className="empty-state flex-1">
+        <LoaderCircle className="spin" size={25} />
+        <p>جارٍ تحميل المحادثات...</p>
+      </div>
+    ) : supportConversations.length === 0 ? (
+      <div className="empty-state flex-1">
+        <Mail size={28} />
+        <p>لا توجد طلبات دعم حالياً.</p>
+      </div>
+    ) : (
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain divide-y">
+        {supportConversations.map((conversation) => (
+          <button
+            type="button"
+            key={conversation.id}
+            onClick={() =>
+              handleSelectSupportConversation(conversation.id)
+            }
+            className={`w-full text-right p-4 transition-colors hover:bg-slate-50 ${
+              selectedSupportConversationId === conversation.id
+                ? "bg-blue-50"
+                : "bg-white"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <strong className="text-sm text-slate-800">
+                {conversation.user_name}
+              </strong>
+
+              <span
+                className={`text-xs rounded-full px-2 py-1 ${
+                  conversation.status === "open"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {conversation.status === "open" ? "مفتوحة" : "مغلقة"}
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-500 mt-2 line-clamp-2">
+              {conversation.last_message}
+            </p>
+
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-[11px] text-slate-400">
+                {formatDate(conversation.last_message_at)}
+              </span>
+
+              {!!conversation.unread_count && (
+                <span className="min-w-5 h-5 rounded-full bg-red-600 text-white text-xs flex items-center justify-center px-1">
+                  {conversation.unread_count}
+                </span>
+              )}
+            </div>
+          </button>
+        ))}
+      </div>
+    )}
+  </div>
+
+  {/* نافذة المحادثة */}
+  <div className="category-card h-[650px] max-h-[80vh] min-h-0 flex flex-col overflow-hidden">
+
+    {!selectedSupportConversationId ? (
+      <div className="empty-state flex-1">
+        <Mail size={34} />
+        <p>اختر محادثة من القائمة لعرض الرسائل والرد عليها.</p>
+      </div>
+    ) : (
+      <>
+        {/* رأس المحادثة - ثابت */}
+        <div className="shrink-0 flex items-center justify-between gap-3 border-b pb-4">
+          <div>
+            <h3 className="font-bold">
+              {supportConversations.find(
+                (item) => item.id === selectedSupportConversationId
+              )?.user_name || "محادثة خدمة العملاء"}
+            </h3>
+
+            <p className="text-xs text-slate-500 mt-1">
+              محادثة دعم منفصلة عن محادثات الإعلانات
+            </p>
+          </div>
+
+          {(() => {
+            const currentConversation = supportConversations.find(
+              (item) => item.id === selectedSupportConversationId
+            );
+
+            return currentConversation ? (
+              <button
+                type="button"
+                className="category-edit-button"
+                onClick={() =>
+                  handleToggleSupportStatus(currentConversation)
+                }
+              >
+                {currentConversation.status === "open"
+                  ? "إغلاق الطلب"
+                  : "إعادة فتح الطلب"}
+              </button>
+            ) : null;
+          })()}
+        </div>
+
+        {/* الرسائل - سكرول مستقل */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain py-4 space-y-3">
+          {supportMessagesLoading ? (
+            <div className="empty-state">
+              <LoaderCircle className="spin" size={25} />
+              <p>جارٍ تحميل الرسائل...</p>
+            </div>
+          ) : supportMessages.length === 0 ? (
+            <div className="empty-state">
+              <p>لا توجد رسائل في هذه المحادثة بعد.</p>
+            </div>
+          ) : (
+            supportMessages.map((message) => {
+              const isAdminMessage = message.sender_id === admin?.id;
+
+              return (
+                <div
+                  key={message.id}
+                  className={`flex ${
+                    isAdminMessage ? "justify-start" : "justify-end"
+                  }`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                      isAdminMessage
+                        ? "bg-blue-600 text-white"
+                        : "bg-slate-100 text-slate-800"
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap break-words">
+                      {message.body}
+                    </p>
+
+                    <span
+                      className={`block text-[10px] mt-2 ${
+                        isAdminMessage
+                          ? "text-blue-100"
+                          : "text-slate-400"
+                      }`}
+                    >
+                      {isAdminMessage ? "الإدارة" : "المستخدم"} ·{" "}
+                      {formatDate(message.created_at)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* منطقة الرد - ثابتة بالأسفل */}
+        {supportConversations.find(
+          (item) => item.id === selectedSupportConversationId
+        )?.status === "closed" ? (
+          <div className="shrink-0 border-t pt-4 text-sm text-amber-700">
+            الطلب مغلق. أعد فتحه حتى تتمكن من إرسال رد جديد.
+          </div>
+        ) : (
+          <div className="shrink-0 border-t pt-4">
+            <textarea
+              value={supportReply}
+              onChange={(event) => setSupportReply(event.target.value)}
+              placeholder="اكتب ردك للمستخدم..."
+              rows={3}
+              className="w-full rounded-xl border border-slate-200 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+
+            <div className="flex justify-end mt-3">
+              <button
+                type="button"
+                className="approve-button"
+                onClick={handleSendSupportReply}
+                disabled={supportSending || !supportReply.trim()}
+              >
+                {supportSending ? "جارٍ الإرسال..." : "إرسال الرد"}
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    )}
+  </div>
+</div>
+  </>
+)}
 {/* قسم إدارة البلاغات */}
 {activeMenu === "البلاغات" && (
   <>
@@ -6162,7 +6742,6 @@ onClick={() => {
     </div>
   </div>
 )}
-
 {/* قسم شحن النقاط */}
 {activeMenu === "شحن النقاط" && (
   <div className="space-y-6">

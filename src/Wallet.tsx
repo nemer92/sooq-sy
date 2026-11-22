@@ -61,6 +61,7 @@ export default function WalletPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [activityTab, setActivityTab] = useState<"requests" | "transactions">("requests");
 
 
   const [balance, setBalance] = useState(0);
@@ -525,118 +526,163 @@ export default function WalletPage() {
           )}
         </section>
 
-        <section className="mb-5 overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <History className="text-emerald-700" size={21} />
-            <h2 className="font-black text-slate-800">
-              طلبات شحن النقاط
-            </h2>
-          </div>
-
-          {requests.length === 0 ? (
-            <p className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">
-              لم ترسل أي طلب شحن حتى الآن.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {requests.map((request) => (
-                <div
-                  key={request.id}
-                  className="rounded-xl border border-slate-100 bg-slate-50 p-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <strong className="text-sm text-slate-800">
-                      {Number(request.points).toLocaleString("en-US")} نقطة
-                    </strong>
-
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                        request.status === "approved"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : request.status === "rejected"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-amber-100 text-amber-700"
-                      }`}
-                    >
-                      {statusLabel(request.status)}
-                    </span>
-                  </div>
-
-                  <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
-                    <span>
-                      {Number(request.amount_syp).toLocaleString("en-US")} ل.س
-                    </span>
-                    <span>{formatDate(request.created_at)}</span>
-                  </div>
-
-                  {request.admin_note && (
-                    <p className="mt-3 rounded-lg bg-white p-3 text-xs leading-6 text-slate-600">
-                      ملاحظة الإدارة: {request.admin_note}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
         <section className="overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <History className="text-blue-700" size={21} />
-            <h2 className="font-black text-slate-800">
-              سجل حركات المحفظة
-            </h2>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <History className="text-emerald-700" size={21} />
+              <h2 className="font-black text-slate-800">
+                نشاط المحفظة
+              </h2>
+            </div>
+            <span className="text-[11px] font-medium text-slate-400">
+              {activityTab === "requests"
+                ? `${requests.length} طلب`
+                : `${transactions.length} حركة`}
+            </span>
           </div>
 
-          {transactions.length === 0 ? (
-            <p className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">
-              لا توجد حركات في محفظتك حتى الآن.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {transactions.map((transaction) => {
-                const positive = Number(transaction.points) > 0;
+          <div
+            className="mb-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1"
+            role="tablist"
+            aria-label="أقسام نشاط المحفظة"
+          >
+            <button
+              type="button"
+              role="tab"
+              id="wallet-requests-tab"
+              aria-selected={activityTab === "requests"}
+              aria-controls="wallet-requests-panel"
+              onClick={() => setActivityTab("requests")}
+              className={`min-h-11 rounded-lg px-3 py-2 text-xs font-black transition sm:text-sm ${
+                activityTab === "requests"
+                  ? "bg-white text-emerald-700 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              طلبات شحن النقاط
+            </button>
+            <button
+              type="button"
+              role="tab"
+              id="wallet-transactions-tab"
+              aria-selected={activityTab === "transactions"}
+              aria-controls="wallet-transactions-panel"
+              onClick={() => setActivityTab("transactions")}
+              className={`min-h-11 rounded-lg px-3 py-2 text-xs font-black transition sm:text-sm ${
+                activityTab === "transactions"
+                  ? "bg-white text-blue-700 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              سجل حركات المحفظة
+            </button>
+          </div>
 
-                return (
-                  <div
-                    key={transaction.id}
-                    className="flex items-center gap-3 rounded-xl border border-slate-100 p-3"
-                  >
+          {activityTab === "requests" ? (
+            <div
+              id="wallet-requests-panel"
+              role="tabpanel"
+              aria-labelledby="wallet-requests-tab"
+              className="min-h-[120px]"
+            >
+              {requests.length === 0 ? (
+                <p className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">
+                  لم ترسل أي طلب شحن حتى الآن.
+                </p>
+              ) : (
+                <div className="max-h-64 space-y-3 overflow-y-auto overscroll-contain pr-1 pl-2 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+                  {requests.map((request) => (
                     <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                        positive
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-red-50 text-red-600"
-                      }`}
+                      key={request.id}
+                      className="rounded-xl border border-slate-100 bg-slate-50 p-3"
                     >
-                      {positive ? (
-                        <TrendingUp size={20} />
-                      ) : (
-                        <TrendingDown size={20} />
+                      <div className="flex items-center justify-between gap-2">
+                        <strong className="text-sm text-slate-800">
+                          {Number(request.points).toLocaleString("en-US")} نقطة
+                        </strong>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                            request.status === "approved"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : request.status === "rejected"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {statusLabel(request.status)}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
+                        <span>
+                          {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+                        </span>
+                        <span>{formatDate(request.created_at)}</span>
+                      </div>
+                      {request.admin_note && (
+                        <p className="mt-3 rounded-lg bg-white p-3 text-xs leading-6 text-slate-600">
+                          ملاحظة الإدارة: {request.admin_note}
+                        </p>
                       )}
                     </div>
-
-                    <div className="min-w-0 flex-1">
-                      <strong className="block truncate text-sm text-slate-800">
-                        {transaction.description ||
-                          transactionLabel(transaction.transaction_type)}
-                      </strong>
-                      <span className="mt-1 block text-[11px] text-slate-400">
-                        {formatDate(transaction.created_at)}
-                      </span>
-                    </div>
-
-                    <strong
-                      className={`shrink-0 text-sm font-black ${
-                        positive ? "text-emerald-700" : "text-red-600"
-                      }`}
-                    >
-                      {positive ? "+" : ""}
-                      {Number(transaction.points).toLocaleString("en-US")}
-                    </strong>
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div
+              id="wallet-transactions-panel"
+              role="tabpanel"
+              aria-labelledby="wallet-transactions-tab"
+              className="min-h-[120px]"
+            >
+              {transactions.length === 0 ? (
+                <p className="rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500">
+                  لا توجد حركات في محفظتك حتى الآن.
+                </p>
+              ) : (
+                <div className="max-h-64 space-y-2 overflow-y-auto overscroll-contain pr-1 pl-2 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]">
+                  {transactions.map((transaction) => {
+                    const positive = Number(transaction.points) > 0;
+                    return (
+                      <div
+                        key={transaction.id}
+                        className="flex items-center gap-3 rounded-xl border border-slate-100 p-3"
+                      >
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            positive
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-red-50 text-red-600"
+                          }`}
+                        >
+                          {positive ? (
+                            <TrendingUp size={20} />
+                          ) : (
+                            <TrendingDown size={20} />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <strong className="block truncate text-sm text-slate-800">
+                            {transaction.description ||
+                              transactionLabel(transaction.transaction_type)}
+                          </strong>
+                          <span className="mt-1 block text-[11px] text-slate-400">
+                            {formatDate(transaction.created_at)}
+                          </span>
+                        </div>
+                        <strong
+                          className={`shrink-0 text-sm font-black ${
+                            positive ? "text-emerald-700" : "text-red-600"
+                          }`}
+                        >
+                          {positive ? "+" : ""}
+                          {Number(transaction.points).toLocaleString("en-US")}
+                        </strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </section>

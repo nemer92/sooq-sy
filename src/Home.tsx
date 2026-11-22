@@ -956,6 +956,13 @@ const matchesCondition = selectedConditions.includes(
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#f7f8fa] text-slate-800">
+
+      <button
+  onClick={() => navigate("/device-key-test")}
+  className="fixed bottom-24 right-4 z-[99999] rounded-xl bg-red-600 px-4 py-3 font-bold text-white shadow-lg"
+>
+  فحص مفتاح الجهاز
+</button>
       
       {messageNotification && (
   <div className="fixed bottom-5 left-5 z-[99999] w-[calc(100%-2.5rem)] max-w-sm rounded-2xl border border-emerald-100 bg-white p-4 shadow-2xl">

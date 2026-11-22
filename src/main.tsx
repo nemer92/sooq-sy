@@ -44,6 +44,7 @@ import ManageStore from "./ManageStore";
 import StoreSubscription from "./StoreSubscription.tsx";
 import PublicProfile from "./PublicProfile";
 import MySales from "./MySales";
+import DeviceKeyTest from "./DeviceKeyTest";
 
 
 // ==========================================
@@ -556,7 +557,7 @@ function MaintenanceGuard({
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <p className="font-bold text-slate-500">
-          جاري تحميل الموقع...
+          جاري فتح التطبيق...
         </p>
       </div>
     );
@@ -619,6 +620,7 @@ createRoot(document.getElementById("root")!).render(
           />
 
           <Route path="/auth" element={<Auth />} />
+          <Route path="/device-key-test" element={<DeviceKeyTest />} />
           <Route path="/add-ad" element={<AddAd />} />
           <Route path="/edit-ad/:id" element={<EditAd />} />
 

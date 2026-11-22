@@ -3,6 +3,11 @@ import { supabase } from "./lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { Share } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
+import {
+  checkForLiveUpdate,
+  getLiveUpdateState,
+  subscribeLiveUpdate,
+} from "./lib/liveUpdate";
 import siteIcon from "../assets/icon.png";
 import {
   Search,
@@ -31,6 +36,7 @@ import {
   Megaphone,
   X,
   MessageCircle,
+  RefreshCw,
   Headset,
   Store as StoreIcon
 } from "lucide-react";
@@ -93,46 +99,73 @@ type Ad = {
 };
 
 export default function Home() {
-    const navigate = useNavigate();
+ const navigate = useNavigate();
 
-    const openCustomerSupport = async () => {
-      setIsMobileMenuOpen(false);
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) {
-        alert("يرجى تسجيل الدخول أولاً للتواصل مع خدمة العملاء.");
-        navigate("/auth");
-        return;
-      }
-      navigate("/support");
-    };
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [cities, setCities] = useState<City[]>([]);
-    const [governorates, setGovernorates] = useState<Governorate[]>([]);
-    const [selectedGovernorate, setSelectedGovernorate] = useState("");
-    const [, setCitiesLoading] = useState(true);
-    const [ads, setAds] = useState<Ad[]>([]);
-    const [featuredAds, setFeaturedAds] = useState<Ad[]>([]);
-    const [featuredStores, setFeaturedStores] = useState<StorePreview[]>([]);
-    const [featuredStoresLoading, setFeaturedStoresLoading] = useState(true);
-    const [featuredAdsLoading, setFeaturedAdsLoading] = useState(true);
-    const [donations, setDonations] = useState<Ad[]>([]);
-    const [donationsLoading, setDonationsLoading] = useState(true);
-    const [favoriteAdIds, setFavoriteAdIds] = useState<string[]>([]);
-    const [notifications, setNotifications] = useState<any[]>([]);
-    const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-    const [showNotifications, setShowNotifications] = useState(false);
-    const [showHelpModal, setShowHelpModal] = useState(false);
+const [liveUpdateState, setLiveUpdateState] = useState(
+  getLiveUpdateState()
+);
+
+const [categories, setCategories] = useState<Category[]>([]);
+const [cities, setCities] = useState<City[]>([]);
+const [governorates, setGovernorates] = useState<Governorate[]>([]);
+const [selectedGovernorate, setSelectedGovernorate] = useState("");
+const [, setCitiesLoading] = useState(true);
+const [ads, setAds] = useState<Ad[]>([]);
+const [featuredAds, setFeaturedAds] = useState<Ad[]>([]);
+const [featuredStores, setFeaturedStores] = useState<StorePreview[]>([]);
+const [featuredStoresLoading, setFeaturedStoresLoading] = useState(true);
+const [featuredAdsLoading, setFeaturedAdsLoading] = useState(true);
+const [donations, setDonations] = useState<Ad[]>([]);
+const [donationsLoading, setDonationsLoading] = useState(true);
+const [favoriteAdIds, setFavoriteAdIds] = useState<string[]>([]);
+const [notifications, setNotifications] = useState<any[]>([]);
+const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+const [showNotifications, setShowNotifications] = useState(false);
+const [showHelpModal, setShowHelpModal] = useState(false);
 const [helpTab, setHelpTab] = useState<"guide" | "developer">("guide");
 const [hasUnreadSupport, setHasUnreadSupport] = useState(false);
 const [deleteTarget, setDeleteTarget] = useState<{
   type: "one" | "all";
   id?: string;
 } | null>(null);
-
 const [isDeletingNotification, setIsDeletingNotification] = useState(false);
 
-const loadNotifications = async (userId: string) => {
+// متابعة حالة تحديث التطبيق
+useEffect(() => {
+  const unsubscribe = subscribeLiveUpdate(() => {
+    setLiveUpdateState(getLiveUpdateState());
+  });
 
+  setLiveUpdateState(getLiveUpdateState());
+
+  return unsubscribe;
+}, []);
+
+const isUpdatingApp = [
+  "checking",
+  "downloading",
+  "applying",
+].includes(liveUpdateState.status);
+
+// فتح خدمة العملاء
+const openCustomerSupport = async () => {
+  setIsMobileMenuOpen(false);
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    alert("يرجى تسجيل الدخول أولاً للتواصل مع خدمة العملاء.");
+    navigate("/auth");
+    return;
+  }
+
+  navigate("/support");
+};
+
+const loadNotifications = async (userId: string) => {
   const { data, error } = await supabase
     .from("user_notifications")
     .select(`
@@ -159,8 +192,6 @@ const loadNotifications = async (userId: string) => {
     (data || []).filter((item: any) => !item.read_at).length
   );
 };
-
-
 const confirmDeleteNotification = async () => {
   if (!deleteTarget || isDeletingNotification) return;
 
@@ -474,6 +505,8 @@ useEffect(() => {
     }
   };
 }, []);
+
+
 
 useEffect(() => {
   let lastSeenInterval: ReturnType<typeof setInterval> | null = null;
@@ -1814,6 +1847,75 @@ const matchesCondition = selectedConditions.includes(
             </button>
           </div>
         )}
+
+
+{Capacitor.isNativePlatform() && (
+  <div className="mt-2 rounded-xl border border-blue-100 bg-blue-50/70 p-3">
+    <button
+      type="button"
+      disabled={isUpdatingApp}
+      onClick={() => {
+        void checkForLiveUpdate().catch(() => {});
+      }}
+      className="flex w-full items-center gap-3 text-right disabled:opacity-70"
+    >
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+        <RefreshCw
+          size={19}
+          className={isUpdatingApp ? "animate-spin" : ""}
+        />
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-bold text-blue-900">
+          {liveUpdateState.status === "checking"
+            ? "جارٍ فحص التحديثات..."
+            : liveUpdateState.status === "downloading"
+            ? "جارٍ تحميل التحديث..."
+            : liveUpdateState.status === "applying"
+            ? "جارٍ تطبيق التحديث..."
+            : liveUpdateState.status === "upToDate"
+            ? "التطبيق محدّث"
+            : liveUpdateState.status === "error"
+            ? "إعادة محاولة التحديث"
+            : "فحص التحديثات وتحديث التطبيق"}
+        </span>
+
+        <span className="mt-1 block text-[11px] font-medium text-blue-700">
+          {liveUpdateState.message ||
+            "تحقق من وجود إصدار جديد للتطبيق"}
+        </span>
+      </span>
+    </button>
+
+    {liveUpdateState.status === "downloading" && (
+      <div className="mt-3">
+        <div className="mb-1 flex items-center justify-between text-xs font-bold text-blue-800">
+          <span>تقدم التحميل</span>
+          <span dir="ltr">
+            {liveUpdateState.progress}%
+          </span>
+        </div>
+
+        <div className="h-2.5 overflow-hidden rounded-full bg-blue-100">
+          <div
+            className="h-full rounded-full bg-blue-600 transition-all duration-200"
+            style={{
+              width: `${liveUpdateState.progress}%`,
+            }}
+          />
+        </div>
+      </div>
+    )}
+
+    {liveUpdateState.status === "applying" && (
+      <p className="mt-2 text-center text-xs font-bold text-blue-700">
+        يرجى الانتظار، سيُعاد تشغيل واجهة التطبيق تلقائياً
+      </p>
+    )}
+  </div>
+)}
+
 
 {/* مشاركة التطبيق وربح النقاط */}
 

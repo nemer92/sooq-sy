@@ -331,15 +331,19 @@ export default function Profile() {
       setMessage(
         "تم إرسال طلب توثيق الحساب بنجاح. سيبقى الطلب قيد المراجعة حتى موافقة الإدارة."
       );
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "تعذر إرسال طلب التوثيق. حاول مرة أخرى."
-      );
-    } finally {
-      setSubmittingVerification(false);
-    }
+
+} catch (err: any) {
+  const errorMessage =
+    err?.message ||
+    err?.details ||
+    err?.hint ||
+    "تعذر إرسال طلب التوثيق. حاول مرة أخرى.";
+
+  setError(errorMessage);
+} finally {
+  setSubmittingVerification(false);
+}
+
   }
 
   async function saveProfileDetails() {

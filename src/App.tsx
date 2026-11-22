@@ -1760,6 +1760,39 @@ const handleAdminStoreToggle = async (store: AdminStore) => {
   }
 };
 
+const revokeAccountVerification = async (userId: string) => {
+  const reason = window.prompt("اكتب سبب سحب شارة التوثيق:");
+
+  if (reason === null) return;
+
+  if (!reason.trim()) {
+    alert("يجب كتابة سبب سحب التوثيق");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    "هل أنت متأكد من سحب شارة التوثيق من هذا الحساب؟"
+  );
+
+  if (!confirmed) return;
+
+  const { error } = await supabase.rpc(
+    "revoke_account_verification",
+    {
+      p_user_id: userId,
+      p_admin_note: reason.trim(),
+    }
+  );
+
+  if (error) {
+    alert("تعذر سحب التوثيق: " + error.message);
+    return;
+  }
+
+  alert("تم سحب شارة التوثيق بنجاح");
+  await loadAccountVerificationRequests();
+};
+
 const loadAccountVerificationRequests = useCallback(async () => {
   setAccountVerificationRequestsLoading(true);
   setAccountVerificationRequestsError("");
@@ -4460,6 +4493,7 @@ function getSubCategories(categoryId: number) {
 </>
 )}
 {/* طلبات حملات التمييز بالنقاط */}
+
 <div className="mt-8 space-y-5" dir="rtl">
   <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
     <h2 className="text-lg font-black text-slate-800">
@@ -4470,133 +4504,136 @@ function getSubCategories(categoryId: number) {
     </p>
   </div>
 
-  {campaignRequestsLoading ? (
-    <div className="rounded-2xl border bg-white p-6 text-center text-sm text-slate-500">
-      جارٍ تحميل الطلبات...
-    </div>
-  ) : pointsCampaignRequests.length === 0 ? (
-    <div className="rounded-2xl border border-dashed bg-white p-8 text-center">
-      <p className="font-bold text-slate-700">
-        لا توجد طلبات حملات بالنقاط حالياً
-      </p>
-    </div>
-  ) : (
-    <div className="grid grid-cols-1 gap-4">
-      {pointsCampaignRequests.map((request) => (
-        <div
-          key={request.id}
-          className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm"
-        >
-          <div className="flex flex-col gap-2 border-b bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs text-slate-500">رقم الطلب</p>
-              <p className="mt-1 break-all text-sm font-bold text-slate-700" dir="ltr">
-                {request.id}
-              </p>
-            </div>
-
-            {request.status === "pending_ad_approval" ? (
-              <span className="w-fit rounded-full bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800">
-                بانتظار موافقة الإدارة
-              </span>
-            ) : request.status === "active" ? (
-              <span className="w-fit rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800">
-                الحملة مفعّلة
-              </span>
-            ) : request.status === "completed" ? (
-              <span className="w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">
-                مكتملة
-              </span>
-            ) : request.status === "cancelled" ? (
-              <span className="w-fit rounded-full bg-red-100 px-3 py-1.5 text-xs font-bold text-red-700">
-                مرفوضة أو ملغاة
-              </span>
-            ) : (
-              <span className="w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">
-                {request.status}
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-4 p-4 sm:p-5">
-            <div>
-              <p className="text-xs text-slate-500">المستخدم</p>
-              <p className="mt-1 font-bold text-slate-800">
-                {request.user_name || "مستخدم غير معروف"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-slate-500">الإعلان</p>
-              <p className="mt-1 font-bold text-slate-800">
-                {request.ad_title || "إعلان غير متوفر"}
-              </p>
-              {request.ad_id && (
-                <p className="mt-1 break-all text-xs text-slate-400" dir="ltr">
-                  {request.ad_id}
+  <div className="h-[650px] max-h-[75vh] overflow-y-auto overscroll-contain pr-1">
+    {campaignRequestsLoading ? (
+      <div className="rounded-2xl border bg-white p-6 text-center text-sm text-slate-500">
+        جارٍ تحميل الطلبات...
+      </div>
+    ) : pointsCampaignRequests.length === 0 ? (
+      <div className="rounded-2xl border border-dashed bg-white p-8 text-center">
+        <p className="font-bold text-slate-700">
+          لا توجد طلبات حملات بالنقاط حالياً
+        </p>
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-4">
+        {pointsCampaignRequests.map((request) => (
+          <div
+            key={request.id}
+            className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm"
+          >
+            <div className="flex flex-col gap-2 border-b bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs text-slate-500">رقم الطلب</p>
+                <p className="mt-1 break-all text-sm font-bold text-slate-700" dir="ltr">
+                  {request.id}
                 </p>
+              </div>
+
+              {request.status === "pending_ad_approval" ? (
+                <span className="w-fit rounded-full bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-800">
+                  بانتظار موافقة الإدارة
+                </span>
+              ) : request.status === "active" ? (
+                <span className="w-fit rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                  الحملة مفعّلة
+                </span>
+              ) : request.status === "completed" ? (
+                <span className="w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">
+                  مكتملة
+                </span>
+              ) : request.status === "cancelled" ? (
+                <span className="w-fit rounded-full bg-red-100 px-3 py-1.5 text-xs font-bold text-red-700">
+                  مرفوضة أو ملغاة
+                </span>
+              ) : (
+                <span className="w-fit rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700">
+                  {request.status}
+                </span>
               )}
             </div>
 
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-              <p className="text-sm text-emerald-700">
-                النقاط المخصومة للحملة
-              </p>
-              <p className="mt-1 text-2xl font-black text-emerald-800">
-                {Number(request.points_cost).toLocaleString("en-US")} نقطة
-              </p>
-            </div>
-
-            <div className="border-t pt-3">
-              <p className="text-xs text-slate-500">تاريخ تقديم الطلب</p>
-              <p className="mt-1 text-sm font-medium text-slate-700">
-                {formatDate(request.created_at)}
-              </p>
-            </div>
-
-            {request.admin_note && (
-              <div className="rounded-xl bg-slate-50 p-3">
-                <p className="text-xs font-bold text-slate-500">
-                  ملاحظة الإدارة
-                </p>
-                <p className="mt-1 text-sm text-slate-700">
-                  {request.admin_note}
+            <div className="space-y-4 p-4 sm:p-5">
+              <div>
+                <p className="text-xs text-slate-500">المستخدم</p>
+                <p className="mt-1 font-bold text-slate-800">
+                  {request.user_name || "مستخدم غير معروف"}
                 </p>
               </div>
-            )}
 
-            {request.status === "pending_ad_approval" ? (
-              <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
-                <button
-                  type="button"
-                  disabled={campaignRequestsLoading}
-                  onClick={() => approvePointsCampaignRequest(request.id)}
-                  className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
-                >
-                  <CheckCircle size={18} className="ml-2" />
-                  موافقة وتفعيل الحملة
-                </button>
+              <div>
+                <p className="text-xs text-slate-500">الإعلان</p>
+                <p className="mt-1 font-bold text-slate-800">
+                  {request.ad_title || "إعلان غير متوفر"}
+                </p>
+                {request.ad_id && (
+                  <p className="mt-1 break-all text-xs text-slate-400" dir="ltr">
+                    {request.ad_id}
+                  </p>
+                )}
+              </div>
 
-                <button
-                  type="button"
-                  disabled={campaignRequestsLoading}
-                  onClick={() => rejectPointsCampaignRequest(request.id)}
-                  className="min-h-12 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
-                >
-                  رفض الطلب وإعادة النقاط
-                </button>
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-sm text-emerald-700">
+                  النقاط المخصومة للحملة
+                </p>
+                <p className="mt-1 text-2xl font-black text-emerald-800">
+                  {Number(request.points_cost).toLocaleString("en-US")} نقطة
+                </p>
               </div>
-            ) : (
-              <div className="border-t pt-3 text-center text-sm text-slate-400">
-                تمت مراجعة هذا الطلب
+
+              <div className="border-t pt-3">
+                <p className="text-xs text-slate-500">تاريخ تقديم الطلب</p>
+                <p className="mt-1 text-sm font-medium text-slate-700">
+                  {formatDate(request.created_at)}
+                </p>
               </div>
-            )}
+
+              {request.admin_note && (
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-xs font-bold text-slate-500">
+                    ملاحظة الإدارة
+                  </p>
+                  <p className="mt-1 text-sm text-slate-700">
+                    {request.admin_note}
+                  </p>
+                </div>
+              )}
+
+              {request.status === "pending_ad_approval" ? (
+                <div className="grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    disabled={campaignRequestsLoading}
+                    onClick={() => approvePointsCampaignRequest(request.id)}
+                    className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <CheckCircle size={18} className="ml-2" />
+                    موافقة وتفعيل الحملة
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={campaignRequestsLoading}
+                    onClick={() => rejectPointsCampaignRequest(request.id)}
+                    className="min-h-12 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    رفض الطلب وإعادة النقاط
+                  </button>
+                </div>
+              ) : (
+                <div className="border-t pt-3 text-center text-sm text-slate-400">
+                  تمت مراجعة هذا الطلب
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      ))}
-    </div>
-  )}
+        ))}
+      </div>
+    )}
+  </div>
 </div>
+
 {/* طلبات المتاجر */}
 {activeMenu === "طلبات المتاجر" && (
   <>
@@ -5148,21 +5185,25 @@ function getSubCategories(categoryId: number) {
                 </p>
               </div>
 
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-bold ${
-                  request.status === "pending"
-                    ? "bg-amber-100 text-amber-700"
-                    : request.status === "approved"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-red-100 text-red-700"
-                }`}
-              >
-                {request.status === "pending"
-                  ? "قيد المراجعة"
-                  : request.status === "approved"
-                    ? "تمت الموافقة"
-                    : "مرفوض"}
-              </span>
+<span
+  className={`rounded-full px-3 py-1 text-xs font-bold ${
+    request.status === "pending"
+      ? "bg-amber-100 text-amber-700"
+      : request.status === "approved"
+        ? "bg-emerald-100 text-emerald-700"
+        : request.status === "revoked"
+          ? "bg-slate-200 text-slate-700"
+          : "bg-red-100 text-red-700"
+  }`}
+>
+  {request.status === "pending"
+    ? "قيد المراجعة"
+    : request.status === "approved"
+      ? "تمت الموافقة"
+      : request.status === "revoked"
+        ? "تم سحب التوثيق"
+        : "مرفوض"}
+</span>
             </div>
 
             <div className="space-y-3 p-4">
@@ -5246,6 +5287,23 @@ function getSubCategories(categoryId: number) {
                   </button>
                 </div>
               )}
+            {request.status === "approved" &&
+  request.end_at &&
+  new Date(request.end_at).getTime() > Date.now() && (
+    <div className="border-t border-slate-100 pt-4">
+      <button
+        type="button"
+        disabled={accountVerificationRequestsLoading}
+        onClick={() =>
+          revokeAccountVerification(request.user_id)
+        }
+        className="flex min-h-12 w-full items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50"
+      >
+        <XCircle size={18} className="ml-2" />
+        سحب شارة التوثيق
+      </button>
+    </div>
+  )}
             </div>
           </div>
         ))}

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -49,6 +49,14 @@ jobs:
         run: |
           mkdir -p dist/updates
 
+          VERSION_FILE="updates/version.txt"
+
+          if [ -f "$VERSION_FILE" ]; then
+            VERSION=$(tr -d '[:space:]' < "$VERSION_FILE")
+          else
+            VERSION="2.1"
+          fi
+
           BUNDLE_ID="${GITHUB_SHA}"
           ZIP_NAME="bundle-${GITHUB_SHA}.zip"
           ZIP_PATH="dist/updates/${ZIP_NAME}"
@@ -61,11 +69,14 @@ jobs:
 
           cat > dist/updates/latest.json <<EOF
           {
+            "version": "${VERSION}",
             "bundleId": "${BUNDLE_ID}",
             "downloadUrl": "https://nemer92.github.io/sooq-sy/updates/${ZIP_NAME}",
             "checksum": "${CHECKSUM}"
           }
           EOF
+
+          echo "Android version: ${VERSION}"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -83,3 +94,40 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Checkout version file
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Increase version for next update
+        run: |
+          mkdir -p updates
+
+          VERSION_FILE="updates/version.txt"
+
+          if [ -f "$VERSION_FILE" ]; then
+            CURRENT_VERSION=$(tr -d '[:space:]' < "$VERSION_FILE")
+          else
+            CURRENT_VERSION="2.1"
+          fi
+
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d '.' -f 1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d '.' -f 2)
+
+          NEXT_MINOR=$((MINOR + 1))
+          NEXT_VERSION="${MAJOR}.${NEXT_MINOR}"
+
+          echo "$NEXT_VERSION" > "$VERSION_FILE"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add "$VERSION_FILE"
+
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: prepare Android version ${NEXT_VERSION}"
+            git push origin main
+          fi
+
+          echo "Next Android version: ${NEXT_VERSION}"

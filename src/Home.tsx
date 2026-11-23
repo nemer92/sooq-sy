@@ -13,6 +13,7 @@ import {
   Search,
   MapPin,
   UserRound,
+  Wallet,
   Plus,
   Menu,
   Car,
@@ -27,6 +28,7 @@ import {
   Gift,
    Share2,
    Mail,
+   Store,
     Heart,
     Star,
     Trash2,
@@ -1754,18 +1756,31 @@ const matchesCondition = selectedConditions.includes(
             </button>
 
 <button
-  type="button"
-  onClick={openCustomerSupport}
-  className="relative flex w-full items-center gap-3 rounded-xl border border-sky-100 bg-sky-50/70 px-3 py-3 text-right text-sm font-bold text-sky-800 transition hover:bg-sky-100"
+  onClick={() => {
+    setIsMobileMenuOpen(false);
+    navigate("/wallet");
+  }}
+  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-amber-50 hover:text-amber-700"
 >
-  {hasUnreadSupport && (
-    <span className="absolute -top-1 -left-1 z-50 h-3.5 w-3.5 rounded-full border-2 border-white bg-red-600" />
-  )}
-  <span className="rounded-xl bg-sky-100 p-2 text-sky-700">
-    <Headset size={18} />
+  <span className="rounded-xl bg-amber-50 p-2 text-amber-700">
+    <Wallet size={18} />
   </span>
-  <span className="flex-1">خدمة العملاء</span>
+  <span className="flex-1">المحفظة</span>
 </button>
+
+<button
+  onClick={() => {
+    setIsMobileMenuOpen(false);
+    navigate("/store-subscription");
+  }}
+  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-right text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700"
+>
+  <span className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+    <Store size={18} />
+  </span>
+  <span className="flex-1">إنشاء متجر</span>
+</button>
+
 
             <button
               onClick={() => {
@@ -1881,10 +1896,10 @@ const matchesCondition = selectedConditions.includes(
             : "فحص التحديثات وتحديث التطبيق"}
         </span>
 
-        <span className="mt-1 block text-[11px] font-medium text-blue-700">
-          {liveUpdateState.message ||
-            "تحقق من وجود إصدار جديد للتطبيق"}
-        </span>
+<span className="mt-1 block text-[11px] font-medium text-blue-700">
+  {liveUpdateState.message ||
+    `الإصدار الحالي: ${liveUpdateState.currentVersion}`}
+</span>
       </span>
     </button>
 

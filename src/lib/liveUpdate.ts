@@ -6,6 +6,7 @@ const UPDATE_MANIFEST_URL =
   "https://nemer92.github.io/sooq-sy/updates/latest.json";
 
 type UpdateManifest = {
+  version: string;
   bundleId: string;
   downloadUrl: string;
   checksum?: string;
@@ -21,12 +22,16 @@ export type LiveUpdateState = {
     | "error";
   progress: number;
   message: string;
+  currentVersion: string;
+  latestVersion: string;
 };
 
 let state: LiveUpdateState = {
   status: "idle",
   progress: 0,
   message: "",
+  currentVersion: "2.1",
+  latestVersion: "2.1",
 };
 
 const listeners = new Set<() => void>();
@@ -69,9 +74,7 @@ export function checkForLiveUpdate(): Promise<void> {
     return Promise.resolve();
   }
 
-  if (checkPromise) {
-    return checkPromise;
-  }
+  if (checkPromise) return checkPromise;
 
   checkPromise = (async () => {
     let progressListener:
@@ -99,15 +102,25 @@ export function checkForLiveUpdate(): Promise<void> {
 
       const update: UpdateManifest = await response.json();
 
-      if (!update.bundleId || !update.downloadUrl) {
-        throw new Error("بيانات التحديث غير مكتملة");
+      if (!update.version || !update.bundleId || !update.downloadUrl) {
+        throw new Error("بيانات التحديث أو رقم النسخة غير مكتمل");
       }
+
+      publish({
+        latestVersion: update.version,
+        currentVersion:
+          currentBundle.bundleId === update.bundleId
+            ? update.version
+            : state.currentVersion,
+      });
 
       if (currentBundle.bundleId === update.bundleId) {
         publish({
           status: "upToDate",
           progress: 100,
-          message: "التطبيق محدّث إلى آخر إصدار",
+          currentVersion: update.version,
+          latestVersion: update.version,
+          message: `التطبيق محدّث إلى الإصدار ${update.version}`,
         });
         return;
       }
@@ -115,7 +128,7 @@ export function checkForLiveUpdate(): Promise<void> {
       publish({
         status: "downloading",
         progress: 0,
-        message: "يوجد تحديث جديد، جارٍ تحميله...",
+        message: `يتوفر الإصدار ${update.version}، جارٍ تحميله...`,
       });
 
       progressListener = await LiveUpdate.addListener(
@@ -129,7 +142,7 @@ export function checkForLiveUpdate(): Promise<void> {
               100,
               Math.max(0, Math.round(event.progress * 100))
             ),
-            message: "جارٍ تحميل التحديث...",
+            message: `جارٍ تحميل الإصدار ${update.version}...`,
           });
         }
       );
@@ -147,7 +160,7 @@ export function checkForLiveUpdate(): Promise<void> {
       publish({
         status: "applying",
         progress: 100,
-        message: "اكتمل التحميل، جارٍ تطبيق التحديث...",
+        message: `اكتمل تحميل الإصدار ${update.version}، جارٍ تطبيقه...`,
       });
 
       await LiveUpdate.setNextBundle({

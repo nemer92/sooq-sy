@@ -2,6 +2,12 @@
 apply plugin: 'com.android.application'
 
 def releaseKeystorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+def androidVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+
+def androidVersionName = System.getenv("ANDROID_VERSION_NAME")
+if (!androidVersionName?.trim()) {
+    androidVersionName = "1.0"
+}
 
 android {
     namespace = "com.sooqsy.app"
@@ -11,8 +17,8 @@ android {
         applicationId "com.sooqsy.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
-        versionName (System.getenv("ANDROID_VERSION_NAME") ?: "1.0")
+        versionCode = androidVersionCode
+versionName = androidVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         aaptOptions {

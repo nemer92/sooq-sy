@@ -19,15 +19,18 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+if (!releaseKeystorePath) {
+    throw new GradleException("RELEASE_KEYSTORE_PATH is missing")
+}
 
-    signingConfigs {
-        release {
-            storeFile file(releaseKeystorePath)
-            storePassword System.getenv("RELEASE_KEYSTORE_PASSWORD")
-            keyAlias System.getenv("RELEASE_KEY_ALIAS")
-            keyPassword System.getenv("RELEASE_KEY_PASSWORD")
-        }
+signingConfigs {
+    release {
+        storeFile file(releaseKeystorePath)
+        storePassword System.getenv("RELEASE_KEYSTORE_PASSWORD")
+        keyAlias System.getenv("RELEASE_KEY_ALIAS")
+        keyPassword System.getenv("RELEASE_KEY_PASSWORD")
     }
+}
 
     buildTypes {
         release {

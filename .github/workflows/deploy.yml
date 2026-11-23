@@ -86,6 +86,7 @@ jobs:
 
           echo "Android version: ${VERSION}"
 
+
       - name: Build Signed Android APK
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -100,24 +101,21 @@ jobs:
           : "${RELEASE_KEY_ALIAS:?Missing RELEASE_KEY_ALIAS}"
           : "${RELEASE_KEY_PASSWORD:?Missing RELEASE_KEY_PASSWORD}"
 
-          mkdir -p android/app
+          mkdir -p "$RUNNER_TEMP"
 
-          export RELEASE_KEYSTORE_PATH="$GITHUB_WORKSPACE/android/app/release-key.jks"
-
+          RELEASE_KEYSTORE_PATH="$RUNNER_TEMP/release-key.jks"
           printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RELEASE_KEYSTORE_PATH"
-
           test -s "$RELEASE_KEYSTORE_PATH"
 
-          VERSION_FILE="updates/version.txt"
-
-          if [ -f "$VERSION_FILE" ]; then
-            VERSION=$(tr -d '[:space:]' < "$VERSION_FILE")
-          else
-            VERSION="2.1"
-          fi
-
+          export RELEASE_KEYSTORE_PATH
           export ANDROID_VERSION_CODE="$GITHUB_RUN_NUMBER"
-          export ANDROID_VERSION_NAME="$VERSION"
+
+          VERSION_FILE="updates/version.txt"
+          if [ -f "$VERSION_FILE" ]; then
+            export ANDROID_VERSION_NAME="$(tr -d '[:space:]' < "$VERSION_FILE")"
+          else
+            export ANDROID_VERSION_NAME="2.1"
+          fi
 
           echo "Building Android version: $ANDROID_VERSION_NAME"
           echo "Android version code: $ANDROID_VERSION_CODE"
@@ -135,11 +133,9 @@ jobs:
           cd ..
 
           mkdir -p dist
-
           cp android/app/build/outputs/apk/release/app-release.apk dist/app.apk
 
           test -s dist/app.apk
-
           sha256sum dist/app.apk
 
           echo "Signed APK created successfully"

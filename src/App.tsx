@@ -3945,18 +3945,303 @@ function getSubCategories(categoryId: number) {
           border-radius: 18px;
         }
 
+        /* أساسيات تمنع تمدد عناصر لوحة الإدارة خارج مساحة العرض */
+        .admin-app-scroll-layout,
+        .admin-app-scroll-layout * {
+          box-sizing: border-box;
+        }
+
+        .admin-app-scroll-layout img,
+        .admin-app-scroll-layout video,
+        .admin-app-scroll-layout canvas {
+          max-width: 100%;
+        }
+
+        .admin-app-scroll-layout input,
+        .admin-app-scroll-layout select,
+        .admin-app-scroll-layout textarea,
+        .admin-app-scroll-layout button {
+          max-width: 100%;
+          font: inherit;
+        }
+
+        .admin-app-scroll-layout .content table {
+          width: 100%;
+          max-width: 100%;
+        }
+
+        .admin-app-scroll-layout .content {
+          overflow-wrap: anywhere;
+        }
+
+        /* الشاشات المتوسطة */
+        @media (min-width: 769px) and (max-width: 1100px) {
+          .admin-app-scroll-layout > .sidebar {
+            width: 230px;
+          }
+
+          .admin-app-scroll-layout > .main > .content {
+            padding: 18px;
+          }
+        }
+
+        /* الهاتف والتابلت العمودي */
         @media (max-width: 768px) {
           .admin-app-scroll-layout {
-            min-height: 100dvh;
+            display: flex !important;
+            flex-direction: column !important;
+            width: 100%;
+            height: 100dvh;
+            min-height: 0;
+            overflow: hidden !important;
           }
+
           .admin-app-scroll-layout > .sidebar {
-            max-height: 100dvh;
+            order: 1;
+            display: flex !important;
+            flex: 0 0 auto;
+            flex-direction: column !important;
+            width: 100% !important;
+            height: auto !important;
+            max-height: 34dvh;
+            min-height: 0;
+            overflow: hidden !important;
+            border-left: 0;
+            border-bottom: 1px solid #e8edf4;
+            box-shadow: 0 4px 16px rgba(15,23,42,.045);
           }
+
+          .admin-app-scroll-layout > .sidebar > .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px 6px;
+          }
+
+          .admin-app-scroll-layout > .sidebar > .brand .brand-icon {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 38px;
+          }
+
+          .admin-app-scroll-layout > .sidebar > .brand h2 {
+            margin: 0;
+            font-size: 17px;
+            line-height: 1.3;
+          }
+
+          .admin-app-scroll-layout > .sidebar > .brand span {
+            font-size: 11px;
+          }
+
+          .admin-app-scroll-layout > .sidebar > .menu-title {
+            display: none !important;
+          }
+
           .admin-app-scroll-layout > .sidebar > nav {
-            padding-inline: 7px;
+            display: flex !important;
+            flex: 0 0 auto;
+            flex-direction: row !important;
+            align-items: stretch;
+            width: 100%;
+            min-height: 0;
+            max-height: 76px;
+            gap: 7px;
+            padding: 7px 10px 10px;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scroll-snap-type: x proximity;
+            -webkit-overflow-scrolling: touch;
           }
+
+          .admin-app-scroll-layout > .sidebar > nav .menu-item {
+            display: inline-flex;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            width: auto;
+            min-width: max-content;
+            min-height: 42px;
+            padding: 0 13px;
+            border-radius: 12px;
+            white-space: nowrap;
+            scroll-snap-align: start;
+            font-size: 12px;
+          }
+
+          .admin-app-scroll-layout > .sidebar > nav .menu-item svg {
+            width: 17px;
+            height: 17px;
+            flex: 0 0 auto;
+          }
+
+          .admin-app-scroll-layout > .sidebar > .sidebar-footer {
+            display: none !important;
+          }
+
+          .admin-app-scroll-layout > .main {
+            order: 2;
+            display: flex !important;
+            flex: 1 1 auto;
+            width: 100%;
+            min-width: 0;
+            min-height: 0;
+            height: auto !important;
+            overflow: hidden !important;
+          }
+
+          .admin-app-scroll-layout > .main > .topbar {
+            display: flex;
+            flex: 0 0 auto;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            min-height: 62px;
+            padding: 10px 14px;
+          }
+
+          .admin-app-scroll-layout > .main > .topbar h1 {
+            margin: 0;
+            font-size: clamp(17px, 4.5vw, 21px);
+            line-height: 1.35;
+          }
+
+          .admin-app-scroll-layout > .main > .topbar p {
+            margin: 3px 0 0;
+            font-size: 11px;
+            line-height: 1.5;
+          }
+
+          .admin-app-scroll-layout > .main > .topbar .top-actions {
+            flex: 0 0 auto;
+            gap: 7px;
+          }
+
           .admin-app-scroll-layout > .main > .content {
+            flex: 1 1 auto;
+            width: 100%;
+            min-width: 0;
+            min-height: 0;
             padding: 12px;
+            overflow-x: hidden !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .admin-app-scroll-layout .welcome-card {
+            gap: 12px;
+            padding: 16px;
+          }
+
+          .admin-app-scroll-layout .welcome-card h2 {
+            font-size: clamp(17px, 4.5vw, 21px);
+          }
+
+          .admin-app-scroll-layout .welcome-card p {
+            font-size: 12px;
+            line-height: 1.7;
+          }
+
+          .admin-app-scroll-layout .welcome-symbol {
+            flex: 0 0 auto;
+          }
+
+          .admin-app-scroll-layout .stat-card,
+          .admin-app-scroll-layout .category-card,
+          .admin-app-scroll-layout .admin-section,
+          .admin-app-scroll-layout .admin-ad-card {
+            min-width: 0;
+            max-width: 100%;
+          }
+
+          .admin-app-scroll-layout .admin-section {
+            padding: 14px;
+            overflow: hidden;
+          }
+
+          .admin-app-scroll-layout .content table {
+            display: block;
+            width: 100%;
+            overflow-x: auto;
+            white-space: nowrap;
+            -webkit-overflow-scrolling: touch;
+          }
+
+          .admin-app-scroll-layout .content form {
+            min-width: 0;
+            max-width: 100%;
+          }
+
+          .admin-app-scroll-layout .content input,
+          .admin-app-scroll-layout .content select,
+          .admin-app-scroll-layout .content textarea {
+            min-width: 0;
+            width: 100%;
+          }
+
+          .admin-app-scroll-layout .content button {
+            touch-action: manipulation;
+          }
+
+          .admin-app-scroll-layout .content [class*="grid"] {
+            min-width: 0;
+          }
+        }
+
+        /* الهواتف الصغيرة */
+        @media (max-width: 420px) {
+          .admin-app-scroll-layout > .sidebar {
+            max-height: 31dvh;
+          }
+
+          .admin-app-scroll-layout > .sidebar > .brand {
+            padding-inline: 11px;
+          }
+
+          .admin-app-scroll-layout > .sidebar > nav {
+            gap: 6px;
+            padding-inline: 8px;
+          }
+
+          .admin-app-scroll-layout > .sidebar > nav .menu-item {
+            min-height: 39px;
+            padding-inline: 10px;
+            font-size: 11px;
+          }
+
+          .admin-app-scroll-layout > .main > .topbar {
+            padding-inline: 11px;
+          }
+
+          .admin-app-scroll-layout > .main > .content {
+            padding: 9px;
+          }
+
+          .admin-app-scroll-layout .welcome-card,
+          .admin-app-scroll-layout .admin-section {
+            border-radius: 14px;
+          }
+        }
+
+        /* الهاتف بالوضع الأفقي */
+        @media (max-height: 520px) and (max-width: 900px) {
+          .admin-app-scroll-layout > .sidebar {
+            max-height: 42dvh;
+          }
+
+          .admin-app-scroll-layout > .sidebar > .brand {
+            padding-block: 5px 2px;
+          }
+
+          .admin-app-scroll-layout > .sidebar > nav {
+            max-height: 58px;
+            padding-block: 4px 7px;
+          }
+
+          .admin-app-scroll-layout > .main > .topbar {
+            min-height: 52px;
+            padding-block: 6px;
           }
         }
       `}</style>

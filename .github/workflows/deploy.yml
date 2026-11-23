@@ -87,6 +87,19 @@ jobs:
           echo "Android version: ${VERSION}"
 
 
+echo "Checking Android signing variables..."
+
+for name in RELEASE_KEYSTORE_PATH RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD ANDROID_VERSION_CODE ANDROID_VERSION_NAME; do
+  if [ -n "${!name}" ]; then
+    echo "$name: OK"
+  else
+    echo "::error::$name is EMPTY"
+    exit 1
+  fi
+done
+
+echo "Keystore file:"
+ls -l "$RELEASE_KEYSTORE_PATH"
       - name: Build Signed Android APK
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
@@ -106,6 +119,16 @@ jobs:
           RELEASE_KEYSTORE_PATH="$RUNNER_TEMP/release-key.jks"
           printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RELEASE_KEYSTORE_PATH"
           test -s "$RELEASE_KEYSTORE_PATH"
+          echo "Checking signing configuration..."
+
+for name in RELEASE_KEYSTORE_PATH RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+  if [ -n "${!name}" ]; then
+    echo "$name is set"
+  else
+    echo "::error::$name is missing or empty"
+    exit 1
+  fi
+done
 
           export RELEASE_KEYSTORE_PATH
           export ANDROID_VERSION_CODE="$GITHUB_RUN_NUMBER"
@@ -126,10 +149,12 @@ jobs:
           mkdir -p android/app/src/main/assets/public
           cp -a dist-native/. android/app/src/main/assets/public/
 
+
+
           chmod +x android/gradlew
 
           cd android
-          ./gradlew --no-daemon assembleRelease
+          ./gradlew --no-daemon assembleRelease --stacktrace
           cd ..
 
           mkdir -p dist

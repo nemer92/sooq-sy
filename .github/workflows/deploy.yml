@@ -52,6 +52,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Package Android Update
+        shell: bash
         run: |
           set -e
 
@@ -84,28 +85,18 @@ jobs:
           }
           EOF
 
-          echo "Android version: ${VERSION}"
+          echo "Android update version: ${VERSION}"
+          echo "Bundle ID: ${BUNDLE_ID}"
 
-
-echo "Checking Android signing variables..."
-
-for name in RELEASE_KEYSTORE_PATH RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD ANDROID_VERSION_CODE ANDROID_VERSION_NAME; do
-  if [ -n "${!name}" ]; then
-    echo "$name: OK"
-  else
-    echo "::error::$name is EMPTY"
-    exit 1
-  fi
-done
-
-echo "Keystore file:"
-ls -l "$RELEASE_KEYSTORE_PATH"
       - name: Build Signed Android APK
+        shell: bash
         env:
           RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           set -e
 
@@ -116,29 +107,34 @@ ls -l "$RELEASE_KEYSTORE_PATH"
 
           mkdir -p "$RUNNER_TEMP"
 
-          RELEASE_KEYSTORE_PATH="$RUNNER_TEMP/release-key.jks"
+          export RELEASE_KEYSTORE_PATH="$RUNNER_TEMP/release-key.jks"
+
           printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RELEASE_KEYSTORE_PATH"
           test -s "$RELEASE_KEYSTORE_PATH"
-          echo "Checking signing configuration..."
 
-for name in RELEASE_KEYSTORE_PATH RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
-  if [ -n "${!name}" ]; then
-    echo "$name is set"
-  else
-    echo "::error::$name is missing or empty"
-    exit 1
-  fi
-done
-
-          export RELEASE_KEYSTORE_PATH
           export ANDROID_VERSION_CODE="$GITHUB_RUN_NUMBER"
 
           VERSION_FILE="updates/version.txt"
+
           if [ -f "$VERSION_FILE" ]; then
             export ANDROID_VERSION_NAME="$(tr -d '[:space:]' < "$VERSION_FILE")"
           else
             export ANDROID_VERSION_NAME="2.1"
           fi
+
+          echo "Checking Android signing variables..."
+
+          for name in RELEASE_KEYSTORE_PATH RELEASE_KEYSTORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD ANDROID_VERSION_CODE ANDROID_VERSION_NAME; do
+            if [ -n "${!name}" ]; then
+              echo "$name: OK"
+            else
+              echo "::error::$name is EMPTY"
+              exit 1
+            fi
+          done
+
+          echo "Checking keystore file..."
+          ls -l "$RELEASE_KEYSTORE_PATH"
 
           echo "Building Android version: $ANDROID_VERSION_NAME"
           echo "Android version code: $ANDROID_VERSION_CODE"
@@ -149,8 +145,6 @@ done
           mkdir -p android/app/src/main/assets/public
           cp -a dist-native/. android/app/src/main/assets/public/
 
-
-
           chmod +x android/gradlew
 
           cd android
@@ -158,9 +152,12 @@ done
           cd ..
 
           mkdir -p dist
+
           cp android/app/build/outputs/apk/release/app-release.apk dist/app.apk
 
           test -s dist/app.apk
+
+          echo "APK SHA256:"
           sha256sum dist/app.apk
 
           echo "Signed APK created successfully"
@@ -189,6 +186,7 @@ done
           ref: main
 
       - name: Increase version for next update
+        shell: bash
         run: |
           set -e
 

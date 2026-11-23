@@ -24,6 +24,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -47,6 +53,8 @@ jobs:
 
       - name: Package Android Update
         run: |
+          set -e
+
           mkdir -p dist/updates
 
           VERSION_FILE="updates/version.txt"
@@ -78,6 +86,64 @@ jobs:
 
           echo "Android version: ${VERSION}"
 
+      - name: Build Signed Android APK
+        env:
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          set -e
+
+          : "${RELEASE_KEYSTORE_BASE64:?Missing RELEASE_KEYSTORE_BASE64}"
+          : "${RELEASE_KEYSTORE_PASSWORD:?Missing RELEASE_KEYSTORE_PASSWORD}"
+          : "${RELEASE_KEY_ALIAS:?Missing RELEASE_KEY_ALIAS}"
+          : "${RELEASE_KEY_PASSWORD:?Missing RELEASE_KEY_PASSWORD}"
+
+          mkdir -p android/app
+
+          export RELEASE_KEYSTORE_PATH="$GITHUB_WORKSPACE/android/app/release-key.jks"
+
+          printf '%s' "$RELEASE_KEYSTORE_BASE64" | base64 --decode > "$RELEASE_KEYSTORE_PATH"
+
+          test -s "$RELEASE_KEYSTORE_PATH"
+
+          VERSION_FILE="updates/version.txt"
+
+          if [ -f "$VERSION_FILE" ]; then
+            VERSION=$(tr -d '[:space:]' < "$VERSION_FILE")
+          else
+            VERSION="2.1"
+          fi
+
+          export ANDROID_VERSION_CODE="$GITHUB_RUN_NUMBER"
+          export ANDROID_VERSION_NAME="$VERSION"
+
+          echo "Building Android version: $ANDROID_VERSION_NAME"
+          echo "Android version code: $ANDROID_VERSION_CODE"
+
+          npx cap sync android
+
+          rm -rf android/app/src/main/assets/public
+          mkdir -p android/app/src/main/assets/public
+          cp -a dist-native/. android/app/src/main/assets/public/
+
+          chmod +x android/gradlew
+
+          cd android
+          ./gradlew --no-daemon assembleRelease
+          cd ..
+
+          mkdir -p dist
+
+          cp android/app/build/outputs/apk/release/app-release.apk dist/app.apk
+
+          test -s dist/app.apk
+
+          sha256sum dist/app.apk
+
+          echo "Signed APK created successfully"
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -87,6 +153,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
     needs: build
 
@@ -102,6 +169,8 @@ jobs:
 
       - name: Increase version for next update
         run: |
+          set -e
+
           mkdir -p updates
 
           VERSION_FILE="updates/version.txt"

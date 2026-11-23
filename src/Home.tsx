@@ -3862,7 +3862,7 @@ onClick={(e) => {
         </p>
 
         <a
-          href="https://sooq-sy.pages.dev/app.apk"
+          href="https://nemer92.github.io/sooq-sy/app.apk"
           download="Sooq-SY.apk"
           className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-bold text-emerald-400 transition hover:bg-emerald-500/20 active:scale-95"
         >

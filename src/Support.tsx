@@ -19,9 +19,10 @@ type SupportConversation = {
 type SupportMessage = {
   id: string;
   conversation_id: string;
-  sender_id: string;
+  sender_id: string | null;
   body: string;
   is_read: boolean;
+  is_auto_reply: boolean;
   created_at: string;
 };
 
@@ -52,11 +53,14 @@ export default function Support() {
     async (conversationId: string, currentUserId: string) => {
       const { data, error: messagesError } = await supabase
         .from("support_messages")
-        .select("id, conversation_id, sender_id, body, is_read, created_at")
+        .select(
+          "id, conversation_id, sender_id, body, is_read, is_auto_reply, created_at"
+        )
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
 
       if (messagesError) {
+        console.error("SUPPORT LOAD MESSAGES ERROR:", messagesError);
         setError("تعذر تحميل رسائل خدمة العملاء.");
         return;
       }
@@ -64,6 +68,7 @@ export default function Support() {
       const loadedMessages = (data ?? []) as SupportMessage[];
       setMessages(loadedMessages);
 
+      // الرسائل الواردة، بما فيها الرد التلقائي، تُعلّم كمقروءة.
       const unreadIds = loadedMessages
         .filter(
           (message) =>
@@ -219,7 +224,9 @@ export default function Support() {
     if (!body || !conversation || !userId || sending) return;
 
     if (conversation.status === "closed") {
-      setError("هذه المحادثة مغلقة حالياً. يرجى انتظار إعادة فتحها من الإدارة.");
+      setError(
+        "هذه المحادثة مغلقة حالياً. يرجى انتظار إعادة فتحها من الإدارة."
+      );
       return;
     }
 
@@ -235,6 +242,7 @@ export default function Support() {
       });
 
     if (sendError) {
+      console.error("SUPPORT SEND ERROR:", sendError);
       setError("لم يتم إرسال الرسالة. تحقق من اتصالك وحاول مرة أخرى.");
     } else {
       setDraft("");
@@ -329,7 +337,7 @@ export default function Support() {
             </div>
           </div>
 
-          {/* رسائل المحادثة: هذا الجزء وحده قابل للتمرير */}
+          {/* رسائل المحادثة */}
           <div
             ref={messagesContainerRef}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50/70 px-3 py-4 sm:px-5"
@@ -387,7 +395,12 @@ export default function Support() {
                 </div>
 
                 {messages.map((message) => {
-                  const isMine = message.sender_id === userId;
+                  const isMine =
+                    !message.is_auto_reply &&
+                    message.sender_id === userId;
+
+                  const isSupportMessage =
+                    message.is_auto_reply || !isMine;
 
                   return (
                     <div
@@ -408,10 +421,15 @@ export default function Support() {
                               : "text-slate-500"
                           }`}
                         >
-                          {!isMine && (
+                          {isSupportMessage && (
                             <Headset size={12} />
                           )}
-                          {isMine ? "أنت" : "فريق خدمة العملاء"}
+
+                          {message.is_auto_reply
+                            ? "فريق خدمة العملاء"
+                            : isMine
+                              ? "أنت"
+                              : "فريق خدمة العملاء"}
                         </div>
 
                         <div
@@ -454,7 +472,7 @@ export default function Support() {
             </div>
           )}
 
-          {/* منطقة كتابة الرسالة مثبتة أسفل المحادثة */}
+          {/* منطقة كتابة الرسالة */}
           <div className="shrink-0 border-t border-slate-200 bg-white p-3 sm:p-4">
             {conversation?.status === "closed" ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">

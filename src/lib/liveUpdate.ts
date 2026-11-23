@@ -45,6 +45,37 @@ function publish(next: Partial<LiveUpdateState>) {
   listeners.forEach((listener) => listener());
 }
 
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "غير معروف";
+
+  if (bytes < 1024) return `${bytes} بايت`;
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function getErrorDetails(error: any): string {
+  if (typeof error === "string") return error;
+
+  const details = [
+    error?.message,
+    error?.code,
+    error?.errorCode,
+    error?.cause?.message,
+    error?.cause,
+  ]
+    .filter(Boolean)
+    .map((item) =>
+      typeof item === "object" ? JSON.stringify(item) : String(item)
+    );
+
+  return [...new Set(details)].join(" | ") ||
+    "خطأ غير معروف، راجع سجل التطبيق";
+}
+
 export function getLiveUpdateState() {
   return state;
 }
@@ -71,6 +102,7 @@ export function checkForLiveUpdate(): Promise<void> {
       status: "error",
       message: "التحديث متاح داخل التطبيق فقط",
     });
+
     return Promise.resolve();
   }
 
@@ -80,6 +112,11 @@ export function checkForLiveUpdate(): Promise<void> {
     let progressListener:
       | Awaited<ReturnType<typeof LiveUpdate.addListener>>
       | null = null;
+
+    let lastProgress = 0;
+    let lastDownloadedBytes = 0;
+    let lastTotalBytes = 0;
+    let downloadStarted = false;
 
     try {
       publish({
@@ -97,7 +134,9 @@ export function checkForLiveUpdate(): Promise<void> {
       });
 
       if (!response.ok) {
-        throw new Error("تعذر جلب معلومات التحديث");
+        throw new Error(
+          `تعذر جلب معلومات التحديث. HTTP ${response.status}`
+        );
       }
 
       const update: UpdateManifest = await response.json();
@@ -122,6 +161,7 @@ export function checkForLiveUpdate(): Promise<void> {
           latestVersion: update.version,
           message: `التطبيق محدّث إلى الإصدار ${update.version}`,
         });
+
         return;
       }
 
@@ -136,22 +176,55 @@ export function checkForLiveUpdate(): Promise<void> {
         (event) => {
           if (event.bundleId !== update.bundleId) return;
 
+          downloadStarted = true;
+
+          lastProgress = Math.min(
+            100,
+            Math.max(0, Math.round(event.progress * 100))
+          );
+
+          lastDownloadedBytes = event.downloadedBytes ?? 0;
+          lastTotalBytes = event.totalBytes ?? 0;
+
+          const sizeInfo =
+            lastTotalBytes > 0
+              ? ` (${formatBytes(lastDownloadedBytes)} من ${formatBytes(lastTotalBytes)})`
+              : "";
+
           publish({
             status: "downloading",
-            progress: Math.min(
-              100,
-              Math.max(0, Math.round(event.progress * 100))
-            ),
-            message: `جارٍ تحميل الإصدار ${update.version}...`,
+            progress: lastProgress,
+            message: `جارٍ تحميل الإصدار ${update.version}... ${lastProgress}%${sizeInfo}`,
+          });
+
+          console.log("Sooq.Sy OTA Download Progress:", {
+            bundleId: event.bundleId,
+            progress: lastProgress,
+            downloadedBytes: lastDownloadedBytes,
+            totalBytes: lastTotalBytes,
           });
         }
       );
+
+      console.log("Sooq.Sy OTA Download Started:", {
+        version: update.version,
+        bundleId: update.bundleId,
+        downloadUrl: update.downloadUrl,
+        checksum: update.checksum,
+      });
 
       await LiveUpdate.downloadBundle({
         artifactType: "zip",
         bundleId: update.bundleId,
         url: update.downloadUrl,
         ...(update.checksum ? { checksum: update.checksum } : {}),
+      });
+
+      console.log("Sooq.Sy OTA Download Completed:", {
+        bundleId: update.bundleId,
+        lastProgress,
+        lastDownloadedBytes,
+        lastTotalBytes,
       });
 
       await progressListener.remove();
@@ -167,20 +240,36 @@ export function checkForLiveUpdate(): Promise<void> {
         bundleId: update.bundleId,
       });
 
+      console.log("Sooq.Sy OTA Bundle Set Successfully:", update.bundleId);
+
       await LiveUpdate.reload();
     } catch (error: any) {
-      console.error("Sooq.Sy Live Update Error:", error);
+      const errorDetails = getErrorDetails(error);
+
+      console.error("Sooq.Sy Live Update Error:", {
+        error,
+        errorDetails,
+        downloadStarted,
+        lastProgress,
+        lastDownloadedBytes,
+        lastTotalBytes,
+      });
+
+      const stage = downloadStarted
+        ? `فشل التحديث أثناء أو بعد التحميل عند ${lastProgress}%`
+        : "فشل التحديث قبل اكتمال بدء التحميل";
 
       publish({
         status: "error",
-        message:
-          error?.message || "تعذر تحميل التحديث، حاول مرة أخرى",
+        message: `${stage}. ${errorDetails}`,
       });
 
       throw error;
     } finally {
       if (progressListener) {
-        await progressListener.remove().catch(() => {});
+        await progressListener.remove().catch((error) => {
+          console.error("Sooq.Sy OTA Listener Removal Error:", error);
+        });
       }
 
       checkPromise = null;

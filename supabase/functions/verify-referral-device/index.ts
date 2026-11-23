@@ -386,7 +386,6 @@ async function consumeRateLimit(
   }
 
   const result = await response.json();
-
   const row = Array.isArray(result) ? result[0] : result;
 
   if (
@@ -416,7 +415,6 @@ async function enforceRateLimits(
     throw new Error("UNKNOWN_ACTION");
   }
 
-  // حد IP مستقل لكل عملية.
   const ipResult = await consumeRateLimit(
     `ip:${action}:${ip}`,
     config.limit,
@@ -430,8 +428,6 @@ async function enforceRateLimits(
     };
   }
 
-  // حد إضافي للمفتاح العام عند توفره.
-  // بصمة المفتاح هنا ليست بديلاً عن التحقق التشفيري اللاحق.
   if (
     typeof body.public_key === "string" &&
     body.public_key.length >= 100 &&
@@ -453,8 +449,6 @@ async function enforceRateLimits(
         };
       }
     } catch (error) {
-      // المفتاح غير الصالح سيُرفض لاحقاً في التحقق الأصلي.
-      // لا نتجاهل أخطاء الخادم أو أخطاء قاعدة البيانات.
       if (
         error instanceof Error &&
         error.message !== "INVALID_BASE64" &&
@@ -555,10 +549,7 @@ async function checkCertificateStatus(chain: string[]): Promise<void> {
 
   for (const encoded of chain) {
     const bytes = decodeBase64(encoded);
-
-    const cert = new X509Certificate(
-      toArrayBuffer(bytes),
-    );
+    const cert = new X509Certificate(toArrayBuffer(bytes));
 
     const serial = normalizeSerial(cert.serialNumber);
     const status = entries[serial];
@@ -569,10 +560,13 @@ async function checkCertificateStatus(chain: string[]): Promise<void> {
   }
 }
 
-function normalizeReferralCode(value: unknown): string {
-  return typeof value === "string"
-    ? value.trim().toUpperCase()
-    : "";
+function normalizeReferralCode(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toUpperCase();
+  return normalized.length > 0 ? normalized : null;
 }
 
 function isValidReferralCode(value: string): boolean {
@@ -629,14 +623,16 @@ async function verifySignature(
 
 async function lookupChallenge(
   challenge: string,
-  referralCode: string,
+  referralCode: string | null,
   purpose: "attestation" | "proof",
   keyFingerprint?: string,
 ): Promise<boolean> {
   const filters: Record<string, string> = {
     select: "challenge,referral_code,expires_at,consumed_at,purpose,key_fingerprint",
     challenge: `eq.${challenge}`,
-    referral_code: `eq.${referralCode}`,
+    referral_code: referralCode === null
+      ? "is.null"
+      : `eq.${referralCode}`,
     purpose: `eq.${purpose}`,
     consumed_at: "is.null",
     expires_at: `gt.${new Date().toISOString()}`,
@@ -660,25 +656,30 @@ async function lookupChallenge(
   return Array.isArray(rows) && rows.length === 1;
 }
 
-async function createInitialChallenge(referralCode: string) {
-  const codeParams = new URLSearchParams({
-    select: "code",
-    code: `eq.${referralCode}`,
-    limit: "1",
-  });
+async function createInitialChallenge(
+  referralCode: string | null,
+) {
+  // رمز الإحالة اختياري. إذا تم إرساله، يجب أن يكون موجوداً.
+  if (referralCode !== null) {
+    const codeParams = new URLSearchParams({
+      select: "code",
+      code: `eq.${referralCode}`,
+      limit: "1",
+    });
 
-  const codeResponse = await supabaseRequest(
-    `referral_codes?${codeParams}`,
-  );
+    const codeResponse = await supabaseRequest(
+      `referral_codes?${codeParams}`,
+    );
 
-  if (!codeResponse.ok) {
-    throw new Error("REFERRAL_LOOKUP_FAILED");
-  }
+    if (!codeResponse.ok) {
+      throw new Error("REFERRAL_LOOKUP_FAILED");
+    }
 
-  const codes = await codeResponse.json();
+    const codes = await codeResponse.json();
 
-  if (!Array.isArray(codes) || codes.length !== 1) {
-    throw new Error("INVALID_REFERRAL_CODE");
+    if (!Array.isArray(codes) || codes.length !== 1) {
+      throw new Error("INVALID_REFERRAL_CODE");
+    }
   }
 
   const challenge = encodeBase64Url(
@@ -715,9 +716,8 @@ async function createInitialChallenge(referralCode: string) {
   return { challenge, expires_at: expiresAt };
 }
 
-
 async function createProofChallenge(
-  referralCode: string,
+  referralCode: string | null,
   publicKey: string,
 ) {
   const publicKeyBytes = decodeBase64(publicKey);
@@ -765,7 +765,7 @@ async function createProofChallenge(
           ? databaseError.message
           : "";
     } catch {
-      // استجابة غير JSON: لا نعتبرها دليلاً على فقدان المفتاح.
+      // استجابة غير JSON.
     }
 
     if (
@@ -791,10 +791,9 @@ async function createProofChallenge(
   };
 }
 
-
 async function verifyInitialDevice(
   body: any,
-  referralCode: string,
+  referralCode: string | null,
 ) {
   const challenge = validateChallenge(body.challenge);
   const publicKey = body.public_key;
@@ -924,7 +923,7 @@ async function verifyInitialDevice(
 
 async function verifyExistingDevice(
   body: any,
-  referralCode: string,
+  referralCode: string | null,
 ) {
   const challenge = validateChallenge(body.challenge);
   const publicKey = body.public_key;
@@ -1088,9 +1087,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    // رمز الإحالة اختياري، لكن إذا أُرسل يجب أن يكون صالحاً.
     const referralCode = normalizeReferralCode(body.referral_code);
 
-    if (!isValidReferralCode(referralCode)) {
+    if (
+      referralCode !== null &&
+      !isValidReferralCode(referralCode)
+    ) {
       return json({ error: "INVALID_REFERRAL_CODE" }, 400);
     }
 

@@ -1,256 +1,167 @@
 
 import { useEffect, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "./lib/supabase";
 import {
   ArrowRight,
-  MapPin,
-  Heart,
-  Car,
-  LoaderCircle,
-  Filter,
-  X,
+  Eye,
+  CalendarDays,
+  Star,
+  Store,
+  Tag,
+  Plus,
+  Trash2,
+  Pencil,
+  Archive,
+  RotateCcw,
+  Sparkles,
 } from "lucide-react";
-import { supabase } from "./lib/supabase";
 
 type Ad = {
   id: string;
   title: string;
-  description: string;
   price: number | null;
   currency: string;
-  listing_type: "sale" | "donation";
-  category_id: number;
-  city_id: number | null;
-  condition: string;
-  city_name: string;
-  category_name: string;
+  status: string;
   created_at: string;
+  published_at: string | null;
+  rejection_reason: string | null;
+  categories: { name_ar: string } | null;
+  cities: { name_ar: string } | null;
+  listing_type: string;
+  is_featured: boolean;
+  store_id: string | null;
   images: string[];
-  is_featured?: boolean;
 };
 
-type Category = {
-  id: number;
-  name_ar: string;
-  parent_id: number | null;
-};
-
-type Governorate = {
-  id: number;
-  name_ar: string;
-};
-
-type City = {
-  id: number;
-  name_ar: string;
-  governorate_id: number;
-};
-
-const pageConfig = {
-  featured: {
-    title: "جميع الإعلانات المميزة",
-    subtitle: "إعلانات مختارة تظهر بتمييز خاص",
+const statusInfo: Record<string, { label: string; color: string }> = {
+  pending: {
+    label: "قيد المراجعة",
+    color: "bg-amber-50 text-amber-700 border-amber-100",
   },
-  regular: {
-    title: "جميع الإعلانات العادية",
-    subtitle: "تصفح أحدث الإعلانات المنشورة",
+  approved: {
+    label: "مقبول ومنشور",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-100",
   },
-  donations: {
-    title: "جميع التبرعات",
-    subtitle: "أغراض مجانية يمكنك الاستفادة منها",
+  rejected: {
+    label: "مرفوض",
+    color: "bg-red-50 text-red-700 border-red-100",
+  },
+  sold: {
+    label: "مباع",
+    color: "bg-blue-50 text-blue-700 border-blue-100",
+  },
+  archived: {
+    label: "مؤرشف",
+    color: "bg-slate-100 text-slate-600 border-slate-200",
   },
 };
 
-export default function AllAds() {
-  const location = useLocation();
+export default function MyAds() {
   const navigate = useNavigate();
-
-  const type =
-    location.pathname === "/featured-ads"
-      ? "featured"
-      : location.pathname === "/regular-ads"
-        ? "regular"
-        : location.pathname === "/donations"
-          ? "donations"
-          : "";
 
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
-  const [favoriteAdIds, setFavoriteAdIds] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  const [featuringAdId, setFeaturingAdId] = useState<string | null>(null);
 
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [governorates, setGovernorates] = useState<Governorate[]>([]);
-  const [cities, setCities] = useState<City[]>([]);
+  async function featureAd(ad: Ad) {
+    const isStoreAd = Boolean(ad.store_id);
 
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [selectedSubCategory, setSelectedSubCategory] = useState("");
-  const [selectedGovernorate, setSelectedGovernorate] = useState("");
-  const [selectedCity, setSelectedCity] = useState("");
+    const confirmed = await window.sooqConfirm(
+      isStoreAd
+        ? "هل تريد تمييز هذا الإعلان باستخدام حصة الإعلانات المميزة في اشتراك المتجر؟"
+        : "هل تريد تمييز هذا الإعلان مقابل 5 نقاط؟"
+    );
 
-  // استعادة فلتر حالة الإعلان المحفوظ عند فتح الصفحة أو الرجوع إليها
-  const [selectedConditions, setSelectedConditions] = useState<
-    ("new" | "used")[]
-  >(() => {
+    if (!confirmed) return;
+
+    setFeaturingAdId(ad.id);
+
     try {
-      const saved = sessionStorage.getItem("sooq_selected_conditions");
+      const { error } = isStoreAd
+        ? await supabase.rpc("feature_ad_with_subscription", {
+            p_ad_id: ad.id,
+          })
+        : await supabase.rpc("feature_ad_with_points", {
+            p_ad_id: ad.id,
+          });
 
-      if (saved) {
-        const parsed: unknown = JSON.parse(saved);
+      if (error) throw error;
 
-        if (
-          Array.isArray(parsed) &&
-          parsed.length > 0 &&
-          parsed.length <= 2 &&
-          parsed.every(
-            (item): item is "new" | "used" =>
-              item === "new" || item === "used"
-          ) &&
-          new Set(parsed).size === parsed.length
-        ) {
-          return parsed;
-        }
-      }
-    } catch (error) {
-      console.error("خطأ باستعادة فلتر حالة الإعلان:", error);
-    }
-
-    return ["new", "used"];
-  });
-
-  // حفظ الاختيارات تلقائياً عند كل تغيير
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(
-        "sooq_selected_conditions",
-        JSON.stringify(selectedConditions)
+      setAds((currentAds) =>
+        currentAds.map((item) =>
+          item.id === ad.id ? { ...item, is_featured: true } : item
+        )
       );
-    } catch (error) {
-      console.error("خطأ بحفظ فلتر حالة الإعلان:", error);
-    }
-  }, [selectedConditions]);
-  const validType =
-    type === "featured" ||
-    type === "regular" ||
-    type === "donations";
 
-  const config = validType ? pageConfig[type] : pageConfig.regular;
+      window.alert(
+        isStoreAd
+          ? "تم تمييز الإعلان باستخدام حصة المتجر بنجاح."
+          : "تم تمييز إعلانك بنجاح مقابل 5 نقاط."
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "";
 
-  // تبديل حالة الإعلان مع منع إلغاء الخيارين معاً
-  function toggleCondition(condition: "new" | "used") {
-    setSelectedConditions((prev) => {
-      if (prev.includes(condition)) {
-        if (prev.length === 1) {
-          window.alert("يجب اختيار حالة واحدة على الأقل.");
-          return prev;
-        }
-
-        return prev.filter((item) => item !== condition);
+      if (message.includes("لا توجد نقاط كافية")) {
+        window.alert("لا توجد نقاط كافية.");
+      } else {
+        window.alert(message || "تعذر تمييز الإعلان.");
       }
-
-      return [...prev, condition];
-    });
+    } finally {
+      setFeaturingAdId(null);
+    }
   }
 
   useEffect(() => {
     let active = true;
 
-    async function loadFilters() {
-      try {
-        const [categoriesResult, governoratesResult, citiesResult] =
-          await Promise.all([
-            supabase
-              .from("categories")
-              .select("id, name_ar, parent_id")
-              .eq("is_active", true)
-              .order("sort_order", { ascending: true }),
-
-            supabase
-              .from("governorates")
-              .select("id, name_ar")
-              .eq("is_active", true)
-              .order("name_ar", { ascending: true }),
-
-            supabase
-              .from("cities")
-              .select("id, name_ar, governorate_id")
-              .eq("is_active", true)
-              .order("name_ar", { ascending: true }),
-          ]);
-
-        if (categoriesResult.error) throw categoriesResult.error;
-        if (governoratesResult.error) throw governoratesResult.error;
-        if (citiesResult.error) throw citiesResult.error;
-
-        if (!active) return;
-
-        setCategories((categoriesResult.data ?? []) as Category[]);
-        setGovernorates((governoratesResult.data ?? []) as Governorate[]);
-        setCities((citiesResult.data ?? []) as City[]);
-      } catch (error) {
-        console.error("خطأ تحميل بيانات الفلاتر:", error);
-      }
-    }
-
-    loadFilters();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadAds() {
+    async function loadMyAds() {
       setLoading(true);
 
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      if (!sessionData.session) {
+        navigate("/auth", {
+          state: { from: "/my-ads" },
+        });
+        return;
+      }
+
+      const userId = sessionData.session.user.id;
+
+      const { data, error } = await supabase
+        .from("ads")
+        .select(`
+          id,
+          title,
+          price,
+          currency,
+          status,
+          created_at,
+          published_at,
+          rejection_reason,
+          categories(name_ar),
+          cities(name_ar),
+          listing_type,
+          is_featured,
+          store_id,
+          ad_images(image_path, sort_order)
+        `)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (!active) return;
+
+      if (error) {
+        console.error("خطأ تحميل إعلانات المستخدم:", error);
+        setError("تعذر تحميل إعلاناتك. حاول مرة أخرى.");
+        setLoading(false);
+        return;
+      }
+
       try {
-        if (!validType) {
-          if (active) {
-            setAds([]);
-            setLoading(false);
-          }
-          return;
-        }
-
-        let query = supabase
-          .from("ads")
-          .select(`
-            id,
-            title,
-            description,
-            price,
-            currency,
-            listing_type,
-            category_id,
-            city_id,
-            condition,
-            created_at,
-            is_featured,
-            categories(name_ar),
-            cities(name_ar),
-            ad_images(image_path, sort_order)
-          `)
-          .eq("status", "approved")
-          .order("created_at", { ascending: false });
-
-        if (type === "featured") {
-          query = query
-            .eq("listing_type", "sale")
-            .eq("is_featured", true);
-        } else if (type === "regular") {
-          query = query
-            .eq("listing_type", "sale")
-            .or("is_featured.is.null,is_featured.eq.false");
-        } else if (type === "donations") {
-          query = query.eq("listing_type", "donation");
-        }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-
-        const formatted: Ad[] = await Promise.all(
+        const formattedAds: Ad[] = await Promise.all(
           (data ?? []).map(async (ad: any) => {
             const sortedImages = (ad.ad_images ?? []).sort(
               (a: any, b: any) => a.sort_order - b.sort_order
@@ -263,7 +174,11 @@ export default function AllAds() {
                     .from("ad-images")
                     .createSignedUrl(image.image_path, 3600);
 
-                if (imageError) return "";
+                if (imageError) {
+                  console.error("خطأ تحميل صورة الإعلان:", imageError);
+                  return "";
+                }
+
                 return imageData.signedUrl;
               })
             );
@@ -271,54 +186,30 @@ export default function AllAds() {
             return {
               id: ad.id,
               title: ad.title,
-              description: ad.description ?? "",
               price: ad.price,
               currency: ad.currency,
-              listing_type: ad.listing_type,
-              category_id: ad.category_id,
-              city_id: ad.city_id,
-              condition: ad.condition,
+              status: ad.status,
               created_at: ad.created_at,
+              published_at: ad.published_at,
+              rejection_reason: ad.rejection_reason,
+              categories: ad.categories,
+              cities: ad.cities,
+              listing_type: ad.listing_type,
               is_featured: ad.is_featured ?? false,
-              category_name: ad.categories?.name_ar ?? "",
-              city_name: ad.cities?.name_ar ?? "",
+              store_id: ad.store_id,
               images: signedImages.filter(Boolean),
             };
           })
         );
 
-        if (!active) return;
-
-        setAds(formatted);
-
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (user) {
-          const { data: favorites, error: favoritesError } =
-            await supabase
-              .from("favorites")
-              .select("ad_id")
-              .eq("user_id", user.id);
-
-          if (favoritesError) {
-            console.error("خطأ تحميل المفضلة:", favoritesError);
-          }
-
-          if (active) {
-            setFavoriteAdIds(
-              (favorites ?? []).map((item) => item.ad_id)
-            );
-          }
-        } else if (active) {
-          setFavoriteAdIds([]);
+        if (active) {
+          setAds(formattedAds);
         }
-      } catch (error) {
-        console.error("خطأ تحميل الإعلانات:", error);
+      } catch (err) {
+        console.error("خطأ تجهيز صور الإعلانات:", err);
 
         if (active) {
-          setAds([]);
+          setError("تعذر تحميل صور إعلاناتك. حاول مرة أخرى.");
         }
       } finally {
         if (active) {
@@ -327,545 +218,435 @@ export default function AllAds() {
       }
     }
 
-    loadAds();
+    loadMyAds();
 
     return () => {
       active = false;
     };
-  }, [type]);
+  }, [navigate]);
 
-  const subCategories = categories.filter(
-    (category) =>
-      category.parent_id === Number(selectedCategory)
-  );
+  async function deleteAd(adId: string) {
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
 
-  const filteredCities = cities.filter(
-    (city) =>
-      selectedGovernorate === "" ||
-      String(city.governorate_id) === selectedGovernorate
-  );
+      if (!user) {
+        navigate("/auth");
+        return;
+      }
 
-  const filteredAds = ads.filter((ad) => {
-    const matchesCategory =
-      selectedCategory === "" ||
-      Number(ad.category_id) === Number(selectedCategory) ||
-      categories.some(
-        (sub) =>
-          sub.parent_id === Number(selectedCategory) &&
-          sub.id === Number(ad.category_id)
-      );
-
-    const matchesSubCategory =
-      selectedSubCategory === "" ||
-      Number(ad.category_id) === Number(selectedSubCategory);
-
-    const matchesGovernorate =
-      selectedGovernorate === "" ||
-      cities.some(
-        (city) =>
-          String(city.governorate_id) === selectedGovernorate &&
-          city.id === ad.city_id
-      );
-
-    const matchesCity =
-      selectedCity === "" ||
-      String(ad.city_id) === selectedCity;
-
-    // تطبيق فلتر الحالة على الإعلانات المميزة والعادية فقط
-    const matchesCondition =
-      type === "donations" ||
-      selectedConditions.some((condition) => condition === ad.condition);
-
-    return (
-      matchesCategory &&
-      matchesSubCategory &&
-      matchesGovernorate &&
-      matchesCity &&
-      matchesCondition
-    );
-  });
-
-  function clearFilters() {
-    setSelectedCategory("");
-    setSelectedSubCategory("");
-    setSelectedGovernorate("");
-    setSelectedCity("");
-  }
-
-  const hasActiveFilters =
-    selectedCategory !== "" ||
-    selectedSubCategory !== "" ||
-    selectedGovernorate !== "" ||
-    selectedCity !== "" ||
-    (type !== "donations" && selectedConditions.length !== 2);
-
-  async function toggleFavorite(adId: string) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      navigate("/auth");
-      return;
-    }
-
-    const isFavorite = favoriteAdIds.includes(adId);
-
-    if (isFavorite) {
-      const { error } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("user_id", user.id)
+      const { data: imagesData, error: imagesError } = await supabase
+        .from("ad_images")
+        .select("image_path")
         .eq("ad_id", adId);
 
-      if (error) {
-        console.error(error);
-        return;
-      }
+      if (imagesError) throw imagesError;
 
-      setFavoriteAdIds((current) =>
-        current.filter((id) => id !== adId)
+      const imagePaths = (imagesData || []).map(
+        (image) => image.image_path
       );
-    } else {
-      const { error } = await supabase
-        .from("favorites")
-        .insert({
-          user_id: user.id,
-          ad_id: adId,
-        });
 
-      if (error) {
-        console.error(error);
-        return;
+      if (imagePaths.length > 0) {
+        const { error: storageError } = await supabase.storage
+          .from("ad-images")
+          .remove(imagePaths);
+
+        if (storageError) throw storageError;
       }
 
-      setFavoriteAdIds((current) => [...current, adId]);
+      const { error: deleteError } = await supabase
+        .from("ads")
+        .delete()
+        .eq("id", adId)
+        .eq("user_id", user.id)
+        .in("status", ["pending", "rejected"]);
+
+      if (deleteError) throw deleteError;
+
+      setAds((previousAds) =>
+        previousAds.filter((ad) => ad.id !== adId)
+      );
+
+      alert("تم حذف الإعلان بنجاح.");
+    } catch (error) {
+      console.error("خطأ حذف الإعلان:", error);
+      alert("تعذر حذف الإعلان. حاول مرة أخرى.");
     }
   }
 
-  const filterTheme =
-    type === "featured"
-      ? {
-          border: "border-amber-200",
-          background: "bg-amber-50/80",
-          heading: "text-amber-950",
-          focus: "focus:border-amber-400 focus:ring-amber-100",
-          button: "bg-amber-600 hover:bg-amber-700",
-          count: "bg-amber-100 text-amber-900",
-        }
-      : type === "donations"
-        ? {
-            border: "border-rose-100",
-            background: "bg-rose-50/70",
-            heading: "text-rose-950",
-            focus: "focus:border-rose-300 focus:ring-rose-100",
-            button: "bg-rose-500 hover:bg-rose-600",
-            count: "bg-rose-100 text-rose-800",
-          }
-        : {
-            border: "border-emerald-100",
-            background: "bg-emerald-50/60",
-            heading: "text-emerald-950",
-            focus: "focus:border-emerald-400 focus:ring-emerald-100",
-            button: "bg-emerald-600 hover:bg-emerald-700",
-            count: "bg-emerald-100 text-emerald-800",
-          };
+  async function updateAdStatus(
+    adId: string,
+    newStatus: "sold" | "archived"
+  ) {
+    try {
+      const { error } = await supabase.rpc("set_own_ad_status", {
+        p_ad_id: adId,
+        p_status: newStatus,
+      });
 
-  const selectClass = `h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-medium text-slate-700 outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:h-10 sm:px-3 sm:text-xs ${filterTheme.focus}`;
+      if (error) throw error;
+
+      setAds((previousAds) =>
+        previousAds.map((ad) =>
+          ad.id === adId ? { ...ad, status: newStatus } : ad
+        )
+      );
+
+      alert(
+        newStatus === "sold"
+          ? "تم وضع الإعلان كإعلان مباع."
+          : "تم إغلاق الإعلان وأرشفته."
+      );
+    } catch (error) {
+      console.error("خطأ تغيير حالة الإعلان:", error);
+      alert("تعذر تغيير حالة الإعلان. حاول مرة أخرى.");
+    }
+  }
+
+  async function republishAd(adId: string) {
+    try {
+      const { error } = await supabase.rpc("republish_own_ad", {
+        p_ad_id: adId,
+      });
+
+      if (error) throw error;
+
+      setAds((previousAds) =>
+        previousAds.map((ad) =>
+          ad.id === adId ? { ...ad, status: "pending" } : ad
+        )
+      );
+
+      alert("تمت إعادة الإعلان إلى قائمة المراجعة بنجاح.");
+    } catch (error) {
+      console.error("خطأ إعادة نشر الإعلان:", error);
+      alert("تعذرت إعادة نشر الإعلان. حاول مرة أخرى.");
+    }
+  }
 
   return (
-    <main
-      dir="rtl"
-      className="min-h-screen bg-slate-50 px-3 py-4 sm:px-6 sm:py-6 lg:px-10"
-    >
-      <div className="mx-auto max-w-7xl">
-<button
-  onClick={() => {
-    navigate("/", { replace: true });
-  }}
-  className="mb-4 flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-100 sm:mb-6"
->
-  <ArrowRight size={19} />
-  رجوع
-</button>
-        <header
-          className={`mb-4 rounded-2xl p-4 sm:mb-6 sm:rounded-3xl sm:p-8 ${
-            type === "featured"
-              ? "border border-amber-300 bg-gradient-to-l from-amber-100 via-yellow-50 to-amber-200"
-              : type === "donations"
-                ? "border border-rose-100 bg-rose-50"
-                : "border border-slate-200 bg-white"
-          }`}
-        >
-          <h1
-            className={`text-xl font-black sm:text-3xl ${
-              type === "featured"
-                ? "text-amber-900"
-                : "text-slate-900"
-            }`}
+    <main dir="rtl" className="min-h-screen bg-[#f7f9f8]">
+      <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5">
+          <Link
+            to="/"
+            className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
           >
-            {type === "featured" && "⭐ "}
-            {config.title}
-          </h1>
+            <ArrowRight size={19} />
+            العودة للرئيسية
+          </Link>
 
-          <p className="mt-1.5 text-xs text-slate-600 sm:mt-2 sm:text-sm">
-            {config.subtitle}
-          </p>
+          <span className="text-xl font-black tracking-tight text-emerald-700">
+            Sooq.sy
+          </span>
+        </div>
+      </header>
 
-          {!loading && (
-            <p className="mt-2 text-xs font-bold text-slate-500 sm:mt-3 sm:text-sm">
-              عدد الإعلانات: {filteredAds.length}
-            </p>
-          )}
-        </header>
-
-        {/* الفلاتر - تصميم مدمج وأنيق */}
-        <section
-          className={`mb-4 rounded-xl border p-2.5 shadow-sm sm:mb-6 sm:rounded-2xl sm:p-4 ${filterTheme.border} ${filterTheme.background}`}
-        >
-          <div className="mb-2.5 flex items-center justify-between gap-2 sm:mb-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <span
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg sm:h-8 sm:w-8 ${filterTheme.count}`}
-              >
-                <Filter size={15} />
-              </span>
-
-              <div className="min-w-0">
-                <h2 className={`text-xs font-black sm:text-sm ${filterTheme.heading}`}>
-                  تصفية الإعلانات
-                </h2>
-                <p className="hidden text-[10px] text-slate-500 sm:block">
-                  حدد التصنيف والموقع
-                </p>
-              </div>
-            </div>
-
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="flex shrink-0 items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-[10px] font-bold text-slate-600 shadow-sm transition hover:bg-red-50 hover:text-red-600 sm:px-2.5 sm:text-xs"
-              >
-                <X size={12} />
-                مسح الفلاتر
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
-            <div className="min-w-0">
-              <label className="mb-1 block text-[10px] font-bold text-slate-600 sm:text-xs">
-                التصنيف الرئيسي
-              </label>
-
-              <select
-                value={selectedCategory}
-                onChange={(e) => {
-                  setSelectedCategory(e.target.value);
-                  setSelectedSubCategory("");
-                }}
-                className={selectClass}
-              >
-                <option value="">كل التصنيفات</option>
-                {categories
-                  .filter((category) => category.parent_id === null)
-                  .map((category) => (
-                    <option key={category.id} value={String(category.id)}>
-                      {category.name_ar}
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div className="min-w-0">
-              <label className="mb-1 block text-[10px] font-bold text-slate-600 sm:text-xs">
-                التصنيف الفرعي
-              </label>
-
-              <select
-                value={selectedSubCategory}
-                onChange={(e) => setSelectedSubCategory(e.target.value)}
-                disabled={!selectedCategory || subCategories.length === 0}
-                className={selectClass}
-              >
-                <option value="">كل التصنيفات الفرعية</option>
-                {subCategories.map((category) => (
-                  <option key={category.id} value={String(category.id)}>
-                    {category.name_ar}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="min-w-0">
-              <label className="mb-1 block text-[10px] font-bold text-slate-600 sm:text-xs">
-                المحافظة
-              </label>
-
-              <select
-                value={selectedGovernorate}
-                onChange={(e) => {
-                  setSelectedGovernorate(e.target.value);
-                  setSelectedCity("");
-                }}
-                className={selectClass}
-              >
-                <option value="">كل المحافظات</option>
-                {governorates.map((governorate) => (
-                  <option key={governorate.id} value={String(governorate.id)}>
-                    {governorate.name_ar}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="min-w-0">
-              <label className="mb-1 block text-[10px] font-bold text-slate-600 sm:text-xs">
-                المدينة
-              </label>
-
-              <select
-                value={selectedCity}
-                onChange={(e) => setSelectedCity(e.target.value)}
-                disabled={!selectedGovernorate}
-                className={selectClass}
-              >
-                <option value="">كل المدن</option>
-                {filteredCities.map((city) => (
-                  <option key={city.id} value={String(city.id)}>
-                    {city.name_ar}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* فلتر جديد ومستعمل - لا يظهر في صفحة التبرعات */}
-          {type !== "donations" && (
-            <div className="mt-3 rounded-xl border border-white/90 bg-white/80 p-3 shadow-sm sm:mt-4 sm:p-4">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div>
-                  <h3 className={`text-xs font-black sm:text-sm ${filterTheme.heading}`}>
-                    حالة الإعلان
-                  </h3>
-                  <p className="mt-0.5 text-[10px] text-slate-500 sm:text-xs">
-                    اختر حالة المنتجات التي تريد مشاهدتها
-                  </p>
-                </div>
-
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold sm:text-xs ${filterTheme.count}`}>
-                  {selectedConditions.length === 2 ? "الكل" : selectedConditions[0] === "new" ? "جديد فقط" : "مستعمل فقط"}
+      <div className="mx-auto max-w-7xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
+        <section className="mb-5 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-white p-4 shadow-sm sm:mb-7 sm:rounded-3xl sm:p-7">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+                  <Tag size={19} />
+                </span>
+                <span className="text-xs font-bold text-emerald-700">
+                  إدارة إعلاناتك
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                <label
-                  className={`flex cursor-pointer items-center gap-2.5 rounded-xl border p-2.5 transition sm:p-3 ${
-                    selectedConditions.includes("used")
-                      ? "border-emerald-300 bg-emerald-50"
-                      : "border-slate-200 bg-slate-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedConditions.includes("used")}
-                    onChange={() => toggleCondition("used")}
-                    className="h-4 w-4 shrink-0 accent-emerald-600"
-                  />
-                  <span className="text-xs font-bold text-slate-700 sm:text-sm">
-                    مستعمل
-                  </span>
-                </label>
+              <h1 className="text-2xl font-black text-slate-800 sm:text-3xl">
+                إعلاناتي
+              </h1>
 
-                <label
-                  className={`flex cursor-pointer items-center gap-2.5 rounded-xl border p-2.5 transition sm:p-3 ${
-                    selectedConditions.includes("new")
-                      ? "border-emerald-300 bg-emerald-50"
-                      : "border-slate-200 bg-slate-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedConditions.includes("new")}
-                    onChange={() => toggleCondition("new")}
-                    className="h-4 w-4 shrink-0 accent-emerald-600"
-                  />
-                  <span className="text-xs font-bold text-slate-700 sm:text-sm">
-                    جديد
-                  </span>
-                </label>
-              </div>
+              <p className="mt-2 text-xs text-slate-500 sm:text-sm">
+                تابع إعلاناتك، راجع حالتها، وتحكم بها بسهولة.
+              </p>
+            </div>
+
+            <Link
+              to="/add-ad"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md"
+            >
+              <Plus size={18} />
+              أضف إعلاناً جديداً
+            </Link>
+          </div>
+
+          {!loading && !error && (
+            <div className="mt-5 flex items-center gap-2 border-t border-emerald-100 pt-4 text-xs font-semibold text-slate-500">
+              <Sparkles size={15} className="text-emerald-600" />
+              لديك {ads.length} {ads.length === 1 ? "إعلان" : "إعلانات"} في حسابك
             </div>
           )}
-
-          <div className="mt-2.5 flex items-center justify-between border-t border-slate-200/60 pt-2 sm:mt-3 sm:pt-2.5">
-            <span className="flex min-w-0 items-center gap-1 truncate text-[10px] text-slate-500 sm:text-xs">
-              <MapPin size={12} className="shrink-0" />
-              <span className="truncate">
-                {selectedCity
-                  ? cities.find((city) => String(city.id) === selectedCity)?.name_ar
-                  : selectedGovernorate
-                    ? governorates.find((gov) => String(gov.id) === selectedGovernorate)?.name_ar
-                    : "جميع المناطق"}
-              </span>
-            </span>
-
-            {!loading && (
-              <span
-                className={`shrink-0 rounded-md px-2 py-1 text-[10px] font-black sm:px-2.5 sm:text-xs ${filterTheme.count}`}
-              >
-                {filteredAds.length} نتيجة
-              </span>
-            )}
-          </div>
         </section>
 
-        {loading ? (
-          <div className="flex flex-col items-center py-20 text-slate-500">
-            <LoaderCircle className="animate-spin" size={32} />
-            <p className="mt-3">جارٍ تحميل الإعلانات...</p>
+        {loading && (
+          <div className="rounded-2xl border border-slate-100 bg-white p-12 text-center shadow-sm">
+            <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-emerald-100 border-t-emerald-600" />
+            <p className="text-sm font-medium text-slate-500">
+              جارٍ تحميل إعلاناتك...
+            </p>
           </div>
-        ) : filteredAds.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
-            <Heart size={36} className="mx-auto text-slate-300" />
+        )}
 
-            <p className="mt-3 font-bold text-slate-600">
-              {ads.length === 0
-                ? "لا توجد إعلانات في هذا القسم حالياً"
-                : "لا توجد نتائج مطابقة للفلاتر المختارة"}
+        {error && (
+          <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && ads.length === 0 && (
+          <div className="rounded-3xl border border-slate-100 bg-white px-5 py-14 text-center shadow-sm">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+              <Tag size={29} />
+            </div>
+
+            <h2 className="text-lg font-black text-slate-800">
+              ما عندك إعلانات حالياً
+            </h2>
+
+            <p className="mt-2 text-sm text-slate-500">
+              ابدأ بنشر إعلانك الأول على Sooq.sy
             </p>
 
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className={`mt-4 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition ${filterTheme.button}`}
-              >
-                عرض جميع الإعلانات
-              </button>
-            )}
+            <Link
+              to="/add-ad"
+              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
+            >
+              <Plus size={17} />
+              أضف إعلانك الآن
+            </Link>
           </div>
-        ) : (
+        )}
+
+        {!loading && !error && ads.length > 0 && (
           <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredAds.map((ad) => (
-              <article
-                key={ad.id}
-                onClick={() =>
-  navigate(`/ad/${ad.id}`, {
-    state: {
-      from: location.pathname + location.search,
-    },
-  })
-}
-                className={`group min-w-0 cursor-pointer overflow-hidden rounded-xl border bg-white transition hover:-translate-y-1 hover:shadow-lg sm:rounded-2xl ${
-                  type === "featured"
-                    ? "border-amber-300 shadow-sm shadow-amber-100"
-                    : "border-slate-100"
-                }`}
-              >
-                <div className="relative aspect-square overflow-hidden bg-slate-100">
-                  {ad.images.length > 0 ? (
-                    <img
-                      src={ad.images[0]}
-                      alt={ad.title}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-slate-400">
-                      {type === "donations" ? (
-                        <Heart size={32} />
-                      ) : (
-                        <Car size={32} />
+            {ads.map((ad) => {
+              const status = statusInfo[ad.status] ?? {
+                label: ad.status,
+                color: "bg-slate-100 text-slate-600 border-slate-200",
+              };
+
+              return (
+                <article
+                  key={ad.id}
+                  className={`flex min-w-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg sm:rounded-2xl ${
+                    ad.is_featured
+                      ? "border-amber-200"
+                      : "border-slate-100"
+                  }`}
+                >
+                  <Link
+                    to={`/ad/${ad.id}`}
+                    className="group relative block aspect-square overflow-hidden bg-slate-100"
+                  >
+                    {ad.images?.length > 0 ? (
+                      <img
+                        src={ad.images[0]}
+                        alt={ad.title}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-300">
+                        <Tag size={34} />
+                      </div>
+                    )}
+
+                    <span
+                      className={`absolute right-1.5 top-1.5 max-w-[calc(100%-0.75rem)] truncate rounded-md border px-2 py-1 text-[9px] font-bold sm:right-3 sm:top-3 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs ${status.color}`}
+                    >
+                      {status.label}
+                    </span>
+
+                    {ad.is_featured && (
+                      <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-md bg-amber-400 px-2 py-1 text-[9px] font-black text-amber-950 shadow-sm sm:left-3 sm:top-3 sm:rounded-lg sm:text-xs">
+                        <Star size={11} fill="currentColor" />
+                        مميز
+                      </span>
+                    )}
+                  </Link>
+
+                  <div className="flex flex-1 flex-col p-2 sm:p-3">
+                    <div className="mb-1.5 flex min-w-0 flex-wrap items-center gap-1">
+                      <span className="truncate rounded-md bg-slate-100 px-1.5 py-1 text-[9px] font-semibold text-slate-500 sm:text-[10px]">
+                        {ad.categories?.name_ar ?? "غير محدد"}
+                      </span>
+
+                      {ad.store_id && (
+                        <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-violet-50 px-1.5 py-1 text-[9px] font-bold text-violet-700 sm:text-[10px]">
+                          <Store size={11} />
+                          متجر
+                        </span>
                       )}
                     </div>
-                  )}
 
-                  <span
-                    className={`absolute right-1.5 top-1.5 max-w-[calc(100%-3rem)] truncate rounded-md px-2 py-1 text-[9px] font-bold sm:right-3 sm:top-3 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-xs ${
-                      type === "featured"
-                        ? "bg-amber-200 text-amber-900"
-                        : type === "donations"
-                          ? "bg-rose-500 text-white"
-                          : "bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    {type === "featured"
-                      ? "⭐ إعلان مميز"
-                      : type === "donations"
-                        ? "للتبرع مجاناً"
-                        : "إعلان عادي"}
-                  </span>
-
-                  {type !== "donations" && (
-                    <button
-                      type="button"
-                      aria-label="إضافة للمفضلة"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleFavorite(ad.id);
-                      }}
-                      className="absolute left-1.5 top-1.5 rounded-full bg-white/90 p-1.5 text-slate-500 hover:text-red-500 sm:left-3 sm:top-3 sm:p-2"
+                    <Link
+                      to={`/ad/${ad.id}`}
+                      className="line-clamp-2 min-h-9 text-xs font-bold leading-5 text-slate-800 transition hover:text-emerald-700 sm:min-h-12 sm:text-sm sm:leading-6"
                     >
-                      <Heart
-                        size={15}
-                        fill={
-                          favoriteAdIds.includes(ad.id)
-                            ? "currentColor"
-                            : "none"
-                        }
-                        className={
-                          favoriteAdIds.includes(ad.id)
-                            ? "text-red-500"
-                            : ""
-                        }
-                      />
-                    </button>
-                  )}
-                </div>
+                      {ad.title}
+                    </Link>
 
-                <div className="p-2 sm:p-3">
-                  <h3 className="line-clamp-2 min-h-9 text-xs font-bold leading-5 text-slate-800 sm:min-h-12 sm:text-sm sm:leading-6">
-                    {ad.title}
-                  </h3>
-
-                  {type === "donations" ? (
-                    <p className="mt-1.5 text-sm font-black text-emerald-700 sm:mt-2 sm:text-lg">
-                      مجاناً ❤️
-                    </p>
-                  ) : (
-                    <div className="mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-1 sm:mt-2">
+                    <div className="mt-1.5 min-h-5">
                       <span className="text-sm font-black text-emerald-700 sm:text-lg">
-                        {ad.price?.toLocaleString("en-US") ??
-                          "السعر عند التواصل"}
+                        {ad.price !== null
+                          ? ad.price.toLocaleString("en-US")
+                          : "السعر عند التواصل"}
                       </span>
 
-                      <span className="text-[9px] font-semibold text-slate-500 sm:text-xs">
-                        {ad.currency === "USD"
-                          ? "دولار"
-                          : ad.currency === "SYP"
-                            ? "ليرة سورية"
-                            : ad.currency}
+                      {ad.price !== null && (
+                        <span className="mr-1 text-[9px] font-semibold text-slate-500 sm:text-xs">
+                          {ad.currency === "USD"
+                            ? "دولار"
+                            : ad.currency === "SYP"
+                              ? "ليرة سورية"
+                              : ad.currency}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-2 flex min-w-0 items-center justify-between gap-1 border-t border-slate-100 pt-2 text-[9px] text-slate-400 sm:mt-3 sm:pt-2.5 sm:text-[11px]">
+                      <span className="flex min-w-0 items-center gap-1 truncate">
+                        <Eye size={11} className="shrink-0" />
+                        <span className="truncate">
+                          {ad.cities?.name_ar ?? "غير محدد"}
+                        </span>
+                      </span>
+
+                      <span className="flex shrink-0 items-center gap-1">
+                        <CalendarDays size={11} />
+                        {new Date(ad.created_at).toLocaleDateString("ar-SY")}
                       </span>
                     </div>
-                  )}
 
-                  <div className="mt-2 flex min-w-0 items-center justify-between gap-1 border-t border-slate-100 pt-2 text-[9px] text-slate-400 sm:mt-3 sm:pt-2.5 sm:text-[11px]">
-                    <span className="flex min-w-0 items-center gap-0.5 truncate">
-                      <MapPin size={11} className="shrink-0" />
-                      <span className="truncate">
-                        {ad.city_name || "غير محدد"}
-                      </span>
-                    </span>
+                    {ad.status === "rejected" && ad.rejection_reason && (
+                      <div className="mt-2 rounded-lg border border-red-100 bg-red-50/70 p-2 text-[10px] leading-5 text-red-700 sm:text-xs">
+                        <span className="font-bold">سبب الرفض:</span>{" "}
+                        {ad.rejection_reason}
+                      </div>
+                    )}
 
-                    <span className="shrink-0">
-                      {new Date(ad.created_at).toLocaleDateString("ar-SY")}
-                    </span>
+                    <div className="mt-auto flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3 mt-3">
+                      {ad.status === "approved" && (
+                        <>
+                          <Link
+                            to={`/ad/${ad.id}`}
+                            className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-2 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-50 sm:text-xs"
+                          >
+                            <Eye size={13} />
+                            عرض
+                          </Link>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const confirmed = await window.sooqConfirm(
+                                "هل تريد إغلاق الإعلان وأرشفته؟"
+                              );
+
+                              if (confirmed) {
+                                updateAdStatus(ad.id, "archived");
+                              }
+                            }}
+                            className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-[10px] font-bold text-slate-600 transition hover:bg-slate-50 sm:text-xs"
+                          >
+                            <Archive size={13} />
+                            أرشفة
+                          </button>
+
+                          {ad.listing_type === "sale" && !ad.is_featured && (
+                            <button
+                              type="button"
+                              onClick={() => featureAd(ad)}
+                              disabled={featuringAdId === ad.id}
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-xs"
+                            >
+                              <Star size={13} fill="currentColor" />
+                              {featuringAdId === ad.id
+                                ? "جارٍ التمييز..."
+                                : ad.store_id
+                                  ? "تمييز من حصة المتجر"
+                                  : "تمييز مقابل 5 نقاط"}
+                            </button>
+                          )}
+
+                          {ad.published_at &&
+                            !ad.is_featured &&
+                            !ad.store_id && (
+                              <Link
+                                to={`/featured-campaign/${ad.id}`}
+                                className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 transition hover:bg-amber-100 sm:text-xs"
+                              >
+                                <Star size={13} fill="currentColor" />
+                                تمييز الإعلان
+                              </Link>
+                            )}
+
+                          {ad.is_featured && (
+                            <span className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 sm:text-xs">
+                              <Star size={13} fill="currentColor" />
+                              إعلان مميز
+                            </span>
+                          )}
+                        </>
+                      )}
+
+                      {(ad.status === "sold" || ad.status === "archived") && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const confirmed = await window.sooqConfirm(
+                              "هل تريد إعادة هذا الإعلان إلى قائمة المراجعة؟"
+                            );
+
+                            if (confirmed) {
+                              republishAd(ad.id);
+                            }
+                          }}
+                          className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-100 sm:text-xs"
+                        >
+                          <RotateCcw size={13} />
+                          إعادة نشر الإعلان
+                        </button>
+                      )}
+
+                      {(ad.status === "pending" ||
+                        ad.status === "rejected" ||
+                        ad.status === "approved") && (
+                        <Link
+                          to={`/edit-ad/${ad.id}`}
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-blue-100 bg-blue-50/50 px-2 py-2 text-[10px] font-bold text-blue-700 transition hover:bg-blue-50 sm:text-xs"
+                        >
+                          <Pencil size={13} />
+                          تعديل
+                        </Link>
+                      )}
+
+                      {(ad.status === "pending" || ad.status === "rejected") && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const confirmed = await window.sooqConfirm(
+                              "هل أنت متأكد من حذف هذا الإعلان نهائياً؟ لا يمكن التراجع عن الحذف."
+                            );
+
+                            if (confirmed) {
+                              deleteAd(ad.id);
+                            }
+                          }}
+                          className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg border border-red-100 bg-red-50/50 px-2 py-2 text-[10px] font-bold text-red-600 transition hover:bg-red-50 sm:text-xs"
+                        >
+                          <Trash2 size={13} />
+                          حذف
+                        </button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
         )}
       </div>

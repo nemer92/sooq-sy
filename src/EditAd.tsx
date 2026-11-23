@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 
+import { addSooqWatermark } from "./lib/imageWatermark";
+
+
 type Category = {
   id: string;
   name_ar: string;
@@ -202,39 +205,8 @@ if (removedImages.length > 0) {
   if (deleteFilesError) throw deleteFilesError;
 }
 
-    if (newImages.length > 0) {
-  const uploadedImages = [];
 
-  for (let i = 0; i < newImages.length; i++) {
-    const file = newImages[i];
 
-    const extension = file.type === "image/jpeg"
-      ? "jpg"
-      : file.type === "image/png"
-        ? "png"
-        : "webp";
-
-    const imagePath = `${user.id}/${id}/${crypto.randomUUID()}.${extension}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("ad-images")
-      .upload(imagePath, file);
-
-    if (uploadError) throw uploadError;
-
-    uploadedImages.push({
-      ad_id: id,
-      image_path: imagePath,
-      sort_order: images.length + i,
-    });
-  }
-
-  const { error: insertError } = await supabase
-    .from("ad_images")
-    .insert(uploadedImages);
-
-  if (insertError) throw insertError;
-}
 
     alert("تم حفظ التعديلات وإرسال الإعلان للمراجعة.");
     navigate("/my-ads");

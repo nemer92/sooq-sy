@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+
+import { addSooqWatermark } from "./lib/imageWatermark";
+
 import {
   ArrowRight,
   UploadCloud,
@@ -573,25 +576,27 @@ export default function AddAd() {
         const imageRecords = [];
 
         for (let i = 0; i < images.length; i++) {
-          const file = images[i];
-          const extension =
-            file.name.split(".").pop()?.toLowerCase() || "jpg";
-          const imagePath = `${userId}/${ad.id}/${crypto.randomUUID()}.${extension}`;
 
-          const { error: uploadError } = await supabase.storage
-            .from("ad-images")
-            .upload(imagePath, file, {
-              contentType: file.type,
-              upsert: false,
-            });
+const originalFile = images[i];
+const file = await addSooqWatermark(originalFile);
 
-          if (uploadError) throw uploadError;
+const imagePath = `${userId}/${ad.id}/${crypto.randomUUID()}.jpg`;
 
-          imageRecords.push({
-            ad_id: ad.id,
-            image_path: imagePath,
-            sort_order: i,
-          });
+const { error: uploadError } = await supabase.storage
+  .from("ad-images")
+  .upload(imagePath, file, {
+    contentType: "image/jpeg",
+    upsert: false,
+  });
+
+if (uploadError) throw uploadError;
+
+imageRecords.push({
+  ad_id: ad.id,
+  image_path: imagePath,
+  sort_order: i,
+});
+
         }
 
         const { error: imagesError } = await supabase

@@ -19,3 +19,11 @@ entrypoint = "./functions/verify-referral-device/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/verify-referral-device/*.html" ]
+[functions.ads-cleanup]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/ads-cleanup/index.ts"
+[functions.topup-email-notification]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/topup-email-notification/index.ts"

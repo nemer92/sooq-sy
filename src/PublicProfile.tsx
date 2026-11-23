@@ -456,11 +456,7 @@ function formatLastSeen(value: string | null | undefined) {
     }
   }
 
-  function handleVerification() {
-    window.alert(
-      "خدمة توثيق الحساب ستتوفر قريباً. سيتمكن المستخدم من إرسال طلب التوثيق ومتابعة حالته من هنا."
-    );
-  }
+
 
   if (loading) {
     return (
@@ -705,16 +701,6 @@ function formatLastSeen(value: string | null | undefined) {
               </div>
             )}
 
-            {isOwnProfile && (
-              <button
-                type="button"
-                onClick={handleVerification}
-                className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
-              >
-                <ShieldCheck size={16} />
-                طلب توثيق الحساب
-              </button>
-            )}
           </div>
         </section>
 

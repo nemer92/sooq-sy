@@ -16,7 +16,7 @@ async function invokeReferralDevice(
     {
       body: {
         action,
-        referral_code: referralCode,
+        referral_code: referralCode || null,
         ...extra,
       },
     }
@@ -37,6 +37,7 @@ async function invokeReferralDevice(
     ) {
       try {
         const responseBody = await context.clone().json();
+
         if (typeof responseBody?.error === "string") {
           errorCode = responseBody.error;
         }
@@ -66,7 +67,7 @@ async function verifyReferralDevice(
 ): Promise<string> {
   const keyStatus = await DeviceKey.hasAttestedKey();
 
-  // Try proving ownership of the previously attested device key.
+  // إثبات ملكية المفتاح الموثّق السابق إن وجد.
   if (keyStatus.exists) {
     try {
       const material = await DeviceKey.getAttestedKeyMaterial();
@@ -109,8 +110,7 @@ async function verifyReferralDevice(
       const errorCode =
         error instanceof Error ? error.message : "";
 
-      // Delete the local attested key only when the server
-      // explicitly confirms that this key is not registered.
+      // لا نحذف المفتاح إلا إذا أكد الخادم أنه غير مسجل.
       if (errorCode !== "REGISTERED_DEVICE_KEY_NOT_FOUND") {
         throw error;
       }
@@ -119,8 +119,7 @@ async function verifyReferralDevice(
     }
   }
 
-  // No key exists, or the server explicitly reported that
-  // the previous key is not registered. Create a new attested key.
+  // إنشاء مفتاح موثّق جديد عند عدم وجود مفتاح مسجل.
   const initialChallenge = await invokeReferralDevice(
     "create_challenge",
     referralCode
@@ -228,7 +227,6 @@ export default function Auth() {
     loadLocations();
   }, [isRegister]);
 
-  // تحويل رقم الموبايل إلى بريد داخلي ثابت لا يظهر للمستخدم
   function getInternalEmail(cleanPhone: string) {
     return `phone.${cleanPhone}@login.sooq.sy`;
   }
@@ -296,15 +294,15 @@ export default function Auth() {
           }
         }
 
-        // Only Android devices receive an attested referral claim.
-        // Web registration remains available without a referral reward.
         let claimId: string | undefined;
 
-        if (
-          cleanReferralCode &&
-          Capacitor.getPlatform() === "android"
-        ) {
-          setMessage("جارٍ التحقق من الجهاز لتأكيد مكافأة الإحالة...");
+        // التحقق من الجهاز على Android سواء وُجد رمز إحالة أم لا.
+        if (Capacitor.getPlatform() === "android") {
+          setMessage(
+            cleanReferralCode
+              ? "جارٍ التحقق من الجهاز لتأكيد مكافأة الإحالة والترحيب..."
+              : "جارٍ التحقق من الجهاز لتأكيد مكافأة الترحيب..."
+          );
 
           claimId = await verifyReferralDevice(cleanReferralCode);
         }
@@ -357,7 +355,6 @@ export default function Auth() {
           throw new Error("رقم الموبايل أو كلمة المرور غير صحيحة.");
         }
 
-        // التحقق من حالة الحظر
         const { data: isBanned, error: banCheckError } =
           await supabase.rpc("is_current_user_banned");
 
@@ -375,7 +372,6 @@ export default function Auth() {
           );
         }
 
-        // التحقق من صلاحية المدير
         const { data: isAdmin, error: adminCheckError } =
           await supabase.rpc("is_admin");
 
@@ -386,7 +382,6 @@ export default function Auth() {
           );
         }
 
-        // المدير ينتقل دائماً إلى لوحة الإدارة
         if (isAdmin) {
           navigate("/admin", { replace: true });
         } else {
@@ -410,12 +405,10 @@ export default function Auth() {
       dir="rtl"
       className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-slate-100 px-4 py-8 sm:py-12"
     >
-      {/* خلفية جمالية */}
       <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-200/30 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-teal-200/30 blur-3xl" />
 
       <div className="relative w-full max-w-md">
-        {/* الشعار */}
         <div className="mb-6 text-center">
           <Link
             to="/"
@@ -439,7 +432,6 @@ export default function Auth() {
           </p>
         </div>
 
-        {/* البطاقة الرئيسية */}
         <div className="rounded-[28px] border border-white bg-white/95 p-5 shadow-xl shadow-slate-200/60 sm:p-8">
           <div className="mb-7 text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-2xl">

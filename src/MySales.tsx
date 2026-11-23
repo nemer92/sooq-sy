@@ -12,6 +12,10 @@ import {
   Star,
   MessageCircle,
   RefreshCw,
+  CalendarDays,
+  UserRound,
+  Tag,
+  ChevronLeft,
 } from "lucide-react";
 
 type SaleRequest = {
@@ -169,7 +173,6 @@ export default function MySales() {
     loadRequests();
   }, [loadRequests]);
 
-  // اختيار تبويب المشتري أو البائع حسب الطلب المستهدف
   useEffect(() => {
     if (!targetRequestId || !userId || requests.length === 0) return;
 
@@ -184,7 +187,6 @@ export default function MySales() {
     );
   }, [targetRequestId, userId, requests]);
 
-  // الانتقال إلى بطاقة الطلب وتمييزها
   useEffect(() => {
     if (!targetRequestId || !userId || requests.length === 0) return;
 
@@ -309,11 +311,24 @@ export default function MySales() {
   }
 
   function statusColor(status: string) {
-    if (status === "completed") return "bg-emerald-100 text-emerald-700";
+    if (status === "completed")
+      return "bg-emerald-50 text-emerald-700 border-emerald-100";
+
     if (status === "rejected" || status === "cancelled")
-      return "bg-red-100 text-red-700";
-    if (status === "pending") return "bg-amber-100 text-amber-700";
-    return "bg-blue-100 text-blue-700";
+      return "bg-rose-50 text-rose-700 border-rose-100";
+
+    if (status === "pending")
+      return "bg-amber-50 text-amber-700 border-amber-100";
+
+    return "bg-blue-50 text-blue-700 border-blue-100";
+  }
+
+  function statusIcon(status: string) {
+    if (status === "completed") return <CheckCircle size={14} />;
+    if (status === "rejected" || status === "cancelled")
+      return <XCircle size={14} />;
+    if (status === "pending") return <Clock size={14} />;
+    return <PackageCheck size={14} />;
   }
 
   function renderStars(
@@ -321,20 +336,22 @@ export default function MySales() {
     onChange: (value: number) => void
   ) {
     return (
-      <div className="flex flex-row-reverse justify-end gap-2">
+      <div className="flex flex-row-reverse justify-end gap-1.5">
         {[1, 2, 3, 4, 5].map((number) => (
           <button
             key={number}
             type="button"
             onClick={() => onChange(number)}
-            className="text-2xl"
+            className="rounded-lg p-1 transition-transform hover:scale-110 focus:outline-none"
             aria-label={`${number} نجوم`}
           >
             <Star
               size={25}
               fill={number <= value ? "currentColor" : "none"}
               className={
-                number <= value ? "text-amber-400" : "text-slate-300"
+                number <= value
+                  ? "text-amber-400"
+                  : "text-slate-200"
               }
             />
           </button>
@@ -342,6 +359,14 @@ export default function MySales() {
       </div>
     );
   }
+
+  const incomingCount = requests.filter(
+    (request) => request.seller_id === userId
+  ).length;
+
+  const outgoingCount = requests.filter(
+    (request) => request.buyer_id === userId
+  ).length;
 
   const visibleRequests = requests.filter((request) =>
     activeTab === "incoming"
@@ -351,277 +376,518 @@ export default function MySales() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="font-bold text-slate-500">
-          جارٍ تحميل طلبات البيع والشراء...
-        </p>
+      <div
+        dir="rtl"
+        className="flex min-h-screen items-center justify-center bg-[#f7f9f8] px-4"
+      >
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
+            <RefreshCw
+              size={25}
+              className="animate-spin text-emerald-600"
+            />
+          </div>
+          <p className="text-sm font-bold text-slate-500">
+            جارٍ تحميل طلبات البيع والشراء...
+          </p>
+        </div>
       </div>
     );
   }
 
   if (!userId) {
     return (
-      <main dir="rtl" className="min-h-screen bg-slate-50 p-6 text-center">
-        <p className="mb-4 font-bold">يرجى تسجيل الدخول لعرض طلباتك.</p>
-        <Link to="/auth" className="font-bold text-emerald-700">
-          تسجيل الدخول
-        </Link>
+      <main
+        dir="rtl"
+        className="flex min-h-screen items-center justify-center bg-[#f7f9f8] p-5"
+      >
+        <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+            <UserRound size={30} />
+          </div>
+
+          <h2 className="mb-2 text-lg font-black text-slate-800">
+            سجّل دخولك أولاً
+          </h2>
+
+          <p className="mb-6 text-sm leading-7 text-slate-500">
+            يرجى تسجيل الدخول إلى حسابك حتى تتمكن من متابعة طلبات البيع والشراء.
+          </p>
+
+          <Link
+            to="/auth"
+            className="inline-flex w-full items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 font-bold text-white transition hover:bg-emerald-700"
+          >
+            تسجيل الدخول
+          </Link>
+        </div>
       </main>
     );
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-slate-50">
-      <header className="border-b bg-white px-4 py-4">
-        <div className="mx-auto flex max-w-4xl items-center gap-3">
+    <main
+      dir="rtl"
+      className="min-h-screen bg-[#f7f9f8] pb-10 text-slate-800"
+    >
+      <header className="sticky top-0 z-30 border-b border-slate-100/80 bg-white/95 backdrop-blur-md">
+        <div className="mx-auto flex max-w-4xl items-center gap-3 px-4 py-3.5">
           <Link
             to="/profile"
-            className="flex items-center gap-2 font-bold text-emerald-700"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700"
+            aria-label="العودة إلى الملف الشخصي"
           >
             <ArrowRight size={20} />
-            الملف الشخصي
           </Link>
 
-          <h1 className="mr-auto text-lg font-black text-slate-800">
-            طلبات البيع والشراء
-          </h1>
+          <div className="min-w-0">
+            <h1 className="text-base font-black text-slate-800 sm:text-lg">
+              طلبات البيع والشراء
+            </h1>
+            <p className="mt-0.5 text-[11px] text-slate-400 sm:text-xs">
+              تابع طلباتك وأدر عمليات البيع بسهولة
+            </p>
+          </div>
 
           <button
             onClick={loadRequests}
-            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+            disabled={loading}
+            className="mr-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-500 transition hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
             aria-label="تحديث الطلبات"
+            title="تحديث الطلبات"
           >
-            <RefreshCw size={19} />
+            <RefreshCw size={18} />
           </button>
         </div>
       </header>
 
-      <div className="mx-auto max-w-4xl space-y-5 p-4 py-7">
-        <div className="grid grid-cols-2 gap-3 rounded-2xl bg-white p-2 shadow-sm">
-          <button
-            onClick={() => setActiveTab("incoming")}
-            className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 font-bold ${
-              activeTab === "incoming"
-                ? "bg-emerald-600 text-white"
-                : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <ShoppingBag size={18} />
-            طلبات واردة
-          </button>
+      <div className="mx-auto max-w-4xl space-y-5 px-4 py-6 sm:py-8">
+        <section className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-emerald-700 to-emerald-600 p-5 text-white shadow-sm sm:p-6">
+          <div className="pointer-events-none absolute -left-10 -top-16 h-44 w-44 rounded-full bg-white/10" />
+          <div className="pointer-events-none absolute -bottom-20 right-1/3 h-48 w-48 rounded-full bg-white/5" />
 
-          <button
-            onClick={() => setActiveTab("outgoing")}
-            className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 font-bold ${
-              activeTab === "outgoing"
-                ? "bg-emerald-600 text-white"
-                : "text-slate-600 hover:bg-slate-50"
-            }`}
-          >
-            <Clock size={18} />
-            طلباتي
-          </button>
-        </div>
+          <div className="relative flex items-center justify-between gap-4">
+            <div>
+              <div className="mb-2 flex items-center gap-2 text-emerald-100">
+                <ShoppingBag size={17} />
+                <span className="text-xs font-semibold">
+                  مساحة معاملاتك
+                </span>
+              </div>
+
+              <h2 className="text-xl font-black sm:text-2xl">
+                بيع وشراء بكل سهولة
+              </h2>
+
+              <p className="mt-2 max-w-sm text-xs leading-6 text-emerald-50 sm:text-sm">
+                جميع طلباتك ومعاملاتك في مكان واحد، مع متابعة واضحة لكل خطوة.
+              </p>
+            </div>
+
+            <div className="hidden h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/10 sm:flex">
+              <PackageCheck size={34} className="text-white" />
+            </div>
+          </div>
+
+          <div className="relative mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+              <p className="text-[11px] text-emerald-100">
+                الطلبات الواردة
+              </p>
+              <p className="mt-1 text-2xl font-black tabular-nums">
+                {incomingCount}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/15 bg-white/10 p-3">
+              <p className="text-[11px] text-emerald-100">
+                طلبات الشراء
+              </p>
+              <p className="mt-1 text-2xl font-black tabular-nums">
+                {outgoingCount}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-100 bg-white p-1.5 shadow-sm">
+          <div className="grid grid-cols-2 gap-1.5">
+            <button
+              onClick={() => setActiveTab("incoming")}
+              className={`relative flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold transition-all ${
+                activeTab === "incoming"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+              }`}
+            >
+              <ShoppingBag size={17} />
+              <span>طلبات واردة</span>
+              <span
+                className={`min-w-5 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
+                  activeTab === "incoming"
+                    ? "bg-white/20 text-white"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {incomingCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("outgoing")}
+              className={`relative flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold transition-all ${
+                activeTab === "outgoing"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+              }`}
+            >
+              <Clock size={17} />
+              <span>طلباتي</span>
+              <span
+                className={`min-w-5 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
+                  activeTab === "outgoing"
+                    ? "bg-white/20 text-white"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                {outgoingCount}
+              </span>
+            </button>
+          </div>
+        </section>
 
         {message && (
-          <div className="rounded-xl bg-red-50 p-4 text-sm font-bold text-red-700">
-            {message}
+          <div className="flex items-start gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm leading-6 text-rose-700">
+            <XCircle size={19} className="mt-0.5 shrink-0" />
+            <p className="font-semibold">{message}</p>
           </div>
         )}
 
-        {visibleRequests.length === 0 ? (
-          <div className="rounded-2xl bg-white p-10 text-center shadow-sm">
-            <ShoppingBag
-              size={42}
-              className="mx-auto mb-4 text-slate-300"
-            />
-            <p className="font-bold text-slate-600">
-              لا توجد طلبات في هذا القسم حالياً.
+        <div className="flex items-center justify-between px-1">
+          <div>
+            <h2 className="text-base font-black text-slate-800">
+              {activeTab === "incoming"
+                ? "الطلبات الواردة إليك"
+                : "طلبات الشراء الخاصة بك"}
+            </h2>
+            <p className="mt-1 text-xs text-slate-400">
+              {visibleRequests.length === 0
+                ? "لا توجد معاملات حالياً"
+                : `${visibleRequests.length} طلب`}
             </p>
           </div>
+        </div>
+
+        {visibleRequests.length === 0 ? (
+          <div className="rounded-3xl border border-slate-100 bg-white px-5 py-12 text-center shadow-sm">
+            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-slate-50 text-slate-300">
+              {activeTab === "incoming" ? (
+                <ShoppingBag size={35} strokeWidth={1.6} />
+              ) : (
+                <Clock size={35} strokeWidth={1.6} />
+              )}
+            </div>
+
+            <h3 className="text-base font-black text-slate-700">
+              لا توجد طلبات هنا بعد
+            </h3>
+
+            <p className="mx-auto mt-2 max-w-xs text-sm leading-7 text-slate-400">
+              {activeTab === "incoming"
+                ? "عندما يرسل أحد المستخدمين طلب شراء لأحد إعلاناتك، سيظهر هنا."
+                : "عندما ترسل طلب شراء لأحد الإعلانات، ستتمكن من متابعة حالته من هنا."}
+            </p>
+
+            <Link
+              to="/"
+              className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-50 px-5 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+            >
+              تصفح الإعلانات
+              <ChevronLeft size={17} />
+            </Link>
+          </div>
         ) : (
-          visibleRequests.map((request) => {
-            const isSeller = request.seller_id === userId;
-            const alreadyReviewed = request.already_reviewed;
+          <div className="space-y-4">
+            {visibleRequests.map((request) => {
+              const isSeller = request.seller_id === userId;
+              const alreadyReviewed = request.already_reviewed;
 
-            return (
-              <article
-                id={`sale-request-${request.id}`}
-                key={request.id}
-                className={`space-y-4 rounded-2xl border bg-white p-5 shadow-sm transition-all ${
-                  targetRequestId === request.id
-                    ? "border-emerald-500 ring-2 ring-emerald-200"
-                    : "border-slate-100"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h2 className="font-black text-slate-800">
-                      {request.ad_title}
-                    </h2>
+              return (
+                <article
+                  id={`sale-request-${request.id}`}
+                  key={request.id}
+                  className={`overflow-hidden rounded-3xl border bg-white shadow-sm transition-all duration-300 hover:shadow-md ${
+                    targetRequestId === request.id
+                      ? "border-emerald-400 ring-4 ring-emerald-100"
+                      : "border-slate-100"
+                  }`}
+                >
+                  <div className="space-y-4 p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 items-start gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-emerald-50 text-emerald-700">
+                          {request.other_avatar ? (
+                            <img
+                              src={request.other_avatar}
+                              alt={request.other_name || "المستخدم"}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <UserRound size={21} />
+                          )}
+                        </div>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      {isSeller ? "المشتري: " : "البائع: "}
-                      {request.other_name}
-                    </p>
+                        <div className="min-w-0 pt-0.5">
+                          <h3 className="line-clamp-2 text-sm font-black leading-6 text-slate-800 sm:text-base">
+                            {request.ad_title}
+                          </h3>
 
-                    <p className="mt-1 text-xs text-slate-400">
-                      {new Date(request.created_at).toLocaleDateString("ar-SY")}
-                    </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {isSeller ? "المشتري: " : "البائع: "}
+                            <span className="font-bold text-slate-700">
+                              {request.other_name}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-bold sm:text-xs ${statusColor(
+                          request.status
+                        )}`}
+                      >
+                        {statusIcon(request.status)}
+                        {statusLabel(request.status)}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-2xl bg-slate-50 p-3">
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                          <Tag size={13} />
+                          السعر المتفق عليه
+                        </div>
+
+                        <p className="mt-1.5 text-base font-black text-emerald-700 sm:text-lg">
+                          {Number(request.agreed_price).toLocaleString("en-US")}
+                          <span className="mr-1 text-[11px] font-bold text-slate-500">
+                            {request.currency === "USD"
+                              ? "دولار"
+                              : "ليرة سورية"}
+                          </span>
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-slate-50 p-3">
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                          <CalendarDays size={13} />
+                          تاريخ الطلب
+                        </div>
+
+                        <p className="mt-2 text-xs font-bold text-slate-700 sm:text-sm">
+                          {new Date(request.created_at).toLocaleDateString(
+                            "ar-SY"
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {request.public_code && (
+                        <Link
+                          to={`/ad/${request.public_code}`}
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                        >
+                          <ShoppingBag size={15} />
+                          عرض الإعلان
+                        </Link>
+                      )}
+
+                      {request.conversation_id && (
+                        <Link
+                          to={`/messages/${request.conversation_id}`}
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                        >
+                          <MessageCircle size={15} />
+                          المحادثة
+                        </Link>
+                      )}
+                    </div>
+
+                    {isSeller && request.status === "pending" && (
+                      <div className="grid grid-cols-2 gap-2.5 border-t border-slate-100 pt-4">
+                        <button
+                          onClick={() => runAction(request.id, "accept")}
+                          disabled={actionLoading === request.id}
+                          className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                        >
+                          <CheckCircle size={17} />
+                          قبول الطلب
+                        </button>
+
+                        <button
+                          onClick={() => runAction(request.id, "reject")}
+                          disabled={actionLoading === request.id}
+                          className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                        >
+                          <XCircle size={17} />
+                          رفض الطلب
+                        </button>
+                      </div>
+                    )}
+
+                    {isSeller && request.status === "accepted" && (
+                      <div className="border-t border-slate-100 pt-4">
+                        <button
+                          onClick={() => runAction(request.id, "delivered")}
+                          disabled={actionLoading === request.id}
+                          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <PackageCheck size={19} />
+                          تم تسليم السلعة للمشتري
+                        </button>
+                      </div>
+                    )}
+
+                    {!isSeller && request.status === "seller_marked_sold" && (
+                      <div className="border-t border-slate-100 pt-4">
+                        <button
+                          onClick={() => runAction(request.id, "received")}
+                          disabled={actionLoading === request.id}
+                          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <CheckCircle size={19} />
+                          أؤكد استلام السلعة
+                        </button>
+                      </div>
+                    )}
+
+                    {!isSeller &&
+                      request.status === "completed" &&
+                      !alreadyReviewed && (
+                        <div className="border-t border-slate-100 pt-4">
+                          <button
+                            onClick={() => setReviewRequest(request)}
+                            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-amber-600"
+                          >
+                            <Star size={19} />
+                            قيّم البائع
+                          </button>
+                        </div>
+                      )}
+
+                    {!isSeller &&
+                      request.status === "completed" &&
+                      alreadyReviewed && (
+                        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">
+                          <CheckCircle size={17} />
+                          تم إرسال تقييمك لهذا البيع، شكراً لمشاركتك.
+                        </div>
+                      )}
                   </div>
-
-                  <span
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${statusColor(
-                      request.status
-                    )}`}
-                  >
-                    {statusLabel(request.status)}
-                  </span>
-                </div>
-
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="text-sm text-slate-500">السعر المسجل للطلب</p>
-                  <p className="mt-1 text-lg font-black text-emerald-700">
-                    {Number(request.agreed_price).toLocaleString("en-US")}{" "}
-                    {request.currency === "USD" ? "دولار" : "ليرة سورية"}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {request.public_code && (
-                    <Link
-                      to={`/ad/${request.public_code}`}
-                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700"
-                    >
-                      عرض الإعلان
-                    </Link>
-                  )}
-
-                  {request.conversation_id && (
-                    <Link
-                      to={`/messages/${request.conversation_id}`}
-                      className="flex items-center gap-2 rounded-lg border border-emerald-200 px-3 py-2 text-sm font-bold text-emerald-700"
-                    >
-                      <MessageCircle size={16} />
-                      المحادثة
-                    </Link>
-                  )}
-                </div>
-
-                {isSeller && request.status === "pending" && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => runAction(request.id, "accept")}
-                      disabled={actionLoading === request.id}
-                      className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-3 font-bold text-white disabled:opacity-50"
-                    >
-                      <CheckCircle size={18} />
-                      قبول الطلب
-                    </button>
-
-                    <button
-                      onClick={() => runAction(request.id, "reject")}
-                      disabled={actionLoading === request.id}
-                      className="flex items-center justify-center gap-2 rounded-xl bg-red-600 px-3 py-3 font-bold text-white disabled:opacity-50"
-                    >
-                      <XCircle size={18} />
-                      رفض الطلب
-                    </button>
-                  </div>
-                )}
-
-                {isSeller && request.status === "accepted" && (
-                  <button
-                    onClick={() => runAction(request.id, "delivered")}
-                    disabled={actionLoading === request.id}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 font-bold text-white disabled:opacity-50"
-                  >
-                    <PackageCheck size={19} />
-                    تم تسليم السلعة للمشتري
-                  </button>
-                )}
-
-                {!isSeller && request.status === "seller_marked_sold" && (
-                  <button
-                    onClick={() => runAction(request.id, "received")}
-                    disabled={actionLoading === request.id}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white disabled:opacity-50"
-                  >
-                    <CheckCircle size={19} />
-                    أؤكد استلام السلعة
-                  </button>
-                )}
-
-                {!isSeller &&
-                  request.status === "completed" &&
-                  !alreadyReviewed && (
-                    <button
-                      onClick={() => setReviewRequest(request)}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 font-bold text-white hover:bg-amber-600"
-                    >
-                      <Star size={19} />
-                      قيّم البائع
-                    </button>
-                  )}
-
-                {!isSeller &&
-                  request.status === "completed" &&
-                  alreadyReviewed && (
-                    <p className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
-                      <CheckCircle size={18} />
-                      تم إرسال تقييمك لهذا البيع
-                    </p>
-                  )}
-              </article>
-            );
-          })
+                </article>
+              );
+            })}
+          </div>
         )}
       </div>
 
       {reviewRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
-          <div className="my-auto w-full max-w-lg space-y-5 rounded-2xl bg-white p-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-slate-800">
-                تقييم البائع
-              </h2>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setReviewRequest(null);
+            }
+          }}
+        >
+          <div className="my-auto max-h-[92vh] w-full max-w-lg space-y-5 overflow-y-auto rounded-t-3xl border border-slate-100 bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-800">
+                  تقييم البائع
+                </h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  شارك تجربتك وساعد الآخرين في اتخاذ القرار
+                </p>
+              </div>
 
               <button
                 onClick={() => setReviewRequest(null)}
-                className="text-slate-500"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-500 transition hover:bg-rose-50 hover:text-rose-600"
+                aria-label="إغلاق"
               >
-                <XCircle size={23} />
+                <XCircle size={21} />
               </button>
             </div>
 
-            <div>
-              <p className="mb-2 font-bold">التقييم العام</p>
-              {renderStars(rating, setRating)}
+            <div className="rounded-2xl bg-emerald-50/70 p-3">
+              <p className="text-xs text-emerald-700">تقييمك للبائع</p>
+              <p className="mt-1 text-sm font-black text-slate-800">
+                {reviewRequest.other_name}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold text-slate-700">
+                  التقييم العام
+                </p>
+                {renderStars(rating, setRating)}
+              </div>
+
+              <div className="h-px bg-slate-100" />
+
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-600">
+                  التواصل
+                </p>
+                {renderStars(
+                  communicationRating,
+                  setCommunicationRating
+                )}
+              </div>
+
+              <div className="h-px bg-slate-100" />
+
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-600">
+                  مصداقية البائع
+                </p>
+                {renderStars(
+                  credibilityRating,
+                  setCredibilityRating
+                )}
+              </div>
+
+              <div className="h-px bg-slate-100" />
+
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-600">
+                  مطابقة السلعة للوصف
+                </p>
+                {renderStars(
+                  descriptionRating,
+                  setDescriptionRating
+                )}
+              </div>
+
+              <div className="h-px bg-slate-100" />
+
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-slate-600">
+                  التعامل والسلوك
+                </p>
+                {renderStars(behaviorRating, setBehaviorRating)}
+              </div>
             </div>
 
             <div>
-              <p className="mb-2 font-bold">التواصل</p>
-              {renderStars(communicationRating, setCommunicationRating)}
-            </div>
-
-            <div>
-              <p className="mb-2 font-bold">مصداقية البائع</p>
-              {renderStars(credibilityRating, setCredibilityRating)}
-            </div>
-
-            <div>
-              <p className="mb-2 font-bold">مطابقة السلعة للوصف</p>
-              {renderStars(descriptionRating, setDescriptionRating)}
-            </div>
-
-            <div>
-              <p className="mb-2 font-bold">التعامل والسلوك</p>
-              {renderStars(behaviorRating, setBehaviorRating)}
-            </div>
-
-            <div>
-              <label className="mb-2 block font-bold">
-                تعليقك (اختياري)
+              <label className="mb-2 block text-sm font-bold text-slate-700">
+                تعليقك
+                <span className="mr-1 font-normal text-slate-400">
+                  (اختياري)
+                </span>
               </label>
 
               <textarea
@@ -630,19 +896,41 @@ export default function MySales() {
                 maxLength={1000}
                 rows={3}
                 placeholder="شارك تجربتك مع البائع..."
-                className="w-full rounded-xl border border-slate-200 p-3 outline-none focus:border-emerald-500"
+                className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-50"
               />
+
+              <p className="mt-1.5 text-left text-[10px] text-slate-400">
+                {reviewComment.length}/1000
+              </p>
             </div>
 
-            <button
-              onClick={submitReview}
-              disabled={actionLoading === reviewRequest.id}
-              className="w-full rounded-xl bg-emerald-600 px-4 py-3 font-bold text-white disabled:opacity-50"
-            >
-              {actionLoading === reviewRequest.id
-                ? "جارٍ إرسال التقييم..."
-                : "إرسال التقييم"}
-            </button>
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <button
+                onClick={submitReview}
+                disabled={actionLoading === reviewRequest.id}
+                className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {actionLoading === reviewRequest.id ? (
+                  <>
+                    <RefreshCw size={17} className="animate-spin" />
+                    جارٍ الإرسال...
+                  </>
+                ) : (
+                  <>
+                    <Star size={17} />
+                    إرسال التقييم
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={() => setReviewRequest(null)}
+                disabled={actionLoading === reviewRequest.id}
+                className="min-h-12 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                إلغاء
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -1,6 +1,5 @@
-
 import { useEffect, useState, type ChangeEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import {
   UserRound,
@@ -26,6 +25,9 @@ import {
   EyeOff,
   XCircle,
   RefreshCw,
+  Users,
+  UserCheck,
+  X,
 } from "lucide-react";
 
 type VerificationRequest = {
@@ -39,7 +41,18 @@ type VerificationRequest = {
   created_at: string;
 };
 
+type FollowUser = {
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  followed_at: string;
+};
+
+type FollowListType = "followers" | "following";
+
 export default function Profile() {
+  const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
   const [savingName, setSavingName] = useState(false);
   const [savingPhone, setSavingPhone] = useState(false);
@@ -61,6 +74,14 @@ export default function Profile() {
   const [lastSeenAt, setLastSeenAt] = useState<string | null>(null);
   const [bio, setBio] = useState("");
   const [showPhone, setShowPhone] = useState(false);
+
+  // المتابعون ومن أتابع
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followListType, setFollowListType] =
+    useState<FollowListType | null>(null);
+  const [followList, setFollowList] = useState<FollowUser[]>([]);
+  const [followListLoading, setFollowListLoading] = useState(false);
 
   const [governorates, setGovernorates] = useState<any[]>([]);
   const [cities, setCities] = useState<any[]>([]);
@@ -85,6 +106,53 @@ export default function Profile() {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  async function loadFollowCounts(id: string) {
+    const { data, error } = await supabase.rpc(
+      "get_user_follow_counts",
+      {
+        p_user_id: id,
+      }
+    );
+
+    if (error) throw error;
+
+    const counts = Array.isArray(data) ? data[0] : data;
+
+    setFollowersCount(Number(counts?.followers_count || 0));
+    setFollowingCount(Number(counts?.following_count || 0));
+  }
+
+  async function openFollowList(type: FollowListType) {
+    if (!userId || followListLoading) return;
+
+    setFollowListType(type);
+    setFollowList([]);
+    setFollowListLoading(true);
+
+    try {
+      const functionName =
+        type === "followers"
+          ? "get_public_followers"
+          : "get_public_following";
+
+      const { data, error } = await supabase.rpc(functionName, {
+        p_user_id: userId,
+      });
+
+      if (error) throw error;
+
+      setFollowList((data || []) as FollowUser[]);
+    } catch (err) {
+      console.error("Error loading follow list:", err);
+
+      setFollowListType(null);
+
+      window.alert("تعذر تحميل قائمة المتابعين. حاول مرة أخرى.");
+    } finally {
+      setFollowListLoading(false);
+    }
+  }
 
   async function loadLocations(cityId: number | null) {
     const { data: governoratesData, error: governoratesError } =
@@ -276,6 +344,9 @@ export default function Profile() {
         loadLocations(profile.city_id ?? null),
         loadSubscription(id),
         loadVerificationData(id),
+        loadFollowCounts(id).catch((followError) => {
+          console.error("Error loading follow counts:", followError);
+        }),
       ]);
     } catch (err) {
       setError(
@@ -331,19 +402,17 @@ export default function Profile() {
       setMessage(
         "تم إرسال طلب توثيق الحساب بنجاح. سيبقى الطلب قيد المراجعة حتى موافقة الإدارة."
       );
+    } catch (err: any) {
+      const errorMessage =
+        err?.message ||
+        err?.details ||
+        err?.hint ||
+        "تعذر إرسال طلب التوثيق. حاول مرة أخرى.";
 
-} catch (err: any) {
-  const errorMessage =
-    err?.message ||
-    err?.details ||
-    err?.hint ||
-    "تعذر إرسال طلب التوثيق. حاول مرة أخرى.";
-
-  setError(errorMessage);
-} finally {
-  setSubmittingVerification(false);
-}
-
+      setError(errorMessage);
+    } finally {
+      setSubmittingVerification(false);
+    }
   }
 
   async function saveProfileDetails() {
@@ -811,6 +880,41 @@ export default function Profile() {
                 onChange={uploadAvatar}
               />
             </label>
+
+            {/* المتابعون ومن أتابع */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => openFollowList("followers")}
+                className="flex min-h-16 items-center justify-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 transition hover:border-emerald-300 hover:bg-emerald-100 active:scale-[0.98]"
+              >
+                <Users size={19} className="shrink-0 text-emerald-700" />
+                <span className="text-right">
+                  <strong className="block text-base font-black text-emerald-900">
+                    {followersCount.toLocaleString("en-US")}
+                  </strong>
+                  <span className="block text-[10px] font-bold text-emerald-700">
+                    المتابعون
+                  </span>
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => openFollowList("following")}
+                className="flex min-h-16 items-center justify-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 transition hover:border-blue-300 hover:bg-blue-100 active:scale-[0.98]"
+              >
+                <UserCheck size={19} className="shrink-0 text-blue-700" />
+                <span className="text-right">
+                  <strong className="block text-base font-black text-blue-900">
+                    {followingCount.toLocaleString("en-US")}
+                  </strong>
+                  <span className="block text-[10px] font-bold text-blue-700">
+                    أتابع
+                  </span>
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1495,6 +1599,123 @@ export default function Profile() {
           Sooq Sy · حسابك بأمان
         </p>
       </div>
+
+      {/* نافذة قائمة المتابعين ومن أتابع */}
+      {followListType && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3"
+          onClick={() => {
+            if (!followListLoading) setFollowListType(null);
+          }}
+        >
+          <div
+            dir="rtl"
+            className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 p-4">
+              <div className="flex items-center gap-2">
+                {followListType === "followers" ? (
+                  <Users size={19} className="text-emerald-700" />
+                ) : (
+                  <UserCheck size={19} className="text-blue-700" />
+                )}
+
+                <h2 className="text-base font-black text-slate-800">
+                  {followListType === "followers"
+                    ? `المتابعون (${followersCount})`
+                    : `أتابع (${followingCount})`}
+                </h2>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setFollowListType(null)}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+                aria-label="إغلاق"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {followListLoading ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-12">
+                  <LoaderCircle
+                    size={28}
+                    className="animate-spin text-emerald-600"
+                  />
+                  <p className="text-xs text-slate-500">
+                    جارٍ تحميل القائمة...
+                  </p>
+                </div>
+              ) : followList.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-12 text-slate-400">
+                  {followListType === "followers" ? (
+                    <Users size={34} />
+                  ) : (
+                    <UserCheck size={34} />
+                  )}
+                  <p className="text-sm font-bold">
+                    {followListType === "followers"
+                      ? "لا يوجد متابعون حتى الآن"
+                      : "لا تتابع أي شخص حالياً"}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {followList.map((person) => (
+                    <button
+                      key={person.user_id}
+                      type="button"
+                      onClick={() => {
+                        setFollowListType(null);
+                        navigate(`/user/${person.user_id}`);
+                      }}
+                      className="flex w-full items-center gap-3 p-3 text-right transition hover:bg-slate-50 active:bg-slate-100"
+                    >
+                      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-slate-200 bg-slate-100">
+                        {person.avatar_url ? (
+                          <img
+                            src={person.avatar_url}
+                            alt={person.display_name || "مستخدم"}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-slate-400">
+                            <UserRound size={22} />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-slate-800">
+                          {person.display_name || "مستخدم"}
+                        </p>
+                        {person.followed_at && (
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            {followListType === "followers"
+                              ? "يتابعك منذ "
+                              : "تتابعه منذ "}
+                            {new Date(
+                              person.followed_at
+                            ).toLocaleDateString("ar-SY")}
+                          </p>
+                        )}
+                      </div>
+
+                      <ArrowRight
+                        size={16}
+                        className="shrink-0 text-slate-400"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

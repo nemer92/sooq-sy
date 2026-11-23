@@ -15,6 +15,7 @@ import {
   Archive,
   RotateCcw,
   Sparkles,
+  MapPin,
 } from "lucide-react";
 
 type Ad = {
@@ -31,6 +32,7 @@ type Ad = {
   listing_type: string;
   is_featured: boolean;
   store_id: string | null;
+  images: string[];
 };
 
 const statusInfo: Record<string, { label: string; color: string }> = {
@@ -113,49 +115,91 @@ export default function MyAds() {
   }
 
   useEffect(() => {
+    let active = true;
+
     async function loadMyAds() {
-      const { data: sessionData } = await supabase.auth.getSession();
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
 
-      if (!sessionData.session) {
-        navigate("/auth", {
-          state: { from: "/my-ads" },
-        });
-        return;
+        if (!sessionData.session) {
+          navigate("/auth", {
+            state: { from: "/my-ads" },
+          });
+          return;
+        }
+
+        const userId = sessionData.session.user.id;
+
+        const { data, error } = await supabase
+          .from("ads")
+          .select(`
+            id,
+            title,
+            price,
+            currency,
+            status,
+            created_at,
+            published_at,
+            rejection_reason,
+            categories(name_ar),
+            cities(name_ar),
+            listing_type,
+            is_featured,
+            store_id,
+            ad_images(
+              image_path,
+              sort_order
+            )
+          `)
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        const adsWithImages = await Promise.all(
+          (data ?? []).map(async (ad: any) => {
+            const sortedImages = [...(ad.ad_images ?? [])].sort(
+              (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+            );
+
+            const imageResults = await Promise.all(
+              sortedImages.map(async (image: any) => {
+                const { data: signedData } = await supabase.storage
+                  .from("ad-images")
+                  .createSignedUrl(image.image_path, 3600);
+
+                return signedData?.signedUrl ?? "";
+              })
+            );
+
+            return {
+              ...ad,
+              images: imageResults.filter(Boolean),
+            };
+          })
+        );
+
+        if (active) {
+          setAds(adsWithImages as Ad[]);
+        }
+      } catch (err) {
+        console.error("خطأ تحميل إعلانات المستخدم:", err);
+
+        if (active) {
+          setError("تعذر تحميل إعلاناتك. حاول مرة أخرى.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
-
-      const userId = sessionData.session.user.id;
-
-      const { data, error } = await supabase
-        .from("ads")
-        .select(`
-          id,
-          title,
-          price,
-          currency,
-          status,
-          created_at,
-          published_at,
-          rejection_reason,
-          categories(name_ar),
-          cities(name_ar),
-          listing_type,
-          is_featured,
-          store_id
-        `)
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("خطأ تحميل إعلانات المستخدم:", error);
-        setError("تعذر تحميل إعلاناتك. حاول مرة أخرى.");
-      } else {
-        setAds((data ?? []) as unknown as Ad[]);
-      }
-
-      setLoading(false);
     }
 
     loadMyAds();
+
+    return () => {
+      active = false;
+    };
   }, [navigate]);
 
   async function deleteAd(adId: string) {
@@ -260,7 +304,7 @@ export default function MyAds() {
   return (
     <main dir="rtl" className="min-h-screen bg-[#f7f9f8]">
       <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3.5">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link
             to="/"
             className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
@@ -275,13 +319,13 @@ export default function MyAds() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-5xl px-4 py-7 sm:py-9">
-        <section className="mb-7 overflow-hidden rounded-3xl border border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-white p-5 shadow-sm sm:p-7">
-          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
+      <div className="mx-auto max-w-7xl px-3 py-5 sm:px-4 sm:py-8">
+        <section className="mb-5 overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-l from-emerald-50 via-white to-white p-4 shadow-sm sm:mb-7 sm:rounded-3xl sm:p-7">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <div className="mb-2 flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
-                  <Tag size={19} />
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 sm:h-9 sm:w-9">
+                  <Tag size={18} />
                 </span>
                 <span className="text-xs font-bold text-emerald-700">
                   إدارة إعلاناتك
@@ -292,22 +336,22 @@ export default function MyAds() {
                 إعلاناتي
               </h1>
 
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-xs text-slate-500 sm:text-sm">
                 تابع إعلاناتك، راجع حالتها، وتحكم بها بسهولة.
               </p>
             </div>
 
             <Link
               to="/add-ad"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 sm:px-5 sm:py-3 sm:text-sm"
             >
-              <Plus size={18} />
+              <Plus size={17} />
               أضف إعلاناً جديداً
             </Link>
           </div>
 
           {!loading && !error && (
-            <div className="mt-5 flex items-center gap-2 border-t border-emerald-100 pt-4 text-xs font-semibold text-slate-500">
+            <div className="mt-4 flex items-center gap-2 border-t border-emerald-100 pt-3 text-xs font-semibold text-slate-500 sm:mt-5 sm:pt-4">
               <Sparkles size={15} className="text-emerald-600" />
               لديك {ads.length} {ads.length === 1 ? "إعلان" : "إعلانات"} في حسابك
             </div>
@@ -353,8 +397,8 @@ export default function MyAds() {
           </div>
         )}
 
-        {!loading && ads.length > 0 && (
-          <div className="space-y-4">
+        {!loading && !error && ads.length > 0 && (
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
             {ads.map((ad) => {
               const status = statusInfo[ad.status] ?? {
                 label: ad.status,
@@ -364,84 +408,105 @@ export default function MyAds() {
               return (
                 <article
                   key={ad.id}
-                  className={`overflow-hidden rounded-2xl border bg-white p-4 shadow-sm transition duration-200 hover:shadow-md sm:p-5 ${
+                  className={`flex min-w-0 flex-col overflow-hidden rounded-xl border bg-white shadow-sm transition duration-200 hover:shadow-md sm:rounded-2xl ${
                     ad.is_featured
                       ? "border-amber-200"
                       : "border-slate-100"
                   }`}
                 >
                   {ad.is_featured && (
-                    <div className="-mx-4 -mt-4 mb-4 flex items-center gap-2 border-b border-amber-100 bg-amber-50/70 px-4 py-2.5 text-xs font-bold text-amber-700 sm:-mx-5 sm:-mt-5 sm:px-5">
-                      <Star size={14} fill="currentColor" />
-                      هذا الإعلان مميز
+                    <div className="flex items-center justify-center gap-1 border-b border-amber-100 bg-amber-50/70 px-2 py-1.5 text-[10px] font-bold text-amber-700 sm:text-xs">
+                      <Star size={12} fill="currentColor" />
+                      إعلان مميز
                     </div>
                   )}
 
-                  <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <span
-                          className={`rounded-lg border px-3 py-1.5 text-[11px] font-bold ${status.color}`}
-                        >
-                          {status.label}
-                        </span>
-
-                        <span className="text-xs text-slate-400">
-                          {ad.categories?.name_ar ?? "غير محدد"}
-                        </span>
-
-                        {ad.store_id && (
-                          <span className="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50 px-2.5 py-1.5 text-[11px] font-bold text-violet-700">
-                            <Store size={13} />
-                            إعلان متجر
-                          </span>
-                        )}
+                  <Link
+                    to={`/ad/${ad.id}`}
+                    className="group relative block aspect-square w-full overflow-hidden bg-slate-100"
+                  >
+                    {ad.images.length > 0 ? (
+                      <img
+                        src={ad.images[0]}
+                        alt={ad.title}
+                        loading="lazy"
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-slate-300">
+                        <Tag size={38} strokeWidth={1.3} />
                       </div>
+                    )}
 
-                      <h2 className="break-words text-base font-black leading-relaxed text-slate-800 sm:text-lg">
-                        {ad.title}
-                      </h2>
+                    <span
+                      className={`absolute right-2 top-2 max-w-[85%] truncate rounded-lg border px-2 py-1 text-[9px] font-bold shadow-sm sm:text-[10px] ${status.color}`}
+                    >
+                      {status.label}
+                    </span>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
-                        <span className="font-bold text-emerald-700">
-                          {ad.price !== null
-                            ? `${ad.price.toLocaleString("en-US")} ${
-                                ad.currency === "USD"
-                                  ? "دولار"
-                                  : ad.currency === "SYP"
-                                    ? "ليرة سورية"
-                                    : ad.currency
-                              }`
-                            : "السعر عند التواصل"}
-                        </span>
+                    {ad.store_id && (
+                      <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-lg bg-violet-600/95 px-2 py-1 text-[9px] font-bold text-white shadow-sm sm:text-[10px]">
+                        <Store size={11} />
+                        متجر
+                      </span>
+                    )}
+                  </Link>
 
-                        <span className="flex items-center gap-1">
-                          <Eye size={14} />
-                          {ad.cities?.name_ar ?? "غير محدد"}
-                        </span>
-
-                        <span className="flex items-center gap-1">
-                          <CalendarDays size={14} />
-                          {new Date(ad.created_at).toLocaleDateString("ar-SY")}
-                        </span>
-                      </div>
-
-                      {ad.status === "rejected" && ad.rejection_reason && (
-                        <div className="mt-3 rounded-xl border border-red-100 bg-red-50/70 p-3 text-xs leading-6 text-red-700">
-                          <span className="font-bold">سبب الرفض:</span>{" "}
-                          {ad.rejection_reason}
-                        </div>
-                      )}
+                  <div className="flex flex-1 flex-col p-2 sm:p-3">
+                    <div className="mb-1.5 flex min-w-0 items-center gap-1 text-[10px] text-slate-400 sm:text-xs">
+                      <Tag size={11} className="shrink-0" />
+                      <span className="truncate">
+                        {ad.categories?.name_ar ?? "غير محدد"}
+                      </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2 lg:max-w-[430px] lg:justify-end">
+                    <Link to={`/ad/${ad.id}`}>
+                      <h2 className="line-clamp-2 min-h-[2.5rem] text-xs font-black leading-5 text-slate-800 transition hover:text-emerald-700 sm:min-h-[3rem] sm:text-sm sm:leading-6">
+                        {ad.title}
+                      </h2>
+                    </Link>
+
+                    <div className="mt-1.5 min-h-5 text-xs font-black text-emerald-700 sm:text-sm">
+                      {ad.price !== null
+                        ? `${ad.price.toLocaleString("en-US")} ${
+                            ad.currency === "USD"
+                              ? "دولار"
+                              : ad.currency === "SYP"
+                                ? "ليرة سورية"
+                                : ad.currency
+                          }`
+                        : "السعر عند التواصل"}
+                    </div>
+
+                    <div className="mt-2 flex flex-col gap-1.5 border-t border-slate-100 pt-2 text-[10px] text-slate-500 sm:text-xs">
+                      <span className="flex min-w-0 items-center gap-1">
+                        <MapPin size={12} className="shrink-0" />
+                        <span className="truncate">
+                          {ad.cities?.name_ar ?? "غير محدد"}
+                        </span>
+                      </span>
+
+                      <span className="flex items-center gap-1">
+                        <CalendarDays size={12} className="shrink-0" />
+                        {new Date(ad.created_at).toLocaleDateString("ar-SY")}
+                      </span>
+                    </div>
+
+                    {ad.status === "rejected" && ad.rejection_reason && (
+                      <div className="mt-2 rounded-lg border border-red-100 bg-red-50/70 p-2 text-[10px] leading-5 text-red-700 sm:text-xs">
+                        <span className="font-bold">سبب الرفض:</span>{" "}
+                        {ad.rejection_reason}
+                      </div>
+                    )}
+
+                    <div className="mt-auto flex flex-col gap-1.5 pt-3">
                       {ad.status === "approved" && (
                         <>
                           <Link
                             to={`/ad/${ad.id}`}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-3.5 py-2.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50"
+                            className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-2 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-50 sm:text-xs"
                           >
-                            <Eye size={15} />
+                            <Eye size={13} />
                             عرض الإعلان
                           </Link>
 
@@ -456,9 +521,9 @@ export default function MyAds() {
                                 updateAdStatus(ad.id, "archived");
                               }
                             }}
-                            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
+                            className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-[10px] font-bold text-slate-600 transition hover:bg-slate-50 sm:text-xs"
                           >
-                            <Archive size={15} />
+                            <Archive size={13} />
                             إغلاق الإعلان
                           </button>
 
@@ -467,9 +532,9 @@ export default function MyAds() {
                               type="button"
                               onClick={() => featureAd(ad)}
                               disabled={featuringAdId === ad.id}
-                              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-700 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 sm:text-xs"
                             >
-                              <Star size={15} fill="currentColor" />
+                              <Star size={13} fill="currentColor" />
                               {featuringAdId === ad.id
                                 ? "جارٍ التمييز..."
                                 : ad.store_id
@@ -483,16 +548,16 @@ export default function MyAds() {
                             !ad.store_id && (
                               <Link
                                 to={`/featured-campaign/${ad.id}`}
-                                className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-700 transition hover:bg-amber-100"
+                                className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 transition hover:bg-amber-100 sm:text-xs"
                               >
-                                <Star size={15} fill="currentColor" />
+                                <Star size={13} fill="currentColor" />
                                 تمييز الإعلان
                               </Link>
                             )}
 
                           {ad.is_featured && (
-                            <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-bold text-amber-700">
-                              <Star size={15} fill="currentColor" />
+                            <span className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 sm:text-xs">
+                              <Star size={13} fill="currentColor" />
                               إعلان مميز
                             </span>
                           )}
@@ -511,9 +576,9 @@ export default function MyAds() {
                               republishAd(ad.id);
                             }
                           }}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+                          className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-100 sm:text-xs"
                         >
-                          <RotateCcw size={15} />
+                          <RotateCcw size={13} />
                           إعادة نشر الإعلان
                         </button>
                       )}
@@ -523,9 +588,9 @@ export default function MyAds() {
                         ad.status === "approved") && (
                         <Link
                           to={`/edit-ad/${ad.id}`}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50/50 px-3.5 py-2.5 text-xs font-bold text-blue-700 transition hover:bg-blue-50"
+                          className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-blue-100 bg-blue-50/50 px-2 py-2 text-[10px] font-bold text-blue-700 transition hover:bg-blue-50 sm:text-xs"
                         >
-                          <Pencil size={14} />
+                          <Pencil size={13} />
                           تعديل الإعلان
                         </Link>
                       )}
@@ -542,9 +607,9 @@ export default function MyAds() {
                               deleteAd(ad.id);
                             }
                           }}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-red-100 bg-red-50/50 px-3.5 py-2.5 text-xs font-bold text-red-600 transition hover:bg-red-50"
+                          className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-red-100 bg-red-50/50 px-2 py-2 text-[10px] font-bold text-red-600 transition hover:bg-red-50 sm:text-xs"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={13} />
                           حذف الإعلان
                         </button>
                       )}

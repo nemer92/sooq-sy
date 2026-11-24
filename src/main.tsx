@@ -44,6 +44,7 @@ import ManageStore from "./ManageStore";
 import StoreSubscription from "./StoreSubscription.tsx";
 import PublicProfile from "./PublicProfile";
 import MySales from "./MySales";
+import DeliveryDriver from "./DeliveryDriver";
 import DeviceKeyTest from "./DeviceKeyTest";
 import Support from "./Support.tsx";
 
@@ -644,6 +645,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/my-sales" element={<MySales />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/support" element={<Support />} />
+          <Route path="/delivery-driver" element={<DeliveryDriver />} />
           <Route path="/store-subscription/:id" element={<StoreSubscription />} />
 <Route path="/store-subscription" element={<StoreSubscription />} />
           <Route

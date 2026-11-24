@@ -27,6 +27,7 @@ import {
   RefreshCw,
   Users,
   UserCheck,
+  Truck,
   X,
 } from "lucide-react";
 
@@ -99,6 +100,10 @@ export default function Profile() {
   >([]);
   const [paymentReference, setPaymentReference] = useState("");
   const [submittingVerification, setSubmittingVerification] = useState(false);
+  const [submittingDriverApplication, setSubmittingDriverApplication] = useState(false);
+  const [driverApplicationSubmitted, setDriverApplicationSubmitted] = useState(false);
+  const [deliveryDriverStatus, setDeliveryDriverStatus] = useState<string | null>(null);
+  const [deliveryApplicationStatus, setDeliveryApplicationStatus] = useState<string | null>(null);
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -296,6 +301,39 @@ export default function Profile() {
       const id = authData.user.id;
       setUserId(id);
 
+      // تحميل حالة حساب التوصيل والطلب الحالي للمستخدم
+      const [
+        { data: driverData, error: driverError },
+        { data: applicationData, error: applicationError },
+      ] = await Promise.all([
+        supabase
+          .from("delivery_drivers")
+          .select("status, is_available")
+          .eq("user_id", id)
+          .maybeSingle(),
+        supabase
+          .from("delivery_applications")
+          .select("status")
+          .eq("user_id", id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      if (driverError) {
+        console.error("Error loading delivery driver status:", driverError);
+      } else {
+        setDeliveryDriverStatus(driverData?.status ?? null);
+      }
+
+      if (applicationError) {
+        console.error("Error loading delivery application status:", applicationError);
+      } else {
+        const applicationStatus = applicationData?.status ?? null;
+        setDeliveryApplicationStatus(applicationStatus);
+        setDriverApplicationSubmitted(applicationStatus === "pending");
+      }
+
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select(
@@ -412,6 +450,41 @@ export default function Profile() {
       setError(errorMessage);
     } finally {
       setSubmittingVerification(false);
+    }
+  }
+
+  async function submitDriverApplication() {
+    if (submittingDriverApplication || driverApplicationSubmitted) return;
+
+    setError("");
+    setMessage("");
+    setSubmittingDriverApplication(true);
+
+    try {
+      const { data, error: applicationError } = await supabase.rpc(
+        "apply_to_be_delivery_driver",
+        { p_applicant_note: null }
+      );
+
+      if (applicationError) throw applicationError;
+
+      setDriverApplicationSubmitted(true);
+      setDeliveryApplicationStatus("pending");
+      setMessage(
+        typeof data === "string" && data.trim()
+          ? data
+          : "تم إرسال طلب الانضمام كمندوب توصيل بنجاح. سيظهر حساب المندوب بعد مراجعة الإدارة والموافقة."
+      );
+    } catch (err: any) {
+      const errorMessage =
+        err?.message ||
+        err?.details ||
+        err?.hint ||
+        "تعذر إرسال طلب الانضمام كمندوب توصيل. حاول مرة أخرى.";
+
+      setError(errorMessage);
+    } finally {
+      setSubmittingDriverApplication(false);
     }
   }
 
@@ -929,6 +1002,92 @@ export default function Profile() {
           <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-medium text-red-700">
             {error}
           </div>
+        )}
+
+        {/* حساب مندوب التوصيل */}
+        {deliveryDriverStatus === "active" ? (
+          <section className="mb-3 overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-sm">
+            <div className="flex items-center gap-2.5 bg-gradient-to-l from-emerald-800 to-teal-600 p-3 text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
+                <Truck size={20} />
+              </div>
+              <div>
+                <h2 className="text-sm font-black">حساب مندوب التوصيل</h2>
+                <p className="mt-0.5 text-[10px] text-emerald-50">
+                  حسابك مفعّل ويمكنك إدارة خدمات التوصيل
+                </p>
+              </div>
+              <span className="mr-auto rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-bold">
+                نشط
+              </span>
+            </div>
+            <div className="space-y-2 p-3">
+              <p className="text-[11px] leading-5 text-slate-600">
+                تمت الموافقة على طلبك. انتقل إلى لوحة المندوب لإضافة مركبتك وتحديد مناطق التغطية وإدارة طلبات التوصيل.
+              </p>
+              <Link
+                to="/delivery-driver"
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98]"
+              >
+                <Truck size={15} />
+                إدارة حساب المندوب
+                <ArrowRight size={14} />
+              </Link>
+            </div>
+          </section>
+        ) : deliveryApplicationStatus === "pending" || driverApplicationSubmitted ? (
+          <section className="mb-3 overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+            <div className="flex items-center gap-2.5 bg-gradient-to-l from-amber-700 to-orange-500 p-3 text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
+                <Truck size={20} />
+              </div>
+              <div>
+                <h2 className="text-sm font-black">طلب الانضمام كمندوب توصيل</h2>
+                <p className="mt-0.5 text-[10px] text-amber-50">
+                  طلبك قيد مراجعة الإدارة
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 p-3 text-[11px] leading-5 text-amber-800">
+              <LoaderCircle size={16} className="mt-0.5 shrink-0" />
+              <p>تم استلام طلبك، وسيظهر رابط إدارة حساب المندوب بعد موافقة الإدارة.</p>
+            </div>
+          </section>
+        ) : (
+          <section className="mb-3 overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+            <div className="flex items-center gap-2.5 bg-gradient-to-l from-amber-700 to-orange-500 p-3 text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15">
+                <Truck size={20} />
+              </div>
+              <div>
+                <h2 className="text-sm font-black">الانضمام كمندوب توصيل</h2>
+                <p className="mt-0.5 text-[10px] text-amber-50">
+                  قدّم طلبك للعمل كمندوب بعد موافقة الإدارة
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2 p-3">
+              <p className="text-[11px] leading-5 text-slate-600">
+                أرسل طلب الانضمام، وبعد مراجعة الإدارة والموافقة ستتمكن من إدارة
+                مركبتك ومناطق التغطية وطلبات التوصيل من صفحة حساب المندوب.
+              </p>
+              <button
+                type="button"
+                onClick={submitDriverApplication}
+                disabled={submittingDriverApplication}
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-amber-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {submittingDriverApplication ? (
+                  <LoaderCircle size={15} className="animate-spin" />
+                ) : (
+                  <Truck size={15} />
+                )}
+                {submittingDriverApplication
+                  ? "جارٍ إرسال الطلب..."
+                  : "إرسال طلب الانضمام"}
+              </button>
+            </div>
+          </section>
         )}
 
         {/* روابط سريعة */}

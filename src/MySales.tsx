@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import DeliveryRequestModal from "./DeliveryRequestModal";
 import {
   ArrowRight,
   ShoppingBag,
@@ -16,6 +17,7 @@ import {
   UserRound,
   Tag,
   ChevronLeft,
+  Truck,
 } from "lucide-react";
 
 type SaleRequest = {
@@ -49,6 +51,8 @@ export default function MySales() {
   const [activeTab, setActiveTab] = useState<"incoming" | "outgoing">("incoming");
   const [message, setMessage] = useState("");
   const [reviewRequest, setReviewRequest] = useState<SaleRequest | null>(null);
+  const [deliveryRequest, setDeliveryRequest] = useState<SaleRequest | null>(null);
+  const [deliverySubmittedIds, setDeliverySubmittedIds] = useState<string[]>([]);
   const [rating, setRating] = useState(5);
   const [communicationRating, setCommunicationRating] = useState(5);
   const [credibilityRating, setCredibilityRating] = useState(5);
@@ -611,6 +615,8 @@ export default function MySales() {
             {visibleRequests.map((request) => {
               const isSeller = request.seller_id === userId;
               const alreadyReviewed = request.already_reviewed;
+              const deliveryAlreadySubmitted =
+                deliverySubmittedIds.includes(request.id);
 
               return (
                 <article
@@ -748,6 +754,32 @@ export default function MySales() {
                         </button>
                       </div>
                     )}
+
+                    {!isSeller &&
+                      request.status === "accepted" &&
+                      !deliveryAlreadySubmitted && (
+                        <div className="border-t border-slate-100 pt-4">
+                          <button
+                            onClick={() => setDeliveryRequest(request)}
+                            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
+                          >
+                            <Truck size={19} />
+                            اطلب توصيل السلعة
+                          </button>
+                          <p className="mt-2 text-center text-xs leading-5 text-slate-400">
+                            اختر مدينة وموقع التسليم وعامل التوصيل المناسب.
+                          </p>
+                        </div>
+                      )}
+
+                    {!isSeller &&
+                      request.status === "accepted" &&
+                      deliveryAlreadySubmitted && (
+                        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">
+                          <CheckCircle size={17} />
+                          تم إرسال طلب التوصيل، بانتظار رد عامل التوصيل.
+                        </div>
+                      )}
 
                     {!isSeller && request.status === "seller_marked_sold" && (
                       <div className="border-t border-slate-100 pt-4">
@@ -933,6 +965,22 @@ export default function MySales() {
             </div>
           </div>
         </div>
+      )}
+
+      {deliveryRequest && (
+        <DeliveryRequestModal
+          saleRequestId={deliveryRequest.id}
+          onClose={() => setDeliveryRequest(null)}
+          onSuccess={() => {
+            setDeliverySubmittedIds((previous) =>
+              previous.includes(deliveryRequest.id)
+                ? previous
+                : [...previous, deliveryRequest.id]
+            );
+            setDeliveryRequest(null);
+            setMessage("");
+          }}
+        />
       )}
     </main>
   );

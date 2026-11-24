@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 import { useLocation, useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import AdPickupLocationMap from "./AdPickupLocationMap";
 import { Device } from "@capacitor/device";
 import { Capacitor } from "@capacitor/core";
-
 import { PlayIntegrity } from "@capacitor-community/play-integrity";
 
 import {
@@ -42,6 +42,14 @@ export default function AdDetails() {
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseMessage, setPurchaseMessage] = useState("");
   const [isVerified, setIsVerified] = useState(false);
+
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [pickupLatitude, setPickupLatitude] = useState<number | null>(null);
+  const [pickupLongitude, setPickupLongitude] = useState<number | null>(null);
+  const [pickupAddressLabel, setPickupAddressLabel] = useState("");
+  const [showPickupEditor, setShowPickupEditor] = useState(false);
+  const [pickupSaving, setPickupSaving] = useState(false);
+  const [pickupMessage, setPickupMessage] = useState("");
 
   useEffect(() => {
     async function loadAd() {
@@ -82,83 +90,105 @@ export default function AdDetails() {
       if (data) {
         setAd(data);
 
+        const shareToken = new URLSearchParams(
+          window.location.search
+        ).get("share");
 
+        if (shareToken) {
+          try {
+            // المكافأة متاحة لتطبيق Android فقط
+            if (Capacitor.getPlatform() !== "android") {
+              console.log("مكافأة المشاركة متاحة عبر تطبيق Android فقط.");
+            } else {
+              const deviceInfo = await Device.getId();
+              const visitorId = `android:${deviceInfo.identifier}`;
 
-const shareToken = new URLSearchParams(
-  window.location.search
-).get("share");
+              const { data: challenge, error: challengeError } =
+                await supabase.functions.invoke("verify-play-integrity", {
+                  body: {
+                    action: "create_challenge",
+                    share_token: shareToken,
+                    visitor_id: visitorId,
+                  },
+                });
 
-if (shareToken) {
-  try {
-    // المكافأة متاحة لتطبيق Android فقط
-    if (Capacitor.getPlatform() !== "android") {
-      console.log("مكافأة المشاركة متاحة عبر تطبيق Android فقط.");
-    } else {
-      // معرّف ثابت للتطبيق على الجهاز نفسه
-      const deviceInfo = await Device.getId();
-      const visitorId = `android:${deviceInfo.identifier}`;
+              if (challengeError) throw challengeError;
 
-      // طلب تحدي تحقق جديد من الخادم
-      const { data: challenge, error: challengeError } =
-        await supabase.functions.invoke("verify-play-integrity", {
-          body: {
-            action: "create_challenge",
-            share_token: shareToken,
-            visitor_id: visitorId,
-          },
-        });
+              if (!challenge?.success || !challenge?.nonce) {
+                throw new Error("تعذر إنشاء تحدي التحقق.");
+              }
 
-      if (challengeError) throw challengeError;
+              const integrityResult =
+                await PlayIntegrity.requestIntegrityToken({
+                  nonce: challenge.nonce,
+                  googleCloudProjectNumber: 171150571192,
+                });
 
-      if (!challenge?.success || !challenge?.nonce) {
-        throw new Error("تعذر إنشاء تحدي التحقق.");
-      }
+              if (!integrityResult?.token) {
+                throw new Error("لم يتم الحصول على رمز التحقق من Google.");
+              }
 
-      // طلب رمز سلامة الجهاز من Google
-      const integrityResult =
-        await PlayIntegrity.requestIntegrityToken({
-          nonce: challenge.nonce,
-          googleCloudProjectNumber: 171150571192,
-        });
+              const { data: verification, error: verificationError } =
+                await supabase.functions.invoke("verify-play-integrity", {
+                  body: {
+                    action: "verify",
+                    token: integrityResult.token,
+                    share_token: shareToken,
+                    visitor_id: visitorId,
+                  },
+                });
 
-      if (!integrityResult?.token) {
-        throw new Error("لم يتم الحصول على رمز التحقق من Google.");
-      }
+              if (verificationError) throw verificationError;
 
-      // إرسال الرمز للخادم للتحقق وتسجيل الزيارة
-      const { data: verification, error: verificationError } =
-        await supabase.functions.invoke("verify-play-integrity", {
-          body: {
-            action: "verify",
-            token: integrityResult.token,
-            share_token: shareToken,
-            visitor_id: visitorId,
-          },
-        });
+              if (!verification?.success) {
+                throw new Error(
+                  verification?.error || "فشل التحقق من سلامة الجهاز."
+                );
+              }
 
-      if (verificationError) throw verificationError;
-
-      if (!verification?.success) {
-        throw new Error(
-          verification?.error || "فشل التحقق من سلامة الجهاز."
-        );
-      }
-
-      if (verification.visit_recorded) {
-        console.log("تم تسجيل الزيارة ومنح نقطة المشاركة.");
-      } else {
-        console.log("هذه الزيارة مسجلة سابقاً، لم تُمنح نقطة إضافية.");
-      }
-    }
-  } catch (error) {
-    console.error("تعذر التحقق من مشاركة الإعلان:", error);
-  }
-}
-
+              if (verification.visit_recorded) {
+                console.log("تم تسجيل الزيارة ومنح نقطة المشاركة.");
+              } else {
+                console.log(
+                  "هذه الزيارة مسجلة سابقاً، لم تُمنح نقطة إضافية."
+                );
+              }
+            }
+          } catch (error) {
+            console.error("تعذر التحقق من مشاركة الإعلان:", error);
+          }
+        }
 
         const {
           data: { user },
         } = await supabase.auth.getUser();
+
+        setCurrentUserId(user?.id ?? null);
+
+        // تحميل موقع الاستلام لصاحب الإعلان فقط
+        if (user && user.id === data.user_id) {
+          const { data: pickupData, error: pickupError } = await supabase
+            .from("ad_pickup_locations")
+            .select("latitude, longitude, address_label")
+            .eq("ad_id", data.id)
+            .maybeSingle();
+
+          if (pickupError) {
+            console.error("Error loading pickup location:", pickupError);
+          } else if (pickupData) {
+            setPickupLatitude(Number(pickupData.latitude));
+            setPickupLongitude(Number(pickupData.longitude));
+            setPickupAddressLabel(pickupData.address_label ?? "");
+          } else {
+            setPickupLatitude(null);
+            setPickupLongitude(null);
+            setPickupAddressLabel("");
+          }
+        } else {
+          setPickupLatitude(null);
+          setPickupLongitude(null);
+          setPickupAddressLabel("");
+        }
 
         if (user) {
           const { data: favoriteData, error: favoriteError } =
@@ -192,17 +222,17 @@ if (shareToken) {
         }
 
         const { data: verificationResult, error: verificationError } =
-  await supabase.rpc("get_public_verification_status", {
-    p_user_id: data.user_id,
-  });
+          await supabase.rpc("get_public_verification_status", {
+            p_user_id: data.user_id,
+          });
 
-if (verificationError) {
-  console.error("خطأ التحقق من حالة توثيق البائع:", verificationError);
-  setIsVerified(false);
-} else {
-  console.log("نتيجة توثيق البائع:", verificationResult);
-  setIsVerified(Boolean(verificationResult));
-}
+        if (verificationError) {
+          console.error("خطأ التحقق من حالة توثيق البائع:", verificationError);
+          setIsVerified(false);
+        } else {
+          console.log("نتيجة توثيق البائع:", verificationResult);
+          setIsVerified(Boolean(verificationResult));
+        }
 
         const sortedImages = [...(data.ad_images ?? [])].sort(
           (a: any, b: any) => a.sort_order - b.sort_order
@@ -501,6 +531,56 @@ if (verificationError) {
     }
   }
 
+  // حفظ موقع استلام المنتج
+  async function savePickupLocation() {
+    if (!ad) return;
+
+    if (pickupLatitude === null || pickupLongitude === null) {
+      setPickupMessage("يرجى تحديد موقع الاستلام على الخريطة أولاً.");
+      return;
+    }
+
+    setPickupSaving(true);
+    setPickupMessage("");
+
+    try {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+
+      if (authError || !user || user.id !== ad.user_id) {
+        throw new Error("غير مسموح لك بتعديل موقع استلام هذا الإعلان.");
+      }
+
+      const { error } = await supabase
+        .from("ad_pickup_locations")
+        .upsert(
+          {
+            ad_id: ad.id,
+            seller_id: user.id,
+            latitude: pickupLatitude,
+            longitude: pickupLongitude,
+            address_label: pickupAddressLabel.trim() || null,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "ad_id",
+          }
+        );
+
+      if (error) throw error;
+
+      setShowPickupEditor(false);
+      setPickupMessage("تم حفظ موقع الاستلام بنجاح.");
+    } catch (error: any) {
+      console.error("Error saving pickup location:", error);
+      setPickupMessage(error.message || "تعذر حفظ موقع الاستلام.");
+    } finally {
+      setPickupSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <main dir="rtl" className="min-h-screen bg-[#f8faf9] p-4">
@@ -678,21 +758,21 @@ if (verificationError) {
               )}
 
               <div className="min-w-0 flex-1">
-<div className="flex flex-wrap items-center gap-1.5">
-  <p className="text-sm font-bold text-slate-800">
-    {seller?.display_name || "مستخدم Sooq.sy"}
-  </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <p className="text-sm font-bold text-slate-800">
+                    {seller?.display_name || "مستخدم Sooq.sy"}
+                  </p>
 
-  {isVerified && (
-    <span
-      title="حساب موثّق"
-      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-extrabold text-blue-700"
-    >
-      <ShieldCheck size={14} />
-      حساب موثّق
-    </span>
-  )}
-</div>
+                  {isVerified && (
+                    <span
+                      title="حساب موثّق"
+                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-extrabold text-blue-700"
+                    >
+                      <ShieldCheck size={14} />
+                      حساب موثّق
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 text-xs text-slate-400">
                   عضو منذ{" "}
                   {seller?.created_at
@@ -765,6 +845,107 @@ if (verificationError) {
                 </span>
               )}
             </div>
+
+            {/* Seller pickup location settings */}
+            {currentUserId === ad.user_id && (
+              <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+                <div className="mb-3">
+                  <h3 className="text-sm font-bold text-slate-800">
+                    موقع استلام المنتج
+                  </h3>
+
+                  <p className="mt-1 text-xs leading-6 text-slate-500">
+                    حدد مكان استلام عامل التوصيل للمنتج من عندك.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickupMessage("");
+                    setShowPickupEditor((current) => !current);
+                  }}
+                  className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100"
+                >
+                  <MapPin size={17} className="ml-2 inline-block" />
+                  {pickupLatitude !== null && pickupLongitude !== null
+                    ? "تعديل موقع الاستلام"
+                    : "تفعيل التوصيل وتحديد موقع الاستلام"}
+                </button>
+
+                {showPickupEditor && (
+                  <div className="mt-4 space-y-3">
+                    <p className="text-xs leading-6 text-slate-600">
+                      اضغط على الخريطة لتحديد الموقع، ويمكنك سحب العلامة الحمراء لتعديلها.
+                    </p>
+
+                    <AdPickupLocationMap
+                      latitude={pickupLatitude}
+                      longitude={pickupLongitude}
+                      onLocationChange={(latitude, longitude) => {
+                        setPickupLatitude(latitude);
+                        setPickupLongitude(longitude);
+                      }}
+                    />
+
+                    <div>
+                      <label className="mb-2 block text-xs font-semibold text-slate-700">
+                        وصف المكان أو العنوان (اختياري)
+                      </label>
+
+                      <input
+                        type="text"
+                        value={pickupAddressLabel}
+                        onChange={(event) =>
+                          setPickupAddressLabel(event.target.value)
+                        }
+                        placeholder="مثلاً: دمشق - المزة - جانب..."
+                        className="w-full rounded-xl border border-slate-200 px-3 py-3 text-sm outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    {pickupLatitude !== null &&
+                      pickupLongitude !== null && (
+                        <p className="text-xs text-slate-500" dir="ltr">
+                          {pickupLatitude.toFixed(6)}, {pickupLongitude.toFixed(6)}
+                        </p>
+                      )}
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={savePickupLocation}
+                        disabled={
+                          pickupSaving ||
+                          pickupLatitude === null ||
+                          pickupLongitude === null
+                        }
+                        className="flex-1 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {pickupSaving
+                          ? "جارٍ الحفظ..."
+                          : "حفظ موقع الاستلام"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowPickupEditor(false)}
+                        disabled={pickupSaving}
+                        className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {pickupMessage && (
+                  <p className="mt-3 text-xs font-semibold leading-6 text-slate-600">
+                    {pickupMessage}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Main actions */}
             <div className="space-y-2.5">

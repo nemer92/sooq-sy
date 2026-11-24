@@ -36,6 +36,7 @@ import {
   Hash,
   Store,
   ShieldCheck,
+  Truck,
 
 } from "lucide-react";
 
@@ -234,6 +235,26 @@ type SupportMessage = {
   created_at: string;
 };
 
+type DeliveryApplication = {
+  id: string;
+  user_id: string;
+  status: string;
+  applicant_note: string | null;
+  created_at: string;
+  display_name?: string | null;
+  avatar_url?: string | null;
+};
+
+type AdminDeliveryDriver = {
+  user_id: string;
+  status: string;
+  is_available: boolean;
+  admin_disabled: boolean;
+  admin_disabled_reason?: string | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
+};
+
 type AdminStore = {
   id: string;
   owner_id: string | null;
@@ -302,6 +323,15 @@ const [shamCashQrUploading, setShamCashQrUploading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsError, setSettingsError] = useState("");
   const [settingsSuccess, setSettingsSuccess] = useState("");
+
+  const [deliveryApplications, setDeliveryApplications] = useState<DeliveryApplication[]>([]);
+  const [deliveryApplicationsLoading, setDeliveryApplicationsLoading] = useState(false);
+  const [deliveryApplicationsError, setDeliveryApplicationsError] = useState("");
+  const [deliveryApplicationActionLoading, setDeliveryApplicationActionLoading] = useState<string | null>(null);
+  const [adminDeliveryDrivers, setAdminDeliveryDrivers] = useState<AdminDeliveryDriver[]>([]);
+  const [adminDeliveryDriversLoading, setAdminDeliveryDriversLoading] = useState(false);
+  const [adminDeliveryDriversError, setAdminDeliveryDriversError] = useState("");
+  const [deliveryDriverActionLoading, setDeliveryDriverActionLoading] = useState<string | null>(null);
 
   const [activeMenu, setActiveMenu] = useState("الرئيسية");
   const [supportConversations, setSupportConversations] = useState<SupportConversation[]>([]);
@@ -2120,21 +2150,219 @@ const rejectStoreRequest = async (requestId: string) => {
 };
 
 useEffect(() => {
-  if (activeMenu === "طلبات الاشتراك") {
+  if (admin && activeMenu === "طلبات الاشتراك") {
     loadSubscriptionRequests();
+  }
+}, [admin, activeMenu, loadSubscriptionRequests]);
+
+useEffect(() => {
+  if (admin && activeMenu === "طلبات حملات التمييز") {
     loadCampaignRequests();
   }
-}, [
-  activeMenu,
-  loadSubscriptionRequests,
-  loadCampaignRequests,
-]);
+}, [admin, activeMenu, loadCampaignRequests]);
 
 useEffect(() => {
   if (admin && activeMenu === "طلبات توثيق الحسابات") {
     loadAccountVerificationRequests();
   }
 }, [admin, activeMenu, loadAccountVerificationRequests]);
+
+  const loadDeliveryApplications = useCallback(async () => {
+    setDeliveryApplicationsLoading(true);
+    setDeliveryApplicationsError("");
+
+    try {
+      const { data, error } = await supabase.rpc(
+        "get_delivery_applications_for_admin",
+        { p_status: "pending" }
+      );
+
+      if (error) throw error;
+
+      const rawRows: any[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.applications)
+          ? data.applications
+          : data
+            ? [data]
+            : [];
+
+      const normalized = rawRows
+        .map((row) => ({
+          ...row,
+          id: row.id ?? row.application_id,
+          user_id: row.user_id ?? row.applicant_id,
+        }))
+        .filter((row) => Boolean(row.id && row.user_id)) as DeliveryApplication[];
+
+      const userIds = [...new Set(normalized.map((row) => row.user_id))];
+      let profiles: { id: string; display_name: string | null; avatar_url: string | null }[] = [];
+
+      if (userIds.length > 0) {
+        const { data: profileRows, error: profilesError } = await supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url")
+          .in("id", userIds);
+
+        if (profilesError) throw profilesError;
+        profiles = profileRows ?? [];
+      }
+
+      setDeliveryApplications(
+        normalized.map((application) => {
+          const profile = profiles.find((item) => item.id === application.user_id);
+          return {
+            ...application,
+            display_name: application.display_name ?? profile?.display_name ?? null,
+            avatar_url: application.avatar_url ?? profile?.avatar_url ?? null,
+          };
+        })
+      );
+    } catch (err: any) {
+      console.error("Error loading delivery applications:", err);
+      setDeliveryApplicationsError(
+        err?.message || err?.details || "تعذر تحميل طلبات مندوبي التوصيل."
+      );
+      setDeliveryApplications([]);
+    } finally {
+      setDeliveryApplicationsLoading(false);
+    }
+  }, []);
+
+  const reviewDeliveryApplication = async (
+    application: DeliveryApplication,
+    approve: boolean
+  ) => {
+    const confirmed = await window.sooqConfirm(
+      approve
+        ? `هل تريد الموافقة على طلب ${application.display_name || "هذا المستخدم"} ليصبح مندوب توصيل؟`
+        : `هل تريد رفض طلب ${application.display_name || "هذا المستخدم"}؟`
+    );
+
+    if (!confirmed) return;
+
+    setDeliveryApplicationActionLoading(application.id);
+    setDeliveryApplicationsError("");
+
+    try {
+      const { error } = await supabase.rpc("review_delivery_application", {
+        p_application_id: application.id,
+        p_approve: approve,
+      });
+
+      if (error) throw error;
+
+      await loadDeliveryApplications();
+      window.alert(approve ? "تمت الموافقة على طلب المندوب." : "تم رفض طلب الانضمام.");
+    } catch (err: any) {
+      console.error("Error reviewing delivery application:", err);
+      setDeliveryApplicationsError(
+        err?.message || err?.details || "تعذر تنفيذ مراجعة طلب المندوب."
+      );
+    } finally {
+      setDeliveryApplicationActionLoading(null);
+    }
+  };
+
+useEffect(() => {
+  if (admin && activeMenu === "طلبات مندوبي التوصيل") {
+    loadDeliveryApplications();
+  }
+}, [admin, activeMenu, loadDeliveryApplications]);
+
+const loadAdminDeliveryDrivers = useCallback(async () => {
+  setAdminDeliveryDriversLoading(true);
+  setAdminDeliveryDriversError("");
+  try {
+    const { data: drivers, error } = await supabase
+      .from("delivery_drivers")
+      .select("user_id, status, is_available, admin_disabled, admin_disabled_reason")
+      .order("user_id", { ascending: true });
+    if (error) throw error;
+
+    const userIds = [...new Set((drivers ?? []).map((driver) => driver.user_id))];
+    const { data: profiles, error: profilesError } = userIds.length
+      ? await supabase
+          .from("profiles")
+          .select("id, display_name, avatar_url")
+          .in("id", userIds)
+      : { data: [], error: null };
+    if (profilesError) throw profilesError;
+
+    setAdminDeliveryDrivers((drivers ?? []).map((driver) => {
+      const profile = (profiles ?? []).find((item) => item.id === driver.user_id);
+      return {
+        ...driver,
+        admin_disabled: Boolean(driver.admin_disabled),
+        admin_disabled_reason: driver.admin_disabled_reason ?? null,
+        display_name: profile?.display_name ?? null,
+        avatar_url: profile?.avatar_url ?? null,
+      };
+    }));
+  } catch (err: any) {
+    console.error("Error loading delivery drivers:", err);
+    setAdminDeliveryDriversError(
+      err?.message || err?.details || "تعذر تحميل قائمة عمال التوصيل."
+    );
+    setAdminDeliveryDrivers([]);
+  } finally {
+    setAdminDeliveryDriversLoading(false);
+  }
+}, []);
+
+const toggleAdminDeliveryDriver = async (driver: AdminDeliveryDriver) => {
+  const disabling = !driver.admin_disabled;
+  let reason: string | null = null;
+
+  if (disabling) {
+    reason = await window.sooqPrompt(
+      `اكتب سبب إيقاف عامل التوصيل ${driver.display_name || "هذا المندوب"} إدارياً:`
+    );
+    if (reason === null) return;
+    reason = reason.trim();
+    if (!reason) {
+      window.alert("يجب كتابة سبب الإيقاف قبل المتابعة.");
+      return;
+    }
+  }
+
+  const confirmed = await window.sooqConfirm(
+    disabling
+      ? `هل تريد إيقاف عامل التوصيل ${driver.display_name || "هذا المندوب"} إدارياً؟\nالسبب: ${reason}`
+      : `هل تريد إعادة تفعيل عامل التوصيل ${driver.display_name || "هذا المندوب"}؟`
+  );
+  if (!confirmed) return;
+
+  setDeliveryDriverActionLoading(driver.user_id);
+  setAdminDeliveryDriversError("");
+  try {
+    const { error } = await supabase.rpc("admin_set_delivery_driver_disabled", {
+      p_user_id: driver.user_id,
+      p_disabled: disabling,
+      p_reason: reason,
+    });
+    if (error) throw error;
+    await loadAdminDeliveryDrivers();
+    window.alert(
+      disabling
+        ? "تم إيقاف عامل التوصيل وإرسال إشعار يتضمن السبب."
+        : "تمت إعادة تفعيل عامل التوصيل وإرسال إشعار له."
+    );
+  } catch (err: any) {
+    console.error("Error changing delivery driver status:", err);
+    setAdminDeliveryDriversError(
+      err?.message || err?.details || "تعذر تغيير حالة عامل التوصيل."
+    );
+  } finally {
+    setDeliveryDriverActionLoading(null);
+  }
+};
+
+useEffect(() => {
+  if (admin && activeMenu === "عمال التوصيل") {
+    loadAdminDeliveryDrivers();
+  }
+}, [admin, activeMenu, loadAdminDeliveryDrivers]);
 
 useEffect(() => {
   if (admin && activeMenu === "طلبات المتاجر") {
@@ -3748,6 +3976,8 @@ function getSubCategories(categoryId: number) {
     );
   }
 
+
+
   // عناصر القائمة
   const menuItems = [
     {
@@ -3766,11 +3996,23 @@ function getSubCategories(categoryId: number) {
 
 {
   label: "طلبات الاشتراك",
+  icon: Wallet,
+},
+{
+  label: "طلبات حملات التمييز",
   icon: Megaphone,
 },
 {
   label: "شحن النقاط",
   icon: Coins,
+},
+{
+  label: "طلبات مندوبي التوصيل",
+  icon: Truck,
+},
+{
+  label: "عمال التوصيل",
+  icon: Truck,
 },
 {
   label: "طلبات المتاجر",
@@ -4224,6 +4466,231 @@ function getSubCategories(categoryId: number) {
           }
         }
 
+        /* تحسين توزيع المحتوى ومنع الفراغات الرأسية غير الضرورية */
+        .admin-app-scroll-layout > .main {
+          min-height: 0;
+          min-width: 0;
+        }
+
+        .admin-app-scroll-layout > .main > .content {
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          align-content: flex-start;
+          justify-content: flex-start;
+          gap: 16px;
+        }
+
+        .admin-support-panel {
+          height: 650px;
+          min-height: 0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .admin-app-scroll-layout > .main > .content > .admin-section,
+        .admin-app-scroll-layout > .main > .content > .delivery-applications-section {
+          margin-block: 0;
+          min-height: 0;
+        }
+
+        .delivery-applications-list {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+          gap: 14px;
+        }
+
+        .delivery-application-card {
+          min-width: 0;
+          padding: 18px;
+          border: 1px solid #e7edf3;
+          border-radius: 18px;
+          background: #fff;
+          box-shadow: 0 5px 18px rgba(15, 23, 42, .045);
+        }
+
+        .delivery-application-user {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-width: 0;
+        }
+
+        .delivery-application-user img,
+        .delivery-application-avatar {
+          width: 46px;
+          height: 46px;
+          flex: 0 0 46px;
+          border-radius: 14px;
+          object-fit: cover;
+          background: #f1f5f9;
+          color: #64748b;
+          display: grid;
+          place-items: center;
+        }
+
+        .delivery-application-user-info {
+          min-width: 0;
+          flex: 1;
+        }
+
+        .delivery-application-user-info h3 {
+          margin: 0;
+          color: #172033;
+          font-size: 15px;
+          font-weight: 800;
+          overflow-wrap: anywhere;
+        }
+
+        .delivery-application-user-info span {
+          display: block;
+          margin-top: 4px;
+          color: #64748b;
+          font-size: 12px;
+        }
+
+        .delivery-pending-badge {
+          flex: 0 0 auto;
+          padding: 6px 10px;
+          border-radius: 999px;
+          background: #fff7e6;
+          color: #a16207;
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .delivery-application-note {
+          margin-top: 15px;
+          padding: 12px;
+          border-radius: 12px;
+          background: #f8fafc;
+          color: #475569;
+          overflow-wrap: anywhere;
+        }
+
+        .delivery-application-note strong {
+          display: block;
+          margin-bottom: 5px;
+          color: #334155;
+          font-size: 12px;
+        }
+
+        .delivery-application-note p {
+          margin: 0;
+          white-space: pre-wrap;
+          line-height: 1.7;
+          font-size: 13px;
+        }
+
+        .delivery-application-id {
+          display: grid;
+          gap: 4px;
+          margin-top: 12px;
+          color: #94a3b8;
+          font-size: 10px;
+          overflow-wrap: anywhere;
+        }
+
+        .delivery-application-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 9px;
+          margin-top: 16px;
+        }
+
+        .delivery-application-actions button {
+          min-height: 42px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+        }
+
+        @media (max-width: 768px) {
+          .admin-app-scroll-layout > .main > .content {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 12px;
+            padding: 10px;
+          }
+
+          .admin-support-panel {
+            height: min(58dvh, 480px);
+            max-height: 58dvh;
+          }
+
+          .admin-app-scroll-layout .section-heading {
+            align-items: flex-start;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+          }
+
+          .admin-app-scroll-layout .section-heading > div {
+            min-width: 0;
+            flex: 1 1 180px;
+          }
+
+          .admin-app-scroll-layout .section-heading button {
+            min-height: 40px;
+          }
+
+          .admin-app-scroll-layout .admin-section,
+          .admin-app-scroll-layout .category-card,
+          .admin-app-scroll-layout .delivery-application-card {
+            padding: 13px;
+            border-radius: 14px;
+          }
+
+          .delivery-applications-list {
+            grid-template-columns: minmax(0, 1fr);
+            gap: 10px;
+          }
+
+          .delivery-application-user {
+            align-items: flex-start;
+            flex-wrap: wrap;
+          }
+
+          .delivery-pending-badge {
+            margin-inline-start: 58px;
+          }
+
+          .delivery-application-actions {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr);
+          }
+
+          .delivery-application-actions button {
+            width: 100%;
+            min-height: 46px;
+          }
+
+          .admin-app-scroll-layout .content table {
+            font-size: 12px;
+          }
+
+          .admin-app-scroll-layout .content .grid {
+            grid-template-columns: minmax(0, 1fr);
+          }
+        }
+
+        @media (max-width: 380px) {
+          .admin-app-scroll-layout > .main > .content {
+            padding: 8px;
+          }
+
+          .delivery-application-card {
+            padding: 11px;
+          }
+
+          .delivery-application-user-info h3 {
+            font-size: 14px;
+          }
+        }
+
         /* الهاتف بالوضع الأفقي */
         @media (max-height: 520px) and (max-width: 900px) {
           .admin-app-scroll-layout > .sidebar {
@@ -4612,10 +5079,13 @@ function getSubCategories(categoryId: number) {
         </table>
       </div>
     )}
+  </>
+)}
 
-
-{/* طلبات حملات التمييز المدفوعة */}
-<div className="mt-10 space-y-5" dir="rtl">
+{/* طلبات حملات التمييز المدفوعة والنقاط */}
+{activeMenu === "طلبات حملات التمييز" && (
+  <>
+<div className="mt-2 space-y-5" dir="rtl">
   <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
     <div>
       <h2 className="text-lg font-black text-slate-800">
@@ -4775,11 +5245,9 @@ function getSubCategories(categoryId: number) {
     </div>
   )}
 </div>
-</>
-)}
 {/* طلبات حملات التمييز بالنقاط */}
 
-<div className="mt-8 space-y-5" dir="rtl">
+<div className="mt-5 space-y-5" dir="rtl">
   <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
     <h2 className="text-lg font-black text-slate-800">
       طلبات حملات التمييز بالنقاط
@@ -4789,7 +5257,7 @@ function getSubCategories(categoryId: number) {
     </p>
   </div>
 
-  <div className="h-[650px] max-h-[75vh] overflow-y-auto overscroll-contain pr-1">
+  <div className="max-h-[75vh] overflow-y-auto overscroll-contain pr-1">
     {campaignRequestsLoading ? (
       <div className="rounded-2xl border bg-white p-6 text-center text-sm text-slate-500">
         جارٍ تحميل الطلبات...
@@ -4918,6 +5386,182 @@ function getSubCategories(categoryId: number) {
     )}
   </div>
 </div>
+  </>
+)}
+
+{/* طلبات مندوبي التوصيل */}
+{activeMenu === "طلبات مندوبي التوصيل" && (
+  <>
+    <div className="section-heading">
+      <div>
+        <h2>طلبات الانضمام كمندوب توصيل</h2>
+        <p>راجع بيانات المتقدمين ووافق على الطلب أو ارفضه</p>
+      </div>
+      <button
+        className="refresh-button"
+        onClick={loadDeliveryApplications}
+        disabled={deliveryApplicationsLoading}
+      >
+        <RefreshCw size={17} />
+        تحديث
+      </button>
+    </div>
+
+    {deliveryApplicationsError && (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {deliveryApplicationsError}
+      </div>
+    )}
+
+    {deliveryApplicationsLoading ? (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">
+        جارٍ تحميل طلبات مندوبي التوصيل...
+      </div>
+    ) : deliveryApplications.length === 0 ? (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <Truck size={34} className="mx-auto mb-3 text-slate-400" />
+        <h3 className="font-bold text-slate-700">لا توجد طلبات معلّقة</h3>
+        <p className="mt-1 text-sm text-slate-500">ستظهر هنا طلبات الانضمام الجديدة عند إرسالها</p>
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {deliveryApplications.map((application) => (
+          <div key={application.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex items-start gap-3">
+              {application.avatar_url ? (
+                <img src={application.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" />
+              ) : (
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                  <Truck size={21} />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <h3 className="break-words font-bold text-slate-800">
+                  {application.display_name || "مستخدم بدون اسم"}
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">تاريخ التقديم: {formatDate(application.created_at)}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">قيد المراجعة</span>
+            </div>
+            {application.applicant_note && (
+              <div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+                <span className="mb-1 block font-bold text-slate-500">ملاحظة المتقدم</span>
+                {application.applicant_note}
+              </div>
+            )}
+            <p className="mt-3 break-all text-xs text-slate-400">رقم الطلب: {application.id}</p>
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => reviewDeliveryApplication(application, true)}
+                disabled={deliveryApplicationActionLoading === application.id}
+                className="min-h-11 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {deliveryApplicationActionLoading === application.id ? "جارٍ التنفيذ..." : "الموافقة وتفعيل المندوب"}
+              </button>
+              <button
+                type="button"
+                onClick={() => reviewDeliveryApplication(application, false)}
+                disabled={deliveryApplicationActionLoading === application.id}
+                className="min-h-11 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-100 disabled:opacity-50"
+              >
+                رفض الطلب
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </>
+)}
+
+{/* قائمة عمال التوصيل */}
+{activeMenu === "عمال التوصيل" && (
+  <>
+    <div className="section-heading">
+      <div>
+        <h2>عمال التوصيل</h2>
+        <p>جميع المندوبين المعتمدين، مع إمكانية الإيقاف الإداري وإعادة التفعيل</p>
+      </div>
+      <button
+        className="refresh-button"
+        onClick={loadAdminDeliveryDrivers}
+        disabled={adminDeliveryDriversLoading}
+      >
+        <RefreshCw size={17} />
+        تحديث
+      </button>
+    </div>
+
+    {adminDeliveryDriversError && (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {adminDeliveryDriversError}
+      </div>
+    )}
+
+    {adminDeliveryDriversLoading ? (
+      <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">
+        جارٍ تحميل عمال التوصيل...
+      </div>
+    ) : adminDeliveryDrivers.length === 0 ? (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <Truck size={34} className="mx-auto mb-3 text-slate-400" />
+        <h3 className="font-bold text-slate-700">لا يوجد عمال توصيل معتمدون</h3>
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {adminDeliveryDrivers.map((driver) => (
+          <div key={driver.user_id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex items-start gap-3">
+              {driver.avatar_url ? (
+                <img src={driver.avatar_url} alt="" className="h-12 w-12 rounded-full object-cover" />
+              ) : (
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                  <Truck size={21} />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <h3 className="break-words font-bold text-slate-800">
+                  {driver.display_name || "مندوب بدون اسم"}
+                </h3>
+                <p className="mt-1 break-all text-xs text-slate-400">{driver.user_id}</p>
+              </div>
+              <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${driver.admin_disabled ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+                {driver.admin_disabled ? "موقوف إدارياً" : "غير موقوف إدارياً"}
+              </span>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">
+                حالة الحساب: {driver.status || "غير محددة"}
+              </span>
+              <span className={`rounded-full px-3 py-1.5 ${driver.is_available ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                {driver.is_available ? "متاح لاستقبال الطلبات" : "غير متاح حالياً"}
+              </span>
+            </div>
+            {driver.admin_disabled && driver.admin_disabled_reason && (
+              <div className="mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm leading-6 text-red-800">
+                <span className="font-bold">سبب الإيقاف: </span>
+                {driver.admin_disabled_reason}
+              </div>
+            )}
+            <div className="mt-4">
+              <button
+                type="button"
+                onClick={() => toggleAdminDeliveryDriver(driver)}
+                disabled={deliveryDriverActionLoading === driver.user_id}
+                className={`min-h-11 w-full rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-50 ${driver.admin_disabled ? "border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100" : "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"}`}
+              >
+                {deliveryDriverActionLoading === driver.user_id
+                  ? "جارٍ التنفيذ..."
+                  : driver.admin_disabled ? "إعادة تفعيل المندوب" : "إيقاف عامل التوصيل"}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </>
+)}
 
 {/* طلبات المتاجر */}
 {activeMenu === "طلبات المتاجر" && (
@@ -6156,7 +6800,7 @@ function getSubCategories(categoryId: number) {
 <div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 items-start">
 
   {/* قائمة المحادثات */}
-  <div className="category-card h-[650px] max-h-[80vh] min-h-0 p-0 flex flex-col overflow-hidden">
+  <div className="category-card admin-support-panel max-h-[80vh] min-h-0 p-0">
 
     {/* عنوان القائمة - ثابت */}
     <div className="shrink-0 border-b p-4">
@@ -6230,7 +6874,7 @@ function getSubCategories(categoryId: number) {
   </div>
 
   {/* نافذة المحادثة */}
-  <div className="category-card h-[650px] max-h-[80vh] min-h-0 flex flex-col overflow-hidden">
+  <div className="category-card admin-support-panel max-h-[80vh] min-h-0">
 
     {!selectedSupportConversationId ? (
       <div className="empty-state flex-1">
@@ -7406,6 +8050,9 @@ onClick={() => {
   "الرئيسية",
   "مراجعة الإعلانات",
   "طلبات الاشتراك",
+  "طلبات حملات التمييز",
+  "طلبات مندوبي التوصيل",
+  "عمال التوصيل",
   "طلبات المتاجر",
   "إدارة المتاجر",
   "طلبات توثيق الحسابات",

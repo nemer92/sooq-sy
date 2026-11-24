@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { Share } from "@capacitor/share";
@@ -24,6 +24,22 @@ import {
   Shirt,
   Wrench,
   PawPrint,
+  GraduationCap,
+  Baby,
+  Dumbbell,
+  Utensils,
+  Plane,
+  Wheat,
+  Watch,
+  Camera,
+  Truck,
+  Building2,
+  Leaf,
+  Music,
+  Gamepad2,
+  Sparkles,
+  Stethoscope,
+  Package,
   LogOut,
   Gift,
    Share2,
@@ -51,6 +67,7 @@ type Category = {
   sort_order: number;
   is_active: boolean;
 };
+
 type City = {
   id: number;
   name_ar: string;
@@ -75,9 +92,53 @@ const categoryIconMap = {
   "معدات وأدوات": Wrench,
   "دراجات": Car,
   "أراضٍ ومزارع": HomeIcon,
-  "متفرقات": Menu,
+  "التجميل والعناية الشخصية": Sparkles,
+  "مستلزمات طبية": Stethoscope,
+  "متفرقات": Package,
 };
 
+const normalizeCategoryName = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .trim()
+    .toLowerCase();
+
+const getCategoryIcon = (categoryName: string) => {
+  const name = normalizeCategoryName(categoryName);
+  const rules = [
+    { keywords: ["طبي", "صيدليه", "ادويه", "مستلزمات طبيه", "معدات طبيه"], icon: Stethoscope },
+    { keywords: ["تجميل", "عنايه", "مكياج", "بشره", "شعر", "عطور"], icon: Sparkles },
+    { keywords: ["سيارات", "مركبات", "دراجات", "شاحنات", "قطع غيار"], icon: Car },
+    { keywords: ["عقارات", "شقق", "منازل", "اراضي", "محلات"], icon: HomeIcon },
+    { keywords: ["الكترونيات", "موبايل", "جوال", "كمبيوتر", "لابتوب", "حاسوب", "تلفزيون"], icon: Smartphone },
+    { keywords: ["اثاث", "مفروشات", "ديكور", "مطبخ"], icon: Sofa },
+    { keywords: ["ملابس", "ازياء", "احذيه", "حقائب"], icon: Shirt },
+    { keywords: ["وظائف", "توظيف", "عمل"], icon: BriefcaseBusiness },
+    { keywords: ["حيوانات", "طيور", "قطط", "كلاب"], icon: PawPrint },
+    { keywords: ["تعليم", "كتب", "قرطاسيه", "مدارس", "جامعات", "دورات"], icon: GraduationCap },
+    { keywords: ["اطفال", "طفل", "رضع", "مواليد"], icon: Baby },
+    { keywords: ["رياضه", "لياقه", "تمارين"], icon: Dumbbell },
+    { keywords: ["طعام", "اغذيه", "مطاعم", "مأكولات", "حلويات", "مشروبات", "قهوه"], icon: Utensils },
+    { keywords: ["سياحه", "سفر", "رحلات", "فنادق"], icon: Plane },
+    { keywords: ["زراعه", "زراعي", "محاصيل", "بذور", "اسمده", "مزارع"], icon: Wheat },
+    { keywords: ["ساعات", "اكسسوارات", "مجوهرات"], icon: Watch },
+    { keywords: ["تصوير", "كاميرات"], icon: Camera },
+    { keywords: ["نقل", "شحن", "توصيل"], icon: Truck },
+    { keywords: ["بناء", "مقاولات", "مواد بناء"], icon: Building2 },
+    { keywords: ["حدائق", "نباتات", "زهور"], icon: Leaf },
+    { keywords: ["موسيقي", "الات موسيقيه"], icon: Music },
+    { keywords: ["العاب", "العاب الكترونيه"], icon: Gamepad2 },
+    { keywords: ["خدمات", "صيانه", "اصلاح", "تنظيف", "معدات", "ادوات"], icon: Wrench }
+  ];
+  const matchedRule = rules.find(rule =>
+    rule.keywords.some(keyword => name.includes(normalizeCategoryName(keyword)))
+  );
+  return matchedRule?.icon ?? categoryIconMap[categoryName as keyof typeof categoryIconMap] ?? Package;
+};
 type StorePreview = {
   id: string; name: string; business_type: string; description: string | null;
   governorate: string; city: string; logo_url: string | null; cover_url: string | null;
@@ -1452,6 +1513,10 @@ const matchesCondition = selectedConditions.includes(
 
               setShowNotifications(false);
 
+              if (notification?.title === "طلب شراء جديد" || notification?.body?.startsWith("لديك طلب شراء جديد للإعلان:")) {
+                navigate("/my-sales");
+                return;
+              }
               const link = notification?.link;
               if (!link) return;
 
@@ -1765,7 +1830,7 @@ const matchesCondition = selectedConditions.includes(
     `}</style>
 
     <div
-      className="border-t border-slate-100 bg-white px-3 py-4 shadow-[0_12px_25px_rgba(15,23,42,0.07)] md:hidden sm:px-5"
+      className="border-t border-slate-100 bg-white px-3 py-4 shadow-[0_12px_25px_rgba(15,23,42,0.07)] md:hidden sm:px-5 max-h-[calc(100vh-5rem)] max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain touch-pan-y"
       style={{ animation: "mobileMenuDrop 260ms cubic-bezier(0.16, 1, 0.3, 1)" }}
     >
       <div className="mx-auto max-w-7xl">
@@ -2187,6 +2252,10 @@ const matchesCondition = selectedConditions.includes(
 
                 setShowNotifications(false);
 
+                if (notification?.title === "طلب شراء جديد" || notification?.body?.startsWith("لديك طلب شراء جديد للإعلان:")) {
+                  navigate("/my-sales");
+                  return;
+                }
                 const link = notification?.link;
                 if (!link) return;
 
@@ -2727,6 +2796,30 @@ onClick={(e) => {
               </span>
             </a>
 
+            <a
+              href="https://www.facebook.com/viip4"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+              className="flex items-center gap-3 rounded-2xl border border-slate-200 p-4 transition hover:border-blue-200 hover:bg-blue-50"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                <svg viewBox="0 0 24 24" width="21" height="21" fill="currentColor" aria-hidden="true">
+                  <path d="M13.5 21v-8h2.7l.4-3.1h-3.1V8c0-.9.3-1.5 1.6-1.5h1.7V3.7c-.3 0-1.4-.1-2.6-.1-2.6 0-4.4 1.6-4.4 4.5v1.8H7V13h2.8v8h3.7z" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-slate-400">
+                  Facebook
+                </p>
+                <p className="mt-1 break-all text-sm font-bold text-slate-800">
+                  www.facebook.com/viip4
+                </p>
+              </div>
+              <span className="text-xs font-bold text-blue-700">
+                زيارة الحساب
+              </span>
+            </a>
             <p className="rounded-2xl bg-slate-50 p-4 text-center text-xs leading-6 text-slate-500">
               شكراً لثقتكم ب Sooq.SY، ونسعد دائماً باقتراحاتكم وملاحظاتكم
               لتطوير المنصة.
@@ -2940,9 +3033,7 @@ onClick={(e) => {
           .filter((category) => category.parent_id === null)
           .map((category) => {
             const Icon =
-              categoryIconMap[
-                category.name_ar as keyof typeof categoryIconMap
-              ] ?? Menu;
+              getCategoryIcon(category.name_ar);
 
             const isActive = selectedCategory === category.id;
 
@@ -3065,9 +3156,7 @@ onClick={(e) => {
           .filter((category) => category.parent_id === null)
           .map((category) => {
             const Icon =
-              categoryIconMap[
-                category.name_ar as keyof typeof categoryIconMap
-              ] ?? Menu;
+              getCategoryIcon(category.name_ar);
 
             const isActive = selectedCategory === category.id;
 
@@ -3972,4 +4061,8 @@ onClick={(e) => {
     </div>
   );
 }
+
+
+
+
 

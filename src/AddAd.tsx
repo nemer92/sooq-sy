@@ -1,4 +1,4 @@
-﻿
+
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
@@ -288,7 +288,7 @@ export default function AddAd() {
           .single();
 
         if (settingsError) {
-          throw new Error("طھط¹ط°ط± ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط¥ط¹ط¯ط§ط¯ط§طھ ظ†ط´ط± ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ.");
+          throw new Error("تعذر التحقق من إعدادات نشر الإعلانات.");
         }
 
         if (mounted) {
@@ -330,19 +330,19 @@ export default function AddAd() {
         ]);
 
         if (categoriesResult.error) {
-          throw new Error("طھط¹ط°ط± طھط­ظ…ظٹظ„ ط§ظ„طھطµظ†ظٹظپط§طھ.");
+          throw new Error("تعذر تحميل التصنيفات.");
         }
 
         if (governoratesResult.error) {
-          throw new Error("طھط¹ط°ط± طھط­ظ…ظٹظ„ ط§ظ„ظ…ط­ط§ظپط¸ط§طھ.");
+          throw new Error("تعذر تحميل المحافظات.");
         }
 
         if (citiesResult.error) {
-          throw new Error("طھط¹ط°ط± طھط­ظ…ظٹظ„ ط§ظ„ظ…ط¯ظ†.");
+          throw new Error("تعذر تحميل المدن.");
         }
 
         if (storesResult.error) {
-          throw new Error("طھط¹ط°ط± طھط­ظ…ظٹظ„ ظ…طھط§ط¬ط±ظƒ.");
+          throw new Error("تعذر تحميل متاجرك.");
         }
 
         const activeCategories = categoriesResult.data ?? [];
@@ -371,7 +371,7 @@ export default function AddAd() {
 
           if (!requestedStore) {
             throw new Error(
-              "ظ„ط§ ظٹظ…ظƒظ† ط§ظ„ظ†ط´ط± ظپظٹ ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط± ظ„ط£ظ†ظ‡ ط؛ظٹط± ظ…ظپط¹ظ‘ظ„ ط£ظˆ ظ…ظˆظ‚ظˆظپ ظ…ظ† ط§ظ„ط¥ط¯ط§ط±ط©."
+              "لا يمكن النشر في هذا المتجر لأنه غير مفعّل أو موقوف من الإدارة."
             );
           }
 
@@ -383,12 +383,12 @@ export default function AddAd() {
             setStoreQuota(quota);
 
             if (!quota.active) {
-              setError("ط§ط´طھط±ط§ظƒ ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط± ط؛ظٹط± ظپط¹ظ‘ط§ظ„. ظٹط±ط¬ظ‰ طھط¬ط¯ظٹط¯ ط§ظ„ط§ط´طھط±ط§ظƒ.");
+              setError("اشتراك هذا المتجر غير فعّال. يرجى تجديد الاشتراك.");
             } else if (
               quota.remaining <= 0 &&
               quota.featuredRemaining <= 0
             ) {
-              setError("ط§ط³طھظ‡ظ„ظƒ ط§ظ„ظ…طھط¬ط± ظƒط§ظ…ظ„ ط±طµظٹط¯ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ط¹ط§ط¯ظٹط© ظˆط§ظ„ظ…ظ…ظٹط²ط©.");
+              setError("استهلك المتجر كامل رصيد الإعلانات العادية والمميزة.");
             }
           }
         }
@@ -397,7 +397,7 @@ export default function AddAd() {
           setError(
             err instanceof Error
               ? err.message
-              : "طھط¹ط°ط± طھط¬ظ‡ظٹط² طµظپط­ط© ط¥ط¶ط§ظپط© ط§ظ„ط¥ط¹ظ„ط§ظ†."
+              : "تعذر تجهيز صفحة إضافة الإعلان."
           );
         }
       } finally {
@@ -429,7 +429,7 @@ export default function AddAd() {
       store.admin_disabled
     ) {
       setSelectedStoreId("");
-      setError("ظ„ط§ ظٹظ…ظƒظ† ط§ظ„ظ†ط´ط± ظپظٹ ظ…طھط¬ط± ظ…ظˆظ‚ظˆظپ ط£ظˆ ط؛ظٹط± ظ…ظپط¹ظ‘ظ„.");
+      setError("لا يمكن النشر في متجر موقوف أو غير مفعّل.");
       return;
     }
 
@@ -437,18 +437,18 @@ export default function AddAd() {
       const quota = await refreshStoreQuota(storeId);
 
       if (!quota.active) {
-        setError("ط§ط´طھط±ط§ظƒ ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط± ط؛ظٹط± ظپط¹ظ‘ط§ظ„. ظٹط±ط¬ظ‰ طھط¬ط¯ظٹط¯ ط§ظ„ط§ط´طھط±ط§ظƒ.");
+        setError("اشتراك هذا المتجر غير فعّال. يرجى تجديد الاشتراك.");
       } else if (
         quota.remaining <= 0 &&
         quota.featuredRemaining <= 0
       ) {
-        setError("ط§ط³طھظ‡ظ„ظƒ ط§ظ„ظ…طھط¬ط± ظƒط§ظ…ظ„ ط±طµظٹط¯ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ط¹ط§ط¯ظٹط© ظˆط§ظ„ظ…ظ…ظٹط²ط©.");
+        setError("استهلك المتجر كامل رصيد الإعلانات العادية والمميزة.");
       }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "طھط¹ط°ط± ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط±طµظٹط¯ ط§ظ„ظ…طھط¬ط±."
+          : "تعذر التحقق من رصيد المتجر."
       );
     }
   }
@@ -470,10 +470,10 @@ export default function AddAd() {
 
     if (validFiles.length !== selectedFiles.length) {
       setError(
-        "ط§ظ„طµظˆط± ظٹط¬ط¨ ط£ظ† طھظƒظˆظ† JPG ط£ظˆ PNG ط£ظˆ WEBPطŒ ظˆط¨ط­ط¬ظ… ظ„ط§ ظٹطھط¬ط§ظˆط² 5 ظ…ظٹط؛ط§ط¨ط§ظٹطھ ظ„ظ„طµظˆط±ط©."
+        "الصور يجب أن تكون JPG أو PNG أو WEBP، وبحجم لا يتجاوز 5 ميغابايت للصورة."
       );
     } else if (validFiles.length > remainingSlots) {
-      setError("ط§ظ„ط­ط¯ ط§ظ„ط£ظ‚طµظ‰ ط§ظ„ظ…ط³ظ…ظˆط­ ط¨ظ‡ ظ‡ظˆ 3 طµظˆط± ظ„ظ„ط¥ط¹ظ„ط§ظ† ط§ظ„ظˆط§ط­ط¯.");
+      setError("الحد الأقصى المسموح به هو 3 صور للإعلان الواحد.");
     } else {
       setError("");
     }
@@ -853,7 +853,7 @@ export default function AddAd() {
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-10 py-8 shadow-sm">
           <RefreshCw size={28} className="animate-spin text-emerald-600" />
           <p className="text-sm font-bold text-slate-500">
-            ط¬ط§ط±ظچ طھط¬ظ‡ظٹط² طµظپط­ط© ط¥ط¶ط§ظپط© ط§ظ„ط¥ط¹ظ„ط§ظ†...
+            جارٍ تجهيز صفحة إضافة الإعلان...
           </p>
         </div>
       </main>
@@ -872,12 +872,12 @@ export default function AddAd() {
           </div>
 
           <h2 className="mt-5 text-xl font-black text-slate-800">
-            ظ†ط´ط± ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ظ…طھظˆظ‚ظپ ظ…ط¤ظ‚طھط§ظ‹
+            نشر الإعلانات متوقف مؤقتاً
           </h2>
 
           <p className="mt-3 text-sm leading-7 text-slate-500">
-            ظ†ط¹طھط°ط± ظ…ظ†ظƒطŒ ظ„ط§ ظٹظ…ظƒظ† ط¥ط¶ط§ظپط© ط¥ط¹ظ„ط§ظ†ط§طھ ط¬ط¯ظٹط¯ط© ظپظٹ ط§ظ„ظˆظ‚طھ ط§ظ„ط­ط§ظ„ظٹ.
-            ظٹظ…ظƒظ†ظƒ طھطµظپط­ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ظ…ظˆط¬ظˆط¯ط© ظˆط§ظ„ط¹ظˆط¯ط© ظ„ط§ط­ظ‚ط§ظ‹.
+            نعتذر منك، لا يمكن إضافة إعلانات جديدة في الوقت الحالي.
+            يمكنك تصفح الإعلانات الموجودة والعودة لاحقاً.
           </p>
 
           <Link
@@ -885,7 +885,7 @@ export default function AddAd() {
             className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white transition hover:bg-emerald-700"
           >
             <ArrowRight size={18} />
-            ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ط±ط¦ظٹط³ظٹط©
+            العودة للرئيسية
           </Link>
         </div>
       </main>
@@ -905,7 +905,7 @@ export default function AddAd() {
           >
             <ArrowRight size={19} />
             <span>
-              {selectedStoreId ? "ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ظ…طھط¬ط±" : "ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ط±ط¦ظٹط³ظٹط©"}
+              {selectedStoreId ? "العودة للمتجر" : "العودة للرئيسية"}
             </span>
           </Link>
 
@@ -924,23 +924,23 @@ export default function AddAd() {
         <div className="mb-7">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
             <Sparkles size={14} />
-            <span>ط³ظˆظ‚ظƒ ط£ظ‚ط±ط¨ ظˆط£ط³ظ‡ظ„</span>
+            <span>سوقك أقرب وأسهل</span>
           </div>
 
           <h1 className="text-2xl font-black leading-tight text-slate-900 sm:text-3xl">
             {listingType === "donation"
-              ? "ط£ط¶ظپ طھط¨ط±ط¹ط§ظ‹ ط¬ط¯ظٹط¯ط§ظ‹"
+              ? "أضف تبرعاً جديداً"
               : selectedStoreId
-                ? "ط¥ط¶ط§ظپط© ظ…ظ†طھط¬ ظ„ظ„ظ…طھط¬ط±"
-                : "ط£ط¶ظپ ط¥ط¹ظ„ط§ظ†ظƒ ط§ظ„ط¬ط¯ظٹط¯"}
+                ? "إضافة منتج للمتجر"
+                : "أضف إعلانك الجديد"}
           </h1>
 
           <p className="mt-2 max-w-xl text-sm leading-7 text-slate-500">
             {listingType === "donation"
-              ? "ط´ط§ط±ظƒ ط؛ط±ط¶ط§ظ‹ ظ„ظ… طھط¹ط¯ ط¨ط­ط§ط¬ط© ط¥ظ„ظٹظ‡طŒ ظˆط³ط§ط¹ط¯ ط´ط®طµط§ظ‹ ط¢ط®ط± ط¹ظ„ظ‰ ط§ظ„ط§ط³طھظپط§ط¯ط© ظ…ظ†ظ‡."
+              ? "شارك غرضاً لم تعد بحاجة إليه، وساعد شخصاً آخر على الاستفادة منه."
               : selectedStoreId
-                ? "ط£ط¶ظپ ظ…ظ†طھط¬ط§ظ‹ ط¬ط¯ظٹط¯ط§ظ‹ ط¥ظ„ظ‰ ظ…طھط¬ط±ظƒ ظ„ظٹطµظ„ ط¥ظ„ظ‰ ط§ظ„ظ…ظ‡طھظ…ظٹظ†."
-                : "ط§ظ…ظ„ط£ طھظپط§طµظٹظ„ ط¥ط¹ظ„ط§ظ†ظƒ ظˆط£ط¶ظپ ط§ظ„طµظˆط±طŒ ظˆط¯ط¹ ط¥ط¹ظ„ط§ظ†ظƒ ظٹطµظ„ ط¥ظ„ظ‰ ط§ظ„ط£ط´ط®ط§طµ ط§ظ„ظ…ظ‡طھظ…ظٹظ†."}
+                ? "أضف منتجاً جديداً إلى متجرك ليصل إلى المهتمين."
+                : "املأ تفاصيل إعلانك وأضف الصور، ودع إعلانك يصل إلى الأشخاص المهتمين."}
           </p>
 
           <div className="mt-5 flex items-center gap-2">
@@ -948,7 +948,7 @@ export default function AddAd() {
               <div className="h-full w-full rounded-full bg-emerald-500" />
             </div>
             <span className="text-xs font-bold text-emerald-700">
-              ظ†ظ…ظˆط°ط¬ ط¥ط¶ط§ظپط© ط¥ط¹ظ„ط§ظ†
+              نموذج إضافة إعلان
             </span>
           </div>
         </div>
@@ -962,17 +962,17 @@ export default function AddAd() {
                 </div>
                 <div>
                   <h2 className="font-black text-slate-800">
-                    ظ…ظƒط§ظ† ظ†ط´ط± ط§ظ„ط¥ط¹ظ„ط§ظ†
+                    مكان نشر الإعلان
                   </h2>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    ط§ط®طھط± ط¥ظ† ظƒظ†طھ طھط±ظٹط¯ ط§ظ„ظ†ط´ط± ط¨ط§ط³ظ… ظ…طھط¬ط±ظƒ ط£ظˆ ط­ط³ط§ط¨ظƒ ط§ظ„ط´ط®طµظٹ
+                    اختر إن كنت تريد النشر باسم متجرك أو حسابك الشخصي
                   </p>
                 </div>
               </div>
 
               <div className="p-5">
                 <label className={labelClass}>
-                  ط§ط®طھط± ط§ظ„ظ…طھط¬ط±
+                  اختر المتجر
                 </label>
 
                 <select
@@ -980,7 +980,7 @@ export default function AddAd() {
                   onChange={(event) => handleStoreChange(event.target.value)}
                   className={inputClass}
                 >
-                  <option value="">ط¥ط¹ظ„ط§ظ† ط´ط®طµظٹ - ط¨ط¯ظˆظ† ظ…طھط¬ط±</option>
+                  <option value="">إعلان شخصي - بدون متجر</option>
                   {stores.map((store) => (
                     <option key={store.id} value={store.id}>
                       {store.name}
@@ -993,40 +993,40 @@ export default function AddAd() {
                     {quotaLoading ? (
                       <div className="flex items-center gap-2 text-sm text-slate-500">
                         <RefreshCw size={16} className="animate-spin" />
-                        ط¬ط§ط±ظچ ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط±طµظٹط¯ ط§ظ„ظ…طھط¬ط±...
+                        جارٍ التحقق من رصيد المتجر...
                       </div>
                     ) : storeQuota?.active ? (
                       <>
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-black text-emerald-800">
-                            ط±طµظٹط¯ ط§ظ„ظ…طھط¬ط±
+                            رصيد المتجر
                           </p>
                           <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700">
-                            ط§ط´طھط±ط§ظƒ ظپط¹ظ‘ط§ظ„
+                            اشتراك فعّال
                           </span>
                         </div>
 
                         <div className="mt-3 grid grid-cols-2 gap-3">
                           <div className="rounded-lg bg-white/80 p-3">
                             <p className="text-xs font-bold text-slate-500">
-                              ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ط¹ط§ط¯ظٹط©
+                              الإعلانات العادية
                             </p>
                             <p className="mt-1 text-base font-black text-slate-800">
                               {storeQuota.remaining}
                               <span className="mx-1 text-xs font-medium text-slate-400">
-                                ظ…طھط¨ظ‚ظٹ ظ…ظ† {storeQuota.limit}
+                                متبقي من {storeQuota.limit}
                               </span>
                             </p>
                           </div>
 
                           <div className="rounded-lg bg-white/80 p-3">
                             <p className="text-xs font-bold text-amber-700">
-                              ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ظ…ظ…ظٹط²ط© â­گ
+                              الإعلانات المميزة ⭐
                             </p>
                             <p className="mt-1 text-base font-black text-slate-800">
                               {storeQuota.featuredRemaining}
                               <span className="mx-1 text-xs font-medium text-slate-400">
-                                ظ…طھط¨ظ‚ظٹ ظ…ظ† {storeQuota.featuredLimit}
+                                متبقي من {storeQuota.featuredLimit}
                               </span>
                             </p>
                           </div>
@@ -1034,7 +1034,7 @@ export default function AddAd() {
 
                         {storeQuota.endAt && (
                           <p className="mt-3 text-xs text-slate-500">
-                            ظٹظ†طھظ‡ظٹ ط§ظ„ط§ط´طھط±ط§ظƒ ط¨طھط§ط±ظٹط®:{" "}
+                            ينتهي الاشتراك بتاريخ:{" "}
                             {new Date(storeQuota.endAt).toLocaleDateString(
                               "ar-SY"
                             )}
@@ -1043,7 +1043,7 @@ export default function AddAd() {
 
                         <div className="mt-4 border-t border-emerald-100 pt-4">
                           <p className="mb-3 text-xs font-bold text-slate-600">
-                            ط§ط®طھط± ظ†ظˆط¹ ط§ظ„ط¥ط¹ظ„ط§ظ†:
+                            اختر نوع الإعلان:
                           </p>
 
                           <div className="flex flex-wrap items-center gap-2">
@@ -1069,7 +1069,7 @@ export default function AddAd() {
                                     <CheckCircle2 size={11} strokeWidth={3} />
                                   )}
                                 </span>
-                                ط¥ط¹ظ„ط§ظ† ط¹ط§ط¯ظٹ
+                                إعلان عادي
                               </button>
                             )}
 
@@ -1103,7 +1103,7 @@ export default function AddAd() {
                                       : "text-amber-500"
                                   }
                                 />
-                                ط¥ط¹ظ„ط§ظ† ظ…ظ…ظٹط²
+                                إعلان مميز
                               </button>
                             )}
                           </div>
@@ -1111,19 +1111,19 @@ export default function AddAd() {
                           {storeQuota.remaining <= 0 &&
                             storeQuota.featuredRemaining <= 0 && (
                               <p className="mt-2 text-xs font-bold text-red-600">
-                                ط§ظ†طھظ‡ظ‰ ط±طµظٹط¯ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ط¹ط§ط¯ظٹط© ظˆط§ظ„ظ…ظ…ظٹط²ط©.
+                                انتهى رصيد الإعلانات العادية والمميزة.
                               </p>
                             )}
 
                           <p className="mt-2 text-[11px] text-slate-400">
-                            ط³ظٹطھظ… ط§ط­طھط³ط§ط¨ ط§ظ„ط±طµظٹط¯ ط¨ط¹ط¯ ظ…ظˆط§ظپظ‚ط© ط§ظ„ط¥ط¯ط§ط±ط© ط¹ظ„ظ‰ ط§ظ„ط¥ط¹ظ„ط§ظ†.
+                            سيتم احتساب الرصيد بعد موافقة الإدارة على الإعلان.
                           </p>
                         </div>
                       </>
                     ) : (
                       <div className="flex items-center gap-2 text-sm font-bold text-red-600">
                         <AlertCircle size={17} />
-                        ظ„ط§ ظٹظˆط¬ط¯ ط§ط´طھط±ط§ظƒ ظپط¹ظ‘ط§ظ„ ظ„ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط±.
+                        لا يوجد اشتراك فعّال لهذا المتجر.
                       </div>
                     )}
                   </div>
@@ -1139,17 +1139,17 @@ export default function AddAd() {
               </div>
               <div>
                 <h2 className="font-black text-slate-800">
-                  طھظپط§طµظٹظ„ ط§ظ„ط¥ط¹ظ„ط§ظ†
+                  تفاصيل الإعلان
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  ط§ظƒطھط¨ ظ…ط¹ظ„ظˆظ…ط§طھ ظˆط§ط¶ط­ط© طھط³ط§ط¹ط¯ ط§ظ„ظ…ط´طھط±ظٹ ط¹ظ„ظ‰ ظپظ‡ظ… ط¥ط¹ظ„ط§ظ†ظƒ
+                  اكتب معلومات واضحة تساعد المشتري على فهم إعلانك
                 </p>
               </div>
             </div>
 
             <div>
               <label className={labelClass}>
-                ط¹ظ†ظˆط§ظ† ط§ظ„ط¥ط¹ظ„ط§ظ†
+                عنوان الإعلان
                 <span className="mr-1 text-red-500">*</span>
               </label>
 
@@ -1159,7 +1159,7 @@ export default function AddAd() {
                 maxLength={150}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="ظ…ط«ظ„ط§ظ‹: ط³ظٹط§ط±ط© ظ„ظ„ط¨ظٹط¹ ط¨ط­ط§ظ„ط© ظ…ظ…طھط§ط²ط©"
+                placeholder="مثلاً: سيارة للبيع بحالة ممتازة"
                 className={inputClass}
               />
 
@@ -1170,7 +1170,7 @@ export default function AddAd() {
 
             <div className="mt-5">
               <label className={labelClass}>
-                ظˆطµظپ ط§ظ„ط¥ط¹ظ„ط§ظ†
+                وصف الإعلان
                 <span className="mr-1 text-red-500">*</span>
               </label>
 
@@ -1183,14 +1183,14 @@ export default function AddAd() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={
                   listingType === "donation"
-                    ? "ط§ظƒطھط¨ طھظپط§طµظٹظ„ ط§ظ„ط؛ط±ط¶ ط§ظ„ط°ظٹ طھط±ظٹط¯ ط§ظ„طھط¨ط±ط¹ ط¨ظ‡..."
-                    : "ط§ظƒطھط¨ طھظپط§طµظٹظ„ ط§ظ„ط¥ط¹ظ„ط§ظ†طŒ ظˆط§ظ„ظ…ظˆط§طµظپط§طھطŒ ظˆط§ظ„ط­ط§ظ„ط©طŒ ظˆط£ظٹ ظ…ط¹ظ„ظˆظ…ط§طھ ظ…ظ‡ظ…ط©..."
+                    ? "اكتب تفاصيل الغرض الذي تريد التبرع به..."
+                    : "اكتب تفاصيل الإعلان، والمواصفات، والحالة، وأي معلومات مهمة..."
                 }
                 className={`${inputClass} min-h-36 resize-y leading-7`}
               />
 
               <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                <span>ظٹظپط¶ظ„ ظƒطھط§ط¨ط© ظˆطµظپ ظˆط§ط¶ط­ ظˆظ…ظپطµظ„.</span>
+                <span>يفضل كتابة وصف واضح ومفصل.</span>
                 <span>{description.length} / 10000</span>
               </div>
             </div>
@@ -1203,10 +1203,10 @@ export default function AddAd() {
               </div>
               <div>
                 <h2 className="font-black text-slate-800">
-                  ط§ظ„طھطµظ†ظٹظپ ظˆط§ظ„ظ…ظˆظ‚ط¹
+                  التصنيف والموقع
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  ط­ط¯ط¯ ط§ظ„ظ‚ط³ظ… ظˆط§ظ„ظ…ط­ط§ظپط¸ط© ظˆط§ظ„ظ…ط¯ظٹظ†ط© ط§ظ„ظ…ظ†ط§ط³ط¨ط© ظ„ط¥ط¹ظ„ط§ظ†ظƒ
+                  حدد القسم والمحافظة والمدينة المناسبة لإعلانك
                 </p>
               </div>
             </div>
@@ -1216,7 +1216,7 @@ export default function AddAd() {
                 <label className={labelClass}>
                   <span className="inline-flex items-center gap-1.5">
                     <Tag size={15} className="text-slate-400" />
-                    ط§ظ„طھطµظ†ظٹظپ
+                    التصنيف
                   </span>
                   <span className="mr-1 text-red-500">*</span>
                 </label>
@@ -1227,7 +1227,7 @@ export default function AddAd() {
                   onChange={(e) => setCategoryId(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="">ط§ط®طھط± ط§ظ„طھطµظ†ظٹظپ</option>
+                  <option value="">اختر التصنيف</option>
                   {categories.map((category) => {
                     const parent = categories.find(
                       (item) => item.id === category.parent_id
@@ -1248,7 +1248,7 @@ export default function AddAd() {
                 <label className={labelClass}>
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin size={15} className="text-slate-400" />
-                    ط§ظ„ظ…ط­ط§ظپط¸ط©
+                    المحافظة
                   </span>
                   <span className="mr-1 text-red-500">*</span>
                 </label>
@@ -1259,7 +1259,7 @@ export default function AddAd() {
                   onChange={(e) => handleGovernorateChange(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="">ط§ط®طھط± ط§ظ„ظ…ط­ط§ظپط¸ط©</option>
+                  <option value="">اختر المحافظة</option>
                   {governorates.map((governorate) => (
                     <option key={governorate.id} value={governorate.id}>
                       {governorate.name_ar}
@@ -1272,7 +1272,7 @@ export default function AddAd() {
                 <label className={labelClass}>
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin size={15} className="text-slate-400" />
-                    ط§ظ„ظ…ط¯ظٹظ†ط©
+                    المدينة
                   </span>
                   <span className="mr-1 text-red-500">*</span>
                 </label>
@@ -1286,10 +1286,10 @@ export default function AddAd() {
                 >
                   <option value="">
                     {!governorateId
-                      ? "ط§ط®طھط± ط§ظ„ظ…ط­ط§ظپط¸ط© ط£ظˆظ„ط§ظ‹"
+                      ? "اختر المحافظة أولاً"
                       : filteredCities.length > 0
-                        ? "ط§ط®طھط± ط§ظ„ظ…ط¯ظٹظ†ط©"
-                        : "ظ„ط§ طھظˆط¬ط¯ ظ…ط¯ظ† ظ…طھط§ط­ط© ظپظٹ ظ‡ط°ظ‡ ط§ظ„ظ…ط­ط§ظپط¸ط©"}
+                        ? "اختر المدينة"
+                        : "لا توجد مدن متاحة في هذه المحافظة"}
                   </option>
 
                   {filteredCities.map((city) => (
@@ -1309,10 +1309,10 @@ export default function AddAd() {
               </div>
               <div>
                 <h2 className="font-black text-slate-800">
-                  ط§ظ„ط³ط¹ط± ظˆط­ط§ظ„ط© ط§ظ„ظ…ظ†طھط¬
+                  السعر وحالة المنتج
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  ط£ط¶ظپ ط§ظ„ط³ط¹ط± ظˆط­ط¯ط¯ ط­ط§ظ„ط© ط§ظ„ظ…ظ†طھط¬
+                  أضف السعر وحدد حالة المنتج
                 </p>
               </div>
             </div>
@@ -1320,20 +1320,20 @@ export default function AddAd() {
             {listingType === "donation" ? (
               <div className="rounded-xl border border-rose-100 bg-rose-50/70 p-4">
                 <div className="flex items-center gap-2 font-black text-rose-700">
-                  <span className="text-xl">â‌¤ï¸ڈ</span>
-                  ظ‡ط°ط§ ط§ظ„ط؛ط±ط¶ ظ„ظ„طھط¨ط±ط¹ ظ…ط¬ط§ظ†ط§ظ‹
+                  <span className="text-xl">❤️</span>
+                  هذا الغرض للتبرع مجاناً
                 </div>
                 <p className="mt-2 text-sm leading-6 text-rose-600">
-                  ظ„ظ† ظٹظڈط·ظ„ط¨ ظ…ظ† ط§ظ„ظ…ط³طھظپظٹط¯ ط¯ظپط¹ ط£ظٹ ظ…ط¨ظ„ط؛ ظ…ظ‚ط§ط¨ظ„ ظ‡ط°ط§ ط§ظ„ط؛ط±ط¶.
+                  لن يُطلب من المستفيد دفع أي مبلغ مقابل هذا الغرض.
                 </p>
               </div>
             ) : (
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>
-                    ط§ظ„ط³ط¹ط±
+                    السعر
                     <span className="mr-1 text-xs font-normal text-slate-400">
-                      (ط§ط®طھظٹط§ط±ظٹ)
+                      (اختياري)
                     </span>
                   </label>
 
@@ -1343,14 +1343,14 @@ export default function AddAd() {
                     step="any"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    placeholder="ط£ط¯ط®ظ„ ط§ظ„ط³ط¹ط±"
+                    placeholder="أدخل السعر"
                     className={inputClass}
                   />
                 </div>
 
                 <div>
                   <label className={labelClass}>
-                    ط§ظ„ط¹ظ…ظ„ط©
+                    العملة
                   </label>
 
                   <select
@@ -1358,8 +1358,8 @@ export default function AddAd() {
                     onChange={(e) => setCurrency(e.target.value)}
                     className={inputClass}
                   >
-                    <option value="USD">ط¯ظˆظ„ط§ط± ط£ظ…ط±ظٹظƒظٹ</option>
-                    <option value="SYP">ظ„ظٹط±ط© ط³ظˆط±ظٹط©</option>
+                    <option value="USD">دولار أمريكي</option>
+                    <option value="SYP">ليرة سورية</option>
                   </select>
                 </div>
               </div>
@@ -1367,7 +1367,7 @@ export default function AddAd() {
 
             <div className="mt-5">
               <label className={labelClass}>
-                ط­ط§ظ„ط© ط§ظ„ظ…ظ†طھط¬
+                حالة المنتج
               </label>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1382,7 +1382,7 @@ export default function AddAd() {
                 >
                   <span className="flex items-center justify-center gap-2">
                     {condition === "new" && <CheckCircle2 size={17} />}
-                    ط¬ط¯ظٹط¯
+                    جديد
                   </span>
                 </button>
 
@@ -1397,7 +1397,7 @@ export default function AddAd() {
                 >
                   <span className="flex items-center justify-center gap-2">
                     {condition === "used" && <CheckCircle2 size={17} />}
-                    ظ…ط³طھط¹ظ…ظ„
+                    مستعمل
                   </span>
                 </button>
               </div>
@@ -1412,10 +1412,10 @@ export default function AddAd() {
                 </div>
                 <div>
                   <h2 className="font-black text-slate-800">
-                    طµظˆط± ط§ظ„ط¥ط¹ظ„ط§ظ†
+                    صور الإعلان
                   </h2>
                   <p className="mt-0.5 text-xs text-slate-400">
-                    ط§ظ„طµظˆط± ط§ظ„ظˆط§ط¶ط­ط© طھط²ظٹط¯ ط§ظ‡طھظ…ط§ظ… ط§ظ„ظ…ط´طھط±ظٹظ†
+                    الصور الواضحة تزيد اهتمام المشترين
                   </p>
                 </div>
               </div>
@@ -1432,15 +1432,15 @@ export default function AddAd() {
                 </div>
 
                 <span className="mt-4 text-sm font-black text-slate-700 transition group-hover:text-emerald-700">
-                  ط§ط¶ط؛ط· ظ‡ظ†ط§ ظ„ط§ط®طھظٹط§ط± ط§ظ„طµظˆط±
+                  اضغط هنا لاختيار الصور
                 </span>
 
                 <span className="mt-2 text-xs text-slate-400">
-                  JPG ط£ظˆ PNG ط£ظˆ WEBP
+                  JPG أو PNG أو WEBP
                 </span>
 
                 <span className="mt-1 text-xs text-slate-400">
-                  ط§ظ„ط­ط¯ ط§ظ„ط£ظ‚طµظ‰ 5 ظ…ظٹط؛ط§ط¨ط§ظٹطھ ظ„ظ„طµظˆط±ط©
+                  الحد الأقصى 5 ميغابايت للصورة
                 </span>
 
                 <input
@@ -1476,7 +1476,7 @@ export default function AddAd() {
                       type="button"
                       onClick={() => removeImage(index)}
                       className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-red-600 shadow-sm transition hover:bg-red-600 hover:text-white"
-                      aria-label="ط­ط°ظپ ط§ظ„طµظˆط±ط©"
+                      aria-label="حذف الصورة"
                     >
                       <X size={15} />
                     </button>
@@ -1486,8 +1486,8 @@ export default function AddAd() {
             )}
 
             <p className="mt-3 text-xs leading-6 text-slate-400">
-              ظٹظ…ظƒظ†ظƒ ط¥ط¶ط§ظپط© 3 طµظˆط± ظƒط­ط¯ ط£ظ‚طµظ‰. طھط£ظƒط¯ ط£ظ† ط§ظ„طµظˆط± ظˆط§ط¶ط­ط© ظˆطھط¹ط¨ط± ط¹ظ† ط§ظ„ظ…ظ†طھط¬
-              ط£ظˆ ط§ظ„ط؛ط±ط¶ ط§ظ„ظ…ط¹ط±ظˆط¶.
+              يمكنك إضافة 3 صور كحد أقصى. تأكد أن الصور واضحة وتعبر عن المنتج
+              أو الغرض المعروض.
             </p>
           </section>
 
@@ -1504,7 +1504,7 @@ export default function AddAd() {
               <div>
                 <p className="font-black">{success}</p>
                 <p className="mt-1 text-xs text-emerald-600">
-                  ط³ظٹطھظ… طھط­ظˆظٹظ„ظƒ طھظ„ظ‚ط§ط¦ظٹط§ظ‹ ط¨ط¹ط¯ ظ‚ظ„ظٹظ„...
+                  سيتم تحويلك تلقائياً بعد قليل...
                 </p>
               </div>
             </div>
@@ -1532,20 +1532,20 @@ export default function AddAd() {
                 <>
                   <CheckCircle2 size={19} />
                   {listingType === "donation"
-                    ? "ط¥ط±ط³ط§ظ„ ط§ظ„طھط¨ط±ط¹ ظ„ظ„ظ…ط±ط§ط¬ط¹ط©"
-                    : "ط¥ط±ط³ط§ظ„ ط§ظ„ط¥ط¹ظ„ط§ظ† ظ„ظ„ظ…ط±ط§ط¬ط¹ط©"}
+                    ? "إرسال التبرع للمراجعة"
+                    : "إرسال الإعلان للمراجعة"}
                 </>
               )}
             </button>
 
             <p className="mt-3 text-center text-xs leading-6 text-slate-400">
-              ط³ظٹطھظ… ظ…ط±ط§ط¬ط¹ط© ط§ظ„ط¥ط¹ظ„ط§ظ† ظ…ظ† ط§ظ„ط¥ط¯ط§ط±ط© ظ‚ط¨ظ„ ط¸ظ‡ظˆط±ظ‡ ظ„ظ„ط²ظˆط§ط±.
+              سيتم مراجعة الإعلان من الإدارة قبل ظهوره للزوار.
             </p>
           </div>
         </form>
 
         <p className="mt-6 text-center text-xs text-slate-400">
-          ط´ظƒط±ط§ظ‹ ظ„ط§ط³طھط®ط¯ط§ظ…ظƒ Sooq.sy â‌¤ï¸ڈ
+          شكراً لاستخدامك Sooq.sy ❤️
         </p>
       </div>
     </main>

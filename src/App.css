@@ -2117,3 +2117,253 @@ html.dark .modal-overlay {
     transform: translateX(-5px);
   }
 }
+
+/* =========================================
+   SOOQ.SY ADMIN - UNIFIED PROFESSIONAL DESIGN
+   ========================================= */
+
+html body .admin-app-scroll-layout {
+  background: #f3f6fb;
+}
+
+html body .admin-app-scroll-layout > .sidebar {
+  background: #ffffff;
+  border-color: #e5eaf2;
+  box-shadow: 4px 0 24px rgba(15, 23, 42, .035);
+}
+
+html body .admin-app-scroll-layout > .sidebar > .brand {
+  padding: 22px 18px;
+  border-bottom: 1px solid #edf1f6;
+}
+
+html body .admin-app-scroll-layout > .sidebar > nav {
+  padding: 14px 12px;
+  gap: 6px;
+}
+
+html body .admin-app-scroll-layout > .sidebar > nav .menu-item {
+  border: 1px solid transparent;
+  font-weight: 650;
+}
+
+html body .admin-app-scroll-layout > .sidebar > nav .menu-item.active {
+  background: #eaf3ed;
+  color: #17633a;
+  border-color: #d5e9dc;
+  font-weight: 800;
+}
+
+html body .admin-app-scroll-layout > .main > .topbar {
+  background: rgba(255,255,255,.96);
+  border-bottom: 1px solid #e7ecf3;
+  box-shadow: 0 4px 18px rgba(15,23,42,.035);
+  padding-inline: clamp(18px, 2.5vw, 34px);
+}
+
+html body .admin-app-scroll-layout > .main > .content {
+  background: #f3f6fb;
+  gap: 18px;
+}
+
+html body .admin-app-scroll-layout .section-heading {
+  padding: 18px 20px;
+  margin: 0;
+  border: 1px solid #e6ebf2;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(15,23,42,.035);
+}
+
+html body .admin-app-scroll-layout .section-heading h2 {
+  color: #172b4d;
+  font-size: 20px;
+  font-weight: 850;
+}
+
+html body .admin-app-scroll-layout .section-heading p {
+  color: #718096;
+  line-height: 1.7;
+}
+
+html body .admin-app-scroll-layout .bg-white[class*="rounded-"][class*="border"],
+html body .admin-app-scroll-layout .bg-white[class*="rounded-"].shadow-sm,
+html body .admin-app-scroll-layout .bg-white[class*="rounded-"].shadow-md {
+  border-color: #e5eaf2;
+  box-shadow: 0 5px 20px rgba(15,23,42,.045);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+html body .admin-app-scroll-layout .bg-white[class*="rounded-"][class*="border"]:hover {
+  border-color: #cbd8e8;
+  box-shadow: 0 9px 26px rgba(15,23,42,.07);
+}
+
+html body .admin-app-scroll-layout .admin-section,
+html body .admin-app-scroll-layout .stat-card,
+html body .admin-app-scroll-layout .category-card,
+html body .admin-app-scroll-layout .user-card,
+html body .admin-app-scroll-layout .report-stat-card,
+html body .admin-app-scroll-layout .admin-ad-card,
+html body .admin-app-scroll-layout .ad-card,
+html body .admin-app-scroll-layout .empty-state {
+  border: 1px solid #e5eaf2;
+  box-shadow: 0 5px 20px rgba(15,23,42,.045);
+}
+
+html body .admin-app-scroll-layout .stat-card {
+  border-radius: 17px;
+  padding: 21px;
+}
+
+html body .admin-app-scroll-layout .stat-card strong {
+  font-weight: 850;
+  letter-spacing: -.4px;
+}
+
+html body .admin-app-scroll-layout .refresh-button,
+html body .admin-app-scroll-layout .view-all-button {
+  min-height: 42px;
+  border-radius: 11px;
+  font-weight: 750;
+  transition: all .2s ease;
+}
+
+html body .admin-app-scroll-layout .refresh-button:hover,
+html body .admin-app-scroll-layout .view-all-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(36,88,58,.10);
+}
+
+html body .admin-app-scroll-layout .content button:focus-visible,
+html body .admin-app-scroll-layout .sidebar button:focus-visible {
+  outline: 3px solid rgba(59,130,246,.35);
+  outline-offset: 2px;
+}
+
+html body .admin-app-scroll-layout .content table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid #e5eaf2;
+  border-radius: 14px;
+  background: #fff;
+}
+
+html body .admin-app-scroll-layout .content table th {
+  background: #f5f7fb;
+  color: #475569;
+  font-weight: 800;
+}
+
+html body .admin-app-scroll-layout .content table td,
+html body .admin-app-scroll-layout .content table th {
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf1f6;
+}
+
+html body .admin-app-scroll-layout .content input,
+html body .admin-app-scroll-layout .content select,
+html body .admin-app-scroll-layout .content textarea {
+  border-radius: 10px;
+  border-color: #dce3ed;
+}
+
+html body .admin-app-scroll-layout .content input:focus,
+html body .admin-app-scroll-layout .content select:focus,
+html body .admin-app-scroll-layout .content textarea:focus {
+  border-color: #6b9b7b;
+  outline: 3px solid rgba(47,126,75,.12);
+}
+
+html.dark body .admin-app-scroll-layout,
+html.dark body .admin-app-scroll-layout > .main > .content {
+  background: #111827;
+}
+
+html.dark body .admin-app-scroll-layout > .sidebar,
+html.dark body .admin-app-scroll-layout > .main > .topbar,
+html.dark body .admin-app-scroll-layout .section-heading,
+html.dark body .admin-app-scroll-layout .bg-white[class*="rounded-"],
+html.dark body .admin-app-scroll-layout .admin-section,
+html.dark body .admin-app-scroll-layout .stat-card,
+html.dark body .admin-app-scroll-layout .category-card,
+html.dark body .admin-app-scroll-layout .user-card,
+html.dark body .admin-app-scroll-layout .report-stat-card,
+html.dark body .admin-app-scroll-layout .admin-ad-card,
+html.dark body .admin-app-scroll-layout .ad-card,
+html.dark body .admin-app-scroll-layout .empty-state,
+html.dark body .admin-app-scroll-layout .delivery-application-card {
+  background-color: #1f2937;
+  color: #e5e7eb;
+  border-color: #374151;
+}
+
+html.dark body .admin-app-scroll-layout .section-heading h2,
+html.dark body .admin-app-scroll-layout .content h2,
+html.dark body .admin-app-scroll-layout .content h3,
+html.dark body .admin-app-scroll-layout .content strong {
+  color: #f3f4f6;
+}
+
+html.dark body .admin-app-scroll-layout .section-heading p,
+html.dark body .admin-app-scroll-layout .content p {
+  color: #cbd5e1;
+}
+
+html.dark body .admin-app-scroll-layout > .sidebar > .brand,
+html.dark body .admin-app-scroll-layout > .sidebar > .sidebar-footer {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+html.dark body .admin-app-scroll-layout > .sidebar > nav .menu-item.active {
+  background: #263b30;
+  color: #86efac;
+  border-color: #365743;
+}
+
+html.dark body .admin-app-scroll-layout .content table {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+html.dark body .admin-app-scroll-layout .content table th {
+  background: #273449;
+  color: #e5e7eb;
+}
+
+html.dark body .admin-app-scroll-layout .content table td,
+html.dark body .admin-app-scroll-layout .content table th {
+  border-color: #374151;
+}
+
+html.dark body .admin-app-scroll-layout .content input,
+html.dark body .admin-app-scroll-layout .content select,
+html.dark body .admin-app-scroll-layout .content textarea {
+  background-color: #273449;
+  color: #f3f4f6;
+  border-color: #475569;
+}
+
+html.dark body .admin-app-scroll-layout .content input:focus,
+html.dark body .admin-app-scroll-layout .content select:focus,
+html.dark body .admin-app-scroll-layout .content textarea:focus {
+  border-color: #6b9b7b;
+  outline-color: rgba(134,239,172,.15);
+}
+
+@media (max-width: 768px) {
+  html body .admin-app-scroll-layout > .main > .content {
+    gap: 12px;
+  }
+
+  html body .admin-app-scroll-layout .section-heading {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  html body .admin-app-scroll-layout .stat-card {
+    padding: 14px;
+  }
+}

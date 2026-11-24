@@ -72,7 +72,7 @@ export default function MyAds() {
     const confirmed = await window.sooqConfirm(
       isStoreAd
         ? "هل تريد تمييز هذا الإعلان باستخدام حصة الإعلانات المميزة في اشتراك المتجر؟"
-        : "هل تريد تمييز هذا الإعلان مقابل 5 نقاط؟"
+        : "هل تريد تمييز هذا الإعلان مقابل 2 نقطة؟"
     );
 
     if (!confirmed) return;
@@ -99,7 +99,7 @@ export default function MyAds() {
       window.alert(
         isStoreAd
           ? "تم تمييز الإعلان باستخدام حصة المتجر بنجاح."
-          : "تم تمييز إعلانك بنجاح مقابل 5 نقاط."
+          : "تم تمييز إعلانك بنجاح مقابل 2 نقطة."
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : "";

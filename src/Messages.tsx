@@ -490,7 +490,7 @@ export default function Messages() {
               </h1>
 
               <p className="mt-1 text-sm text-slate-500">
-                جميع محادثاتك مع مستخدمي سوق.سي
+                جميع محادثاتك مع مستخدمي Sooq.Sy
               </p>
             </div>
 

@@ -4937,149 +4937,239 @@ function getSubCategories(categoryId: number) {
 
 {/* طلبات الاشتراك */}
 {activeMenu === "طلبات الاشتراك" && (
-  <>
-    <div className="section-heading">
+  <div className="space-y-6" dir="rtl">
+    <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
       <div>
-        <h2>طلبات الاشتراك</h2>
-        <p>مراجعة طلبات الدفع والتحقق من الحوالات يدوياً</p>
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+          <span className="h-2 w-2 rounded-full bg-indigo-500" />
+          إدارة الاشتراكات
+        </div>
+        <h2 className="text-xl font-black text-slate-900 sm:text-2xl">
+          طلبات الاشتراك
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          مراجعة طلبات الاشتراك والتحقق من الحوالات وإدارة تفعيل الباقات
+        </p>
       </div>
 
       <button
-        className="refresh-button"
+        type="button"
         onClick={loadSubscriptionRequests}
         disabled={subscriptionRequestsLoading}
+        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        <RefreshCw size={17} />
-        تحديث
+        <RefreshCw size={17} className={subscriptionRequestsLoading ? "animate-spin" : ""} />
+        تحديث الطلبات
       </button>
     </div>
 
-    {subscriptionRequestsLoading ? (
-      <p>جارٍ تحميل طلبات الاشتراك...</p>
-    ) : subscriptionRequestsError ? (
-      <p className="error-message">{subscriptionRequestsError}</p>
-    ) : subscriptionRequests.length === 0 ? (
-      <p>لا توجد طلبات اشتراك حالياً.</p>
-    ) : (
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>رقم الطلب</th>
-              <th>المستخدم / الهاتف</th>
-              <th>الباقة</th>
-              <th>المبلغ بالدولار</th>
-              <th>سعر الصرف</th>
-              <th>المبلغ بالليرة</th>
-              <th>الحالة</th>
-              <th>تاريخ الطلب</th>
-              <th>الإجراءات</th>
-            </tr>
-          </thead>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-amber-800">بانتظار المراجعة</span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-amber-600 shadow-sm">
+            <RefreshCw size={19} />
+          </span>
+        </div>
+        <div className="mt-3 text-3xl font-black tabular-nums text-amber-900">
+          {subscriptionRequests.filter((r) => r.status === "pending").length}
+        </div>
+        <p className="mt-1 text-xs text-amber-700">طلبات تحتاج إلى إجراء</p>
+      </div>
 
-          <tbody>
-            {subscriptionRequests.map((request) => (
-              <tr key={request.id}>
-                <td>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-xs break-all"
-                      dir="ltr"
-                      title={request.id}
-                    >
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-emerald-800">طلبات مقبولة</span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+            <span className="text-xl font-black">✓</span>
+          </span>
+        </div>
+        <div className="mt-3 text-3xl font-black tabular-nums text-emerald-900">
+          {subscriptionRequests.filter((r) => r.status === "approved").length}
+        </div>
+        <p className="mt-1 text-xs text-emerald-700">تمت الموافقة عليها</p>
+      </div>
+
+      <div className="rounded-2xl border border-red-100 bg-red-50 p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold text-red-800">طلبات مرفوضة</span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-red-600 shadow-sm">
+            <span className="text-xl font-black">×</span>
+          </span>
+        </div>
+        <div className="mt-3 text-3xl font-black tabular-nums text-red-900">
+          {subscriptionRequests.filter((r) => r.status === "rejected").length}
+        </div>
+        <p className="mt-1 text-xs text-red-700">لم تتم الموافقة عليها</p>
+      </div>
+    </div>
+
+    {subscriptionRequestsLoading ? (
+      <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center shadow-sm">
+        <RefreshCw size={28} className="mx-auto animate-spin text-indigo-500" />
+        <p className="mt-4 text-sm font-medium text-slate-500">جارٍ تحميل طلبات الاشتراك...</p>
+      </div>
+    ) : subscriptionRequestsError ? (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-5 text-center text-sm font-bold text-red-700">
+        {subscriptionRequestsError}
+      </div>
+    ) : subscriptionRequests.length === 0 ? (
+      <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-14 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+          <Copy size={25} />
+        </div>
+        <h3 className="mt-4 font-bold text-slate-800">لا توجد طلبات اشتراك حالياً</h3>
+        <p className="mt-2 text-sm text-slate-500">ستظهر طلبات المستخدمين هنا عند إرسالها</p>
+      </div>
+    ) : (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="font-black text-slate-800">قائمة الطلبات</h3>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+            {subscriptionRequests.length} طلب
+          </span>
+        </div>
+
+        {subscriptionRequests.map((request) => (
+          <div
+            key={request.id}
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:border-indigo-200 hover:shadow-md"
+          >
+            <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/80 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-100 font-black text-indigo-700">
+                  #
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-slate-500">رقم الطلب</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="max-w-[190px] truncate text-xs font-bold text-slate-700 sm:max-w-xs" dir="ltr" title={request.id}>
                       {request.id}
                     </span>
-
                     <button
                       type="button"
                       onClick={() => {
                         navigator.clipboard.writeText(request.id);
                         alert("تم نسخ رقم الطلب");
                       }}
-                      className="text-emerald-600 hover:text-emerald-800 shrink-0"
+                      className="shrink-0 rounded-lg p-1.5 text-indigo-600 transition hover:bg-indigo-100"
                       title="نسخ رقم الطلب"
                     >
-                      <Copy size={16} />
+                      <Copy size={15} />
                     </button>
                   </div>
-                </td>
+                </div>
+              </div>
 
-                <td>
-                  <div className="font-medium">
-                    {request.user_name || "مستخدم غير معروف"}
-                  </div>
-                  <div className="text-xs text-gray-500" dir="ltr">
-                    {request.phone}
-                  </div>
-                </td>
-
-                <td>
-                  <div className="font-medium">
-                    {request.plan_name || `الباقة ${request.package_number}`}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {request.duration_months
-                      ? `${request.duration_months} شهر`
-                      : "المدة غير محددة"}
-                  </div>
-                </td>
-
-                <td>${Number(request.amount_usd).toFixed(2)}</td>
-
-                <td>
-                  {Number(request.exchange_rate).toLocaleString("en-US")}
-                </td>
-
-                <td>
-                  {Number(request.amount_syp).toLocaleString("en-US")} ل.س
-                </td>
-
-                <td>
-                  {request.status === "pending"
-                    ? "بانتظار المراجعة"
+              <span className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${
+                request.status === "pending"
+                  ? "bg-amber-100 text-amber-800"
+                  : request.status === "approved"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : request.status === "rejected"
+                  ? "bg-red-100 text-red-800"
+                  : "bg-slate-200 text-slate-700"
+              }`}>
+                <span className={`h-2 w-2 rounded-full ${
+                  request.status === "pending"
+                    ? "bg-amber-500"
                     : request.status === "approved"
-                    ? "مقبول"
+                    ? "bg-emerald-500"
                     : request.status === "rejected"
-                    ? "مرفوض"
-                    : "ملغي"}
-                </td>
+                    ? "bg-red-500"
+                    : "bg-slate-500"
+                }`} />
+                {request.status === "pending"
+                  ? "بانتظار المراجعة"
+                  : request.status === "approved"
+                  ? "مقبول"
+                  : request.status === "rejected"
+                  ? "مرفوض"
+                  : "ملغي"}
+              </span>
+            </div>
 
-                <td>{formatDate(request.created_at)}</td>
+            <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-4">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-slate-400">المستخدم / الهاتف</p>
+                <p className="mt-2 truncate font-bold text-slate-800">
+                  {request.user_name || "مستخدم غير معروف"}
+                </p>
+                <p className="mt-1 text-sm text-slate-500" dir="ltr">
+                  {request.phone || "—"}
+                </p>
+              </div>
 
-                <td>
-                  {request.status === "pending" ? (
-                    <div className="flex gap-2">
-                      <button
-                        className="refresh-button"
-                        disabled={subscriptionRequestsLoading}
-                        onClick={() =>
-                          approveSubscriptionRequest(request.id)
-                        }
-                      >
-                        موافقة
-                      </button>
+              <div>
+                <p className="text-xs font-medium text-slate-400">الباقة</p>
+                <p className="mt-2 font-bold text-slate-800">
+                  {request.plan_name || `الباقة ${request.package_number}`}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {request.duration_months
+                    ? `${request.duration_months} شهر`
+                    : "المدة غير محددة"}
+                </p>
+              </div>
 
-                      <button
-                        className="refresh-button"
-                        disabled={subscriptionRequestsLoading}
-                        onClick={() =>
-                          rejectSubscriptionRequest(request.id)
-                        }
-                      >
-                        رفض
-                      </button>
-                    </div>
-                  ) : (
-                    <span>تمت المراجعة</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              <div>
+                <p className="text-xs font-medium text-slate-400">قيمة الاشتراك</p>
+                <p className="mt-2 text-xl font-black text-indigo-700" dir="ltr">
+                  ${Number(request.amount_usd).toFixed(2)}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  سعر الصرف: {Number(request.exchange_rate).toLocaleString("en-US")}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-slate-400">المبلغ بالليرة السورية</p>
+                <p className="mt-2 text-lg font-black text-slate-800">
+                  {Number(request.amount_syp).toLocaleString("en-US")} ل.س
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  تاريخ الطلب: {formatDate(request.created_at)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <p className="text-xs text-slate-500">
+                {request.status === "pending"
+                  ? "يرجى التحقق من الحوالة قبل اتخاذ القرار"
+                  : "تمت مراجعة هذا الطلب"}
+              </p>
+
+              {request.status === "pending" ? (
+                <div className="flex w-full gap-2 sm:w-auto">
+                  <button
+                    type="button"
+                    disabled={subscriptionRequestsLoading}
+                    onClick={() => approveSubscriptionRequest(request.id)}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+                  >
+                    <span className="text-lg leading-none">✓</span>
+                    موافقة وتفعيل
+                  </button>
+                  <button
+                    type="button"
+                    disabled={subscriptionRequestsLoading}
+                    onClick={() => rejectSubscriptionRequest(request.id)}
+                    className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-5 py-2.5 text-sm font-bold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+                  >
+                    <span className="text-lg leading-none">×</span>
+                    رفض الطلب
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs font-bold text-slate-500">لا توجد إجراءات مطلوبة</span>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     )}
-  </>
+  </div>
 )}
 
 {/* طلبات حملات التمييز المدفوعة والنقاط */}

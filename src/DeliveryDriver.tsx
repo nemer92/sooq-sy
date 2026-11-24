@@ -113,6 +113,8 @@ export default function DeliveryDriver() {
   const [actionLoading, setActionLoading] = useState("");
   const [message, setMessage] = useState("");
   const [priceInputs, setPriceInputs] = useState<Record<string, string>>({});
+  const [priceCurrencyInputs, setPriceCurrencyInputs] = useState<Record<string, string>>({});
+  const [acceptanceFormRequestId, setAcceptanceFormRequestId] = useState("");
   const [paymentInputs, setPaymentInputs] = useState<
     Record<string, { item: string; fee: string }>
   >({});
@@ -239,6 +241,31 @@ export default function DeliveryDriver() {
       supabase.rpc("respond_delivery_request", {
         p_request_id: requestId,
         p_accept: accept,
+      })
+    );
+  }
+
+  async function acceptWithPrice(request: DeliveryRequest) {
+    if (!ensureDriverCanHandleRequests()) return;
+
+    const amount = Number(priceInputs[request.id]);
+    const currency = priceCurrencyInputs[request.id] || request.item_currency;
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMessage("أدخل أجرة توصيل أكبر من صفر.");
+      return;
+    }
+
+    if (currency !== "SYP" && currency !== "USD") {
+      setMessage("اختر عملة صحيحة لأجرة التوصيل.");
+      return;
+    }
+
+    await runAction(`${request.id}-accept-price`, () =>
+      supabase.rpc("accept_delivery_request_with_price", {
+        p_request_id: request.id,
+        p_amount: amount,
+        p_currency: currency,
       })
     );
   }
@@ -469,7 +496,7 @@ export default function DeliveryDriver() {
   if (!profile) {
     return (
       <div dir="rtl" className="min-h-screen bg-slate-50 p-5">
-        <div className="max-w-xl mx-auto rounded-2xl bg-white p-6 shadow-sm">
+        <div className="mx-auto max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-lg shadow-slate-200/50">
           <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-600 mb-6">
             <ArrowRight size={19} />
             رجوع
@@ -487,31 +514,31 @@ export default function DeliveryDriver() {
   const requestActionDisabled = !!actionLoading || profile.admin_disabled || profile.driver_status !== "active";
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-50 pb-10">
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div dir="rtl" className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/40 pb-8 text-slate-800">
+      <header className="sticky top-0 z-30 border-b border-white/70 bg-white/85 shadow-sm backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate(-1)} className="rounded-xl p-2 hover:bg-slate-100">
+            <button onClick={() => navigate(-1)} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:bg-slate-50">
               <ArrowRight size={21} />
             </button>
             <div>
-              <h1 className="font-bold text-lg">لوحة المندوب</h1>
+              <h1 className="text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">لوحة المندوب</h1>
               <p className="text-xs text-slate-500">إدارة طلبات التوصيل</p>
             </div>
           </div>
-          <button onClick={loadData} disabled={loading} className="rounded-xl border border-slate-200 p-2">
+          <button onClick={loadData} disabled={loading} aria-label="تحديث البيانات" className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 shadow-sm transition hover:border-emerald-200 hover:text-emerald-700 disabled:opacity-50">
             <RefreshCw size={19} />
           </button>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto p-4 space-y-5">
-        {message && <div className="rounded-xl bg-blue-50 text-blue-800 p-3 text-sm">{message}</div>}
+      <main className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-3 py-5 sm:gap-5 sm:px-6 lg:grid-cols-2 lg:items-start">
+        {message && <div className="rounded-2xl border border-sky-100 bg-sky-50/90 px-4 py-3 text-sm leading-6 text-sky-800 shadow-sm lg:col-span-2">{message}</div>}
 
-        <section className="rounded-2xl bg-white border border-slate-200 p-5">
+        <section className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_8px_28px_rgba(15,23,42,0.045)] sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-bold text-lg">حالة حسابك</h2>
+              <h2 className="text-base font-extrabold tracking-tight text-slate-900">حالة حسابك</h2>
               <p className="text-sm text-slate-500 mt-1">
                 {profile.admin_disabled
                   ? "تم إيقاف حسابك من قبل الإدارة"
@@ -563,10 +590,10 @@ export default function DeliveryDriver() {
           )}
         </section>
 
-        <section className="rounded-2xl bg-white border border-slate-200 p-5">
+        <section className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_8px_28px_rgba(15,23,42,0.045)] sm:p-5">
           <div className="flex items-center gap-2 mb-4">
             <Car size={20} className="text-emerald-600" />
-            <h2 className="font-bold">مركباتك</h2>
+            <h2 className="text-base font-extrabold tracking-tight text-slate-900">مركباتك</h2>
           </div>
 
           {profile.vehicles.length === 0 ? (
@@ -574,13 +601,13 @@ export default function DeliveryDriver() {
           ) : (
             <div className="space-y-3 mb-5">
               {profile.vehicles.map((vehicle) => (
-                <div key={vehicle.id} className="rounded-xl bg-slate-50 p-3 space-y-3">
+                <div key={vehicle.id} className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-2.5">
                   {editingVehicleId === vehicle.id ? (
                     <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <label className="block text-sm">
                           نوع المركبة
-                          <select value={editVehicleForm.vehicle_type} onChange={(event) => setEditVehicleForm((previous) => ({ ...previous, vehicle_type: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3">
+                          <select value={editVehicleForm.vehicle_type} onChange={(event) => setEditVehicleForm((previous) => ({ ...previous, vehicle_type: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
                             <option value="small_car">سيارة صغيرة</option>
                             <option value="motorcycle">دراجة نارية</option>
                             <option value="bicycle">دراجة هوائية</option>
@@ -591,7 +618,7 @@ export default function DeliveryDriver() {
                         </label>
                         <label className="block text-sm">
                           سعة الحمولة
-                          <select value={editVehicleForm.capacity} onChange={(event) => setEditVehicleForm((previous) => ({ ...previous, capacity: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3">
+                          <select value={editVehicleForm.capacity} onChange={(event) => setEditVehicleForm((previous) => ({ ...previous, capacity: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
                             <option value="small">صغيرة</option>
                             <option value="medium">متوسطة</option>
                             <option value="large">كبيرة</option>
@@ -637,7 +664,7 @@ export default function DeliveryDriver() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="block text-sm">
                 نوع المركبة
-                <select value={vehicleForm.vehicle_type} onChange={(event) => setVehicleForm((previous) => ({ ...previous, vehicle_type: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3">
+                <select value={vehicleForm.vehicle_type} onChange={(event) => setVehicleForm((previous) => ({ ...previous, vehicle_type: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
                   <option value="small_car">سيارة صغيرة</option>
                   <option value="motorcycle">دراجة نارية</option>
                   <option value="bicycle">دراجة هوائية</option>
@@ -648,7 +675,7 @@ export default function DeliveryDriver() {
               </label>
               <label className="block text-sm">
                 سعة الحمولة
-                <select value={vehicleForm.capacity} onChange={(event) => setVehicleForm((previous) => ({ ...previous, capacity: event.target.value }))} className="mt-1 w-full rounded-xl border border-slate-200 bg-white p-3">
+                <select value={vehicleForm.capacity} onChange={(event) => setVehicleForm((previous) => ({ ...previous, capacity: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
                   <option value="small">صغيرة</option>
                   <option value="medium">متوسطة</option>
                   <option value="large">كبيرة</option>
@@ -659,16 +686,16 @@ export default function DeliveryDriver() {
               <input type="checkbox" checked={vehicleForm.loading_help} onChange={(event) => setVehicleForm((previous) => ({ ...previous, loading_help: event.target.checked }))} className="h-4 w-4" />
               أستطيع المساعدة في تحميل وتنزيل الأغراض
             </label>
-            <button onClick={addVehicle} disabled={!!actionLoading} className="w-full rounded-xl bg-emerald-600 py-3 font-bold text-white disabled:opacity-50">
+            <button onClick={addVehicle} disabled={!!actionLoading} className="w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50">
               {actionLoading === "add-vehicle" ? "جارٍ إضافة المركبة..." : "إضافة المركبة"}
             </button>
           </div>
         </section>
 
-        <section className="rounded-2xl bg-white border border-slate-200 p-5 space-y-4">
+        <section className="rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_8px_28px_rgba(15,23,42,0.045)] sm:p-5">
           <div className="flex items-center gap-2">
             <MapPin size={20} className="text-emerald-600" />
-            <h2 className="font-bold">مناطق التغطية</h2>
+            <h2 className="text-base font-extrabold tracking-tight text-slate-900">مناطق التغطية</h2>
           </div>
           <p className="text-xs text-slate-500">
             اختر المدن والأحياء التي تستطيع الاستلام والتوصيل ضمنها. سيظهر حسابك للعميل عندما تغطي منطقتي البائع والمشتري.
@@ -693,7 +720,7 @@ export default function DeliveryDriver() {
           <div className="border-t pt-4 space-y-3">
             <div>
               <p className="text-sm font-bold mb-2">ابحث واختر المدن التي تريد تغطيتها</p>
-              <input type="search" value={coverageSearch} onChange={(event) => setCoverageSearch(event.target.value)} placeholder="اكتب اسم المدينة للبحث..." disabled={!!actionLoading || profile.admin_disabled} className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+              <input type="search" value={coverageSearch} onChange={(event) => setCoverageSearch(event.target.value)} placeholder="اكتب اسم المدينة للبحث..." disabled={!!actionLoading || profile.admin_disabled} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
             </div>
             <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 divide-y">
               {filteredCoverageOptions.length > 0 ? (
@@ -731,7 +758,7 @@ export default function DeliveryDriver() {
                 })}
               </div>
             )}
-            <button type="button" onClick={addCoverage} disabled={selectedCoverageCityIds.length === 0 || !!actionLoading || profile.admin_disabled} className="w-full rounded-xl bg-emerald-600 py-3 font-bold text-white disabled:opacity-50">
+            <button type="button" onClick={addCoverage} disabled={selectedCoverageCityIds.length === 0 || !!actionLoading || profile.admin_disabled} className="w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50">
               {actionLoading === "add-coverage" ? "جارٍ إضافة المناطق..." : `إضافة المناطق المحددة (${selectedCoverageCityIds.length})`}
             </button>
             {coverageOptions.length === 0 && (
@@ -740,9 +767,9 @@ export default function DeliveryDriver() {
           </div>
         </section>
 
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-bold text-lg">طلبات التوصيل</h2>
+        <section className="min-w-0 rounded-2xl border border-slate-200/80 bg-white/95 p-4 shadow-[0_8px_28px_rgba(15,23,42,0.045)] sm:p-5 lg:col-span-2">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-base font-extrabold tracking-tight text-slate-900 sm:text-lg">طلبات التوصيل</h2>
             <span className="text-sm text-slate-500">{activeRequests.length} طلب نشط</span>
           </div>
 
@@ -760,9 +787,9 @@ export default function DeliveryDriver() {
               <p className="text-sm text-slate-500 mt-1">ستظهر هنا طلبات التوصيل الجديدة.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="max-h-[62vh] min-h-[220px] space-y-3 overflow-y-auto overscroll-contain rounded-xl border border-slate-200/80 bg-slate-50/70 p-2.5 pr-2 [scrollbar-color:#94a3b8_transparent] [scrollbar-width:thin] sm:max-h-[68vh] sm:p-3">
               {activeRequests.map((request) => (
-                <article key={request.id} className="rounded-2xl bg-white border border-slate-200 p-4 space-y-4">
+                <article key={request.id} className="space-y-3 rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm transition-shadow hover:shadow-md sm:p-3.5">
                   <div className="flex justify-between items-start gap-3">
                     <div>
                       <p className="font-bold">طلب توصيل</p>
@@ -773,18 +800,18 @@ export default function DeliveryDriver() {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="rounded-xl bg-slate-50 p-3">
+                  <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-100 px-3 py-2.5 text-sm">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50/90 p-2.5">
                       <p className="text-xs text-slate-500 mb-1">المشتري</p>
                       <p className="font-bold">{request.buyer?.display_name || "مستخدم"}</p>
                     </div>
-                    <div className="rounded-xl bg-slate-50 p-3">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50/90 p-2.5">
                       <p className="text-xs text-slate-500 mb-1">البائع</p>
                       <p className="font-bold">{request.seller?.display_name || "مستخدم"}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-2 rounded-lg bg-slate-50/70 p-2.5 text-sm">
                     {request.pickup_address_label && (
                       <p className="flex gap-2">
                         <MapPin size={17} className="text-emerald-600 shrink-0" />
@@ -799,7 +826,7 @@ export default function DeliveryDriver() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-100 px-3 py-2.5 text-sm">
                     <div>
                       <p className="text-xs text-slate-500">المسافة التقديرية</p>
                       <p className="font-bold mt-1">{request.estimated_route_km} كم</p>
@@ -809,14 +836,74 @@ export default function DeliveryDriver() {
                       <p className="font-bold mt-1">{request.item_price} {request.item_currency}</p>
                     </div>
                   </div>
-
                   {request.status === "pending_driver" && (
-                    <div className="flex gap-2">
-                      <button onClick={() => respond(request.id, true)} disabled={requestActionDisabled} className="flex-1 rounded-xl bg-emerald-600 text-white py-3 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                        <CheckCircle size={17} className="inline ml-1" /> قبول الطلب
-                      </button>
-                      <button onClick={() => respond(request.id, false)} disabled={requestActionDisabled} className="flex-1 rounded-xl bg-red-50 text-red-700 py-3 font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                        <XCircle size={17} className="inline ml-1" /> رفض
+                    <div className="space-y-3">
+                      {acceptanceFormRequestId === request.id ? (
+                        <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-3 space-y-2.5">
+                          <p className="font-bold text-sm">{"\u062d\u062f\u062f \u0623\u062c\u0631\u0629 \u0627\u0644\u062a\u0648\u0635\u064a\u0644 \u0648\u0627\u0644\u0639\u0645\u0644\u0629"}</p>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            value={priceInputs[request.id] || ""}
+                            onChange={(event) => setPriceInputs((previous) => ({
+                              ...previous,
+                              [request.id]: event.target.value,
+                            }))}
+                            placeholder={"\u0623\u062f\u062e\u0644 \u0623\u062c\u0631\u0629 \u0627\u0644\u062a\u0648\u0635\u064a\u0644"}
+                            disabled={requestActionDisabled}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100"
+                          />
+                          <select
+                            value={priceCurrencyInputs[request.id] || request.item_currency}
+                            onChange={(event) => setPriceCurrencyInputs((previous) => ({
+                              ...previous,
+                              [request.id]: event.target.value,
+                            }))}
+                            disabled={requestActionDisabled}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100"
+                          >
+                            <option value="SYP">{"\u0644\u064a\u0631\u0629 \u0633\u0648\u0631\u064a\u0629 (SYP)"}</option>
+                            <option value="USD">{"\u062f\u0648\u0644\u0627\u0631 \u0623\u0645\u0631\u064a\u0643\u064a (USD)"}</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => acceptWithPrice(request)}
+                            disabled={requestActionDisabled}
+                            className="w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white shadow-sm shadow-emerald-600/15 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {actionLoading === `${request.id}-accept-price`
+                              ? "\u062c\u0627\u0631\u064d \u0627\u0644\u0625\u0631\u0633\u0627\u0644..."
+                              : "\u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0623\u062c\u0631\u0629 \u0648\u0642\u0628\u0648\u0644 \u0627\u0644\u0637\u0644\u0628"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAcceptanceFormRequestId("")}
+                            disabled={requestActionDisabled}
+                            className="w-full rounded-xl bg-white border border-slate-200 text-slate-700 py-2 font-bold text-sm disabled:opacity-50"
+                          >
+                            {"\u0625\u0644\u063a\u0627\u0621"}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setAcceptanceFormRequestId(request.id)}
+                          disabled={requestActionDisabled}
+                          className="w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white shadow-sm shadow-emerald-600/15 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <CheckCircle size={17} className="inline ml-1" />
+                          {"\u0642\u0628\u0648\u0644 \u0627\u0644\u0637\u0644\u0628"}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => respond(request.id, false)}
+                        disabled={requestActionDisabled}
+                        className="w-full rounded-lg border border-red-100 bg-red-50 px-3 py-2.5 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <XCircle size={17} className="inline ml-1" />
+                        {"\u0631\u0641\u0636 \u0627\u0644\u0637\u0644\u0628"}
                       </button>
                     </div>
                   )}
@@ -824,8 +911,8 @@ export default function DeliveryDriver() {
                   {(request.status === "accepted" || request.status === "waiting_price") && (
                     <div className="border-t pt-4 space-y-3">
                       <label className="text-sm font-bold block">أجرة التوصيل المقترحة</label>
-                      <input type="number" min="0" step="0.01" value={priceInputs[request.id] || ""} onChange={(event) => setPriceInputs((previous) => ({ ...previous, [request.id]: event.target.value }))} placeholder="أدخل الأجرة" disabled={requestActionDisabled} className="w-full rounded-xl border border-slate-200 p-3 disabled:bg-slate-100" />
-                      <button onClick={() => proposePrice(request)} disabled={requestActionDisabled} className="w-full rounded-xl bg-emerald-600 text-white py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed">إرسال الأجرة للمشتري</button>
+                      <input type="number" min="0" step="0.01" value={priceInputs[request.id] || ""} onChange={(event) => setPriceInputs((previous) => ({ ...previous, [request.id]: event.target.value }))} placeholder="أدخل الأجرة" disabled={requestActionDisabled} className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100" />
+                      <button onClick={() => proposePrice(request)} disabled={requestActionDisabled} className="w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">إرسال الأجرة للمشتري</button>
                     </div>
                   )}
 
@@ -835,7 +922,7 @@ export default function DeliveryDriver() {
                     <button
                       onClick={() => simpleAction(request.id, "mark_delivery_picked_up_and_on_the_way")}
                       disabled={requestActionDisabled}
-                      className="w-full rounded-xl bg-emerald-600 text-white py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Truck size={18} className="inline ml-1" />
                       استلمت الطلب وأنا بطريقي إلى المشتري
@@ -845,7 +932,7 @@ export default function DeliveryDriver() {
                   {request.status === "awaiting_buyer_payment" && (
                     <div className="border-t pt-4 space-y-3">
                       <p className="font-bold text-sm">تسجيل المبالغ المستلمة</p>
-                      <div className="rounded-xl bg-slate-50 p-3">
+                      <div className="rounded-lg border border-slate-100 bg-slate-50/90 p-2.5">
                         <label className="text-xs text-slate-500">مبلغ الغرض الذي يجب أن تستلمه</label>
                         <p className="font-bold mt-1">
                           {request.payment_method === "driver_pays_seller"
@@ -870,11 +957,11 @@ export default function DeliveryDriver() {
                             [request.id]: { item: "", fee: event.target.value },
                           }))}
                           disabled={requestActionDisabled}
-                          className="w-full rounded-xl border p-3 mt-1 disabled:bg-slate-100"
+                          className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100"
                         />
                       </div>
                       <p className="text-xs text-slate-500">أكّد استلام أجرة التوصيل المتفق عليها فعلياً. سيتحقق الخادم من المبلغ.</p>
-                      <button onClick={() => confirmPayment(request)} disabled={requestActionDisabled} className="w-full rounded-xl bg-emerald-600 text-white py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                      <button onClick={() => confirmPayment(request)} disabled={requestActionDisabled} className="w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
                         تأكيد استلام المبالغ وإتمام التسليم
                       </button>
                     </div>
@@ -887,7 +974,7 @@ export default function DeliveryDriver() {
                   )}
 
                   {request.status === "returning" && (
-                    <button onClick={() => simpleAction(request.id, "confirm_delivery_returned")} disabled={requestActionDisabled} className="w-full rounded-xl bg-emerald-600 text-white py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button onClick={() => simpleAction(request.id, "confirm_delivery_returned")} disabled={requestActionDisabled} className="w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">
                       تأكيد إعادة الغرض للبائع
                     </button>
                   )}

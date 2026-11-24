@@ -20,6 +20,33 @@ import {
   Truck,
 } from "lucide-react";
 
+type DeliveryPrice = {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  created_at: string;
+};
+
+type CustomerDelivery = {
+  request: {
+    id: string;
+    sale_request_id: string;
+    status: string;
+    delivery_fee: number | null;
+    item_currency: string;
+    payment_method: string;
+    created_at: string;
+    buyer_receipt_status?: string | null;
+  };
+  driver: {
+    id: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+  price_history: DeliveryPrice[];
+};
+
 type SaleRequest = {
   id: string;
   ad_id: string;
@@ -52,7 +79,11 @@ export default function MySales() {
   const [message, setMessage] = useState("");
   const [reviewRequest, setReviewRequest] = useState<SaleRequest | null>(null);
   const [deliveryRequest, setDeliveryRequest] = useState<SaleRequest | null>(null);
-  const [deliverySubmittedIds, setDeliverySubmittedIds] = useState<string[]>([]);
+  const [deliveryRecords, setDeliveryRecords] = useState<CustomerDelivery[]>([]);
+  const [reviewedDeliveryIds, setReviewedDeliveryIds] = useState<Set<string>>(new Set());
+  const [driverReviewRecord, setDriverReviewRecord] = useState<CustomerDelivery | null>(null);
+  const [driverRating, setDriverRating] = useState(5);
+  const [driverReviewComment, setDriverReviewComment] = useState("");
   const [rating, setRating] = useState(5);
   const [communicationRating, setCommunicationRating] = useState(5);
   const [credibilityRating, setCredibilityRating] = useState(5);
@@ -79,6 +110,17 @@ export default function MySales() {
       }
 
       setUserId(user.id);
+
+      const { data: deliveryData, error: deliveryError } =
+        await supabase.rpc("get_my_customer_delivery_requests");
+
+      if (deliveryError) throw deliveryError;
+
+      setDeliveryRecords(
+        Array.isArray(deliveryData)
+          ? (deliveryData as CustomerDelivery[])
+          : []
+      );
 
       const { data, error } = await supabase
         .from("sale_requests")
@@ -265,6 +307,104 @@ export default function MySales() {
     } catch (error: any) {
       console.error("خطأ تنفيذ طلب البيع:", error);
       setMessage(error?.message || "تعذر تنفيذ العملية.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  async function respondToDeliveryPrice(
+    deliveryId: string,
+    accept: boolean
+  ) {
+    const confirmed = await window.sooqConfirm(
+      accept
+        ? "هل توافق على أجرة التوصيل المقترحة من العامل؟"
+        : "هل تريد رفض أجرة التوصيل المقترحة؟"
+    );
+
+    if (!confirmed) return;
+
+    setActionLoading(deliveryId);
+    setMessage("");
+
+    try {
+      const { error } = await supabase.rpc("respond_delivery_price", {
+        p_request_id: deliveryId,
+        p_accept: accept,
+      });
+
+      if (error) throw error;
+
+      await window.alert(
+        accept
+          ? "تمت الموافقة على أجرة التوصيل بنجاح."
+          : "تم رفض الأجرة وإبلاغ عامل التوصيل."
+      );
+
+      await loadRequests();
+    } catch (error: any) {
+      console.error("Delivery price response error:", error);
+      setMessage(error?.message || "تعذر إرسال ردك على أجرة التوصيل.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  async function confirmDeliveryReceipt(deliveryId: string) {
+    const confirmed = await window.sooqConfirm(
+      "هل تؤكد استلام السلعة من عامل التوصيل؟"
+    );
+
+    if (!confirmed) return;
+
+    setActionLoading(deliveryId);
+    setMessage("");
+
+    try {
+      const { error } = await supabase.rpc("confirm_delivery_receipt", {
+        p_request_id: deliveryId,
+        p_accept: true,
+        p_reason: null,
+      });
+
+      if (error) throw error;
+
+      await window.alert("تم تأكيد استلام السلعة بنجاح.");
+      await loadRequests();
+    } catch (error: any) {
+      console.error("Delivery receipt confirmation error:", error);
+      setMessage(error?.message || "تعذر تأكيد استلام السلعة.");
+    } finally {
+      setActionLoading("");
+    }
+  }
+
+  async function submitDriverReview() {
+    if (!driverReviewRecord) return;
+
+    const deliveryId = driverReviewRecord.request.id;
+    setActionLoading(deliveryId);
+    setMessage("");
+
+    try {
+      const { error } = await supabase.rpc("submit_delivery_driver_review", {
+        p_request_id: deliveryId,
+        p_rating: driverRating,
+        p_comment: driverReviewComment.trim() || null,
+      });
+
+      if (error) throw error;
+
+      setReviewedDeliveryIds((previous) => new Set([...previous, deliveryId]));
+      setDriverReviewRecord(null);
+      setDriverReviewComment("");
+      setDriverRating(5);
+
+      await window.alert("شكراً لك، تم إرسال تقييم عامل التوصيل بنجاح.");
+      await loadRequests();
+    } catch (error: any) {
+      console.error("Driver review submission error:", error);
+      setMessage(error?.message || "تعذر إرسال تقييم عامل التوصيل.");
     } finally {
       setActionLoading("");
     }
@@ -615,8 +755,19 @@ export default function MySales() {
             {visibleRequests.map((request) => {
               const isSeller = request.seller_id === userId;
               const alreadyReviewed = request.already_reviewed;
-              const deliveryAlreadySubmitted =
-                deliverySubmittedIds.includes(request.id);
+              const deliveryRecord = deliveryRecords.find(
+                (item) => item.request.sale_request_id === request.id
+              );
+              const deliveryStatus = deliveryRecord?.request.status;
+              const deliveryAlreadySubmitted = !!deliveryRecord && [
+                "pending_driver", "accepted", "waiting_price",
+                "waiting_buyer_approval", "agreed", "picked_up",
+                "on_the_way", "awaiting_buyer_payment",
+                "return_required", "returning"
+              ].includes(deliveryStatus || "");
+              const pendingDeliveryPrice = deliveryRecord?.price_history
+                ?.filter((price) => price.status === "pending")
+                .slice(-1)[0];
 
               return (
                 <article
@@ -772,14 +923,97 @@ export default function MySales() {
                         </div>
                       )}
 
-                    {!isSeller &&
-                      request.status === "accepted" &&
-                      deliveryAlreadySubmitted && (
-                        <div className="flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-xs font-bold text-emerald-700">
-                          <CheckCircle size={17} />
-                          تم إرسال طلب التوصيل، بانتظار رد عامل التوصيل.
-                        </div>
-                      )}
+                    {!isSeller && deliveryRecord && (
+                      <div className="space-y-3 rounded-2xl border border-sky-100 bg-sky-50 p-4">
+                        <p className="text-sm font-black text-slate-800">حالة طلب التوصيل</p>
+                        <p className="text-sm text-slate-600">
+                          {deliveryStatus === "pending_driver" ? "بانتظار رد عامل التوصيل" :
+                           deliveryStatus === "waiting_buyer_approval" ? "أرسل العامل أجرة التوصيل، بانتظار موافقتك" :
+                           deliveryStatus === "agreed" ? "تم الاتفاق على أجرة التوصيل" :
+                           deliveryStatus === "picked_up" ? "استلم العامل السلعة" :
+                           deliveryStatus === "on_the_way" ? "الطلب في الطريق" :
+                           deliveryStatus === "delivered" ? "تم تسليم السلعة" :
+                           deliveryStatus === "cancelled" ? "تم إلغاء الطلب" :
+                           deliveryStatus === "expired" ? "انتهت مهلة الطلب" : "طلب التوصيل قيد المعالجة"}
+                        </p>
+                        {deliveryStatus === "on_the_way" && (
+                          <div className="border-t border-sky-100 pt-3">
+                            {deliveryRecord.request.buyer_receipt_status === "accepted" ? (
+                              <p className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
+                                <CheckCircle size={17} className="ml-1 inline" />
+                                أكدت استلام السلعة، بانتظار العامل لتأكيد استلام المبالغ.
+                              </p>
+                            ) : (
+                              <button
+                                onClick={() => confirmDeliveryReceipt(deliveryRecord.request.id)}
+                                disabled={!!actionLoading}
+                                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                {actionLoading === deliveryRecord.request.id ? (
+                                  <RefreshCw size={18} className="animate-spin" />
+                                ) : (
+                                  <CheckCircle size={18} />
+                                )}
+                                أؤكد استلام السلعة
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {deliveryStatus === "delivered" && (
+                          <div className="space-y-3 border-t border-sky-100 pt-3">
+                            <p className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm font-bold text-emerald-700">
+                              <CheckCircle size={17} className="ml-1 inline" />
+                              اكتمل التوصيل بنجاح.
+                            </p>
+
+                            {reviewedDeliveryIds.has(deliveryRecord.request.id) ? (
+                              <p className="text-xs font-bold text-emerald-700">
+                                شكراً لك، سبق وأرسلت تقييم عامل التوصيل.
+                              </p>
+                            ) : (
+                              <button
+                                onClick={() => setDriverReviewRecord(deliveryRecord)}
+                                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold text-white transition hover:bg-amber-600"
+                              >
+                                <Star size={18} />
+                                قيّم عامل التوصيل
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {pendingDeliveryPrice && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                            <p className="text-sm font-bold text-amber-900">أجرة التوصيل المقترحة</p>
+                            <p className="mt-1 text-xl font-black text-slate-900">
+                              {Number(pendingDeliveryPrice.amount).toLocaleString("ar-SY")} {pendingDeliveryPrice.currency}
+                            </p>
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                              <button
+                                onClick={() => respondToDeliveryPrice(deliveryRecord.request.id, true)}
+                                disabled={!!actionLoading}
+                                className="rounded-xl bg-emerald-600 px-3 py-3 text-sm font-bold text-white disabled:opacity-50"
+                              >
+                                موافقة
+                              </button>
+                              <button
+                                onClick={() => respondToDeliveryPrice(deliveryRecord.request.id, false)}
+                                disabled={!!actionLoading}
+                                className="rounded-xl bg-rose-600 px-3 py-3 text-sm font-bold text-white disabled:opacity-50"
+                              >
+                                رفض الأجرة
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {deliveryStatus === "agreed" && deliveryRecord.request.delivery_fee != null && (
+                          <p className="font-bold text-emerald-700">
+                            الأجرة المتفق عليها: {Number(deliveryRecord.request.delivery_fee).toLocaleString("ar-SY")} {deliveryRecord.request.item_currency}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     {!isSeller && request.status === "seller_marked_sold" && (
                       <div className="border-t border-slate-100 pt-4">
@@ -967,18 +1201,93 @@ export default function MySales() {
         </div>
       )}
 
+      {driverReviewRecord && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && !actionLoading) {
+              setDriverReviewRecord(null);
+            }
+          }}
+        >
+          <div className="my-auto w-full max-w-md space-y-5 rounded-t-3xl border border-slate-100 bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-slate-800">تقييم عامل التوصيل</h2>
+                <p className="mt-1 text-xs text-slate-400">شارك تجربتك مع عامل التوصيل</p>
+              </div>
+              <button
+                onClick={() => setDriverReviewRecord(null)}
+                disabled={actionLoading === driverReviewRecord.request.id}
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-500 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                aria-label="إغلاق"
+              >
+                <XCircle size={21} />
+              </button>
+            </div>
+
+            <div className="rounded-2xl bg-emerald-50/70 p-3">
+              <p className="text-xs text-emerald-700">عامل التوصيل</p>
+              <p className="mt-1 text-sm font-black text-slate-800">
+                {driverReviewRecord.driver.display_name || "عامل التوصيل"}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-slate-700">التقييم العام</p>
+              {renderStars(driverRating, setDriverRating)}
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-bold text-slate-700">
+                تعليقك <span className="font-normal text-slate-400">(اختياري)</span>
+              </label>
+              <textarea
+                value={driverReviewComment}
+                onChange={(event) => setDriverReviewComment(event.target.value)}
+                maxLength={1000}
+                rows={3}
+                placeholder="شارك تجربتك مع عامل التوصيل..."
+                className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-50"
+              />
+              <p className="mt-1.5 text-left text-[10px] text-slate-400">
+                {driverReviewComment.length}/1000
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                onClick={submitDriverReview}
+                disabled={actionLoading === driverReviewRecord.request.id}
+                className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {actionLoading === driverReviewRecord.request.id ? (
+                  <RefreshCw size={17} className="animate-spin" />
+                ) : (
+                  <Star size={17} />
+                )}
+                إرسال التقييم
+              </button>
+              <button
+                onClick={() => setDriverReviewRecord(null)}
+                disabled={actionLoading === driverReviewRecord.request.id}
+                className="min-h-12 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {deliveryRequest && (
         <DeliveryRequestModal
           saleRequestId={deliveryRequest.id}
           onClose={() => setDeliveryRequest(null)}
           onSuccess={() => {
-            setDeliverySubmittedIds((previous) =>
-              previous.includes(deliveryRequest.id)
-                ? previous
-                : [...previous, deliveryRequest.id]
-            );
             setDeliveryRequest(null);
             setMessage("");
+            void loadRequests();
           }}
         />
       )}

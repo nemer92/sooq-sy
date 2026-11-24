@@ -831,17 +831,14 @@ export default function DeliveryDriver() {
 
                   {request.status === "waiting_buyer_approval" && (
                     <p className="rounded-xl bg-amber-50 text-amber-800 p-3 text-sm">بانتظار موافقة المشتري على أجرة التوصيل.</p>
-                  )}
-
-                  {request.status === "agreed" && (
-                    <button onClick={() => simpleAction(request.id, "mark_delivery_picked_up")} disabled={requestActionDisabled} className="w-full rounded-xl bg-emerald-600 text-white py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-                      تأكيد استلام الغرض من البائع
-                    </button>
-                  )}
-
-                  {request.status === "picked_up" && (
-                    <button onClick={() => simpleAction(request.id, "mark_delivery_on_the_way")} disabled={requestActionDisabled} className="w-full rounded-xl bg-emerald-600 text-white py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-                      <Truck size={18} className="inline ml-1" /> الغرض بالطريق إلى المشتري
+                  )}                  {request.status === "agreed" && (
+                    <button
+                      onClick={() => simpleAction(request.id, "mark_delivery_picked_up_and_on_the_way")}
+                      disabled={requestActionDisabled}
+                      className="w-full rounded-xl bg-emerald-600 text-white py-3 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Truck size={18} className="inline ml-1" />
+                      استلمت الطلب وأنا بطريقي إلى المشتري
                     </button>
                   )}
 

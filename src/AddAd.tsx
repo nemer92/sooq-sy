@@ -1,5 +1,5 @@
-
-import { useEffect, useState } from "react";
+﻿
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 
@@ -22,6 +22,61 @@ import {
   Star,
 } from "lucide-react";
 
+function isNetworkError(error: any): boolean {
+  if (error instanceof TypeError) return true;
+
+  const message = String(error?.message ?? error ?? "").toLowerCase();
+
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed") ||
+    message.includes("load failed") ||
+    message.includes("fetch failed") ||
+    message.includes("internet disconnected") ||
+    message.includes("connection refused") ||
+    message.includes("connection reset") ||
+    message.includes("timeout")
+  );
+}
+
+function waitUntilOnline(
+  setWaiting: (value: boolean) => void
+): Promise<void> {
+  if (navigator.onLine) {
+    setWaiting(false);
+    return Promise.resolve();
+  }
+
+  setWaiting(true);
+
+  return new Promise((resolve) => {
+    window.addEventListener(
+      "online",
+      () => {
+        setWaiting(false);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+}
+
+function retryDelay(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 2500));
+}
+
+function isDuplicateStorageUpload(error: any): boolean {
+  const status = String(error?.statusCode ?? error?.status ?? "");
+  const message = String(error?.message ?? "").toLowerCase();
+
+  return (
+    status === "409" ||
+    message.includes("already exists") ||
+    message.includes("duplicate") ||
+    message.includes("resource already")
+  );
+}
 type Category = {
   id: number;
   name_ar: string;
@@ -94,6 +149,19 @@ export default function AddAd() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const submitLockRef = useRef(false);
+  const [waitingForNetwork, setWaitingForNetwork] = useState(false);
+
+  const submissionRef = useRef<{
+    key: string;
+    adId: string | null;
+    preflightComplete: boolean;
+    files: File[];
+    storeId: string;
+    listingType: "sale" | "donation";
+    requestedFeatured: boolean;
+    payload: Record<string, any>;
+  } | null>(null);
 
   const filteredCities = governorateId
     ? cities.filter(
@@ -220,7 +288,7 @@ export default function AddAd() {
           .single();
 
         if (settingsError) {
-          throw new Error("تعذر التحقق من إعدادات نشر الإعلانات.");
+          throw new Error("طھط¹ط°ط± ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط¥ط¹ط¯ط§ط¯ط§طھ ظ†ط´ط± ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ.");
         }
 
         if (mounted) {
@@ -262,19 +330,19 @@ export default function AddAd() {
         ]);
 
         if (categoriesResult.error) {
-          throw new Error("تعذر تحميل التصنيفات.");
+          throw new Error("طھط¹ط°ط± طھط­ظ…ظٹظ„ ط§ظ„طھطµظ†ظٹظپط§طھ.");
         }
 
         if (governoratesResult.error) {
-          throw new Error("تعذر تحميل المحافظات.");
+          throw new Error("طھط¹ط°ط± طھط­ظ…ظٹظ„ ط§ظ„ظ…ط­ط§ظپط¸ط§طھ.");
         }
 
         if (citiesResult.error) {
-          throw new Error("تعذر تحميل المدن.");
+          throw new Error("طھط¹ط°ط± طھط­ظ…ظٹظ„ ط§ظ„ظ…ط¯ظ†.");
         }
 
         if (storesResult.error) {
-          throw new Error("تعذر تحميل متاجرك.");
+          throw new Error("طھط¹ط°ط± طھط­ظ…ظٹظ„ ظ…طھط§ط¬ط±ظƒ.");
         }
 
         const activeCategories = categoriesResult.data ?? [];
@@ -303,7 +371,7 @@ export default function AddAd() {
 
           if (!requestedStore) {
             throw new Error(
-              "لا يمكن النشر في هذا المتجر لأنه غير مفعّل أو موقوف من الإدارة."
+              "ظ„ط§ ظٹظ…ظƒظ† ط§ظ„ظ†ط´ط± ظپظٹ ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط± ظ„ط£ظ†ظ‡ ط؛ظٹط± ظ…ظپط¹ظ‘ظ„ ط£ظˆ ظ…ظˆظ‚ظˆظپ ظ…ظ† ط§ظ„ط¥ط¯ط§ط±ط©."
             );
           }
 
@@ -315,12 +383,12 @@ export default function AddAd() {
             setStoreQuota(quota);
 
             if (!quota.active) {
-              setError("اشتراك هذا المتجر غير فعّال. يرجى تجديد الاشتراك.");
+              setError("ط§ط´طھط±ط§ظƒ ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط± ط؛ظٹط± ظپط¹ظ‘ط§ظ„. ظٹط±ط¬ظ‰ طھط¬ط¯ظٹط¯ ط§ظ„ط§ط´طھط±ط§ظƒ.");
             } else if (
               quota.remaining <= 0 &&
               quota.featuredRemaining <= 0
             ) {
-              setError("استهلك المتجر كامل رصيد الإعلانات العادية والمميزة.");
+              setError("ط§ط³طھظ‡ظ„ظƒ ط§ظ„ظ…طھط¬ط± ظƒط§ظ…ظ„ ط±طµظٹط¯ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ط¹ط§ط¯ظٹط© ظˆط§ظ„ظ…ظ…ظٹط²ط©.");
             }
           }
         }
@@ -329,7 +397,7 @@ export default function AddAd() {
           setError(
             err instanceof Error
               ? err.message
-              : "تعذر تجهيز صفحة إضافة الإعلان."
+              : "طھط¹ط°ط± طھط¬ظ‡ظٹط² طµظپط­ط© ط¥ط¶ط§ظپط© ط§ظ„ط¥ط¹ظ„ط§ظ†."
           );
         }
       } finally {
@@ -361,7 +429,7 @@ export default function AddAd() {
       store.admin_disabled
     ) {
       setSelectedStoreId("");
-      setError("لا يمكن النشر في متجر موقوف أو غير مفعّل.");
+      setError("ظ„ط§ ظٹظ…ظƒظ† ط§ظ„ظ†ط´ط± ظپظٹ ظ…طھط¬ط± ظ…ظˆظ‚ظˆظپ ط£ظˆ ط؛ظٹط± ظ…ظپط¹ظ‘ظ„.");
       return;
     }
 
@@ -369,18 +437,18 @@ export default function AddAd() {
       const quota = await refreshStoreQuota(storeId);
 
       if (!quota.active) {
-        setError("اشتراك هذا المتجر غير فعّال. يرجى تجديد الاشتراك.");
+        setError("ط§ط´طھط±ط§ظƒ ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط± ط؛ظٹط± ظپط¹ظ‘ط§ظ„. ظٹط±ط¬ظ‰ طھط¬ط¯ظٹط¯ ط§ظ„ط§ط´طھط±ط§ظƒ.");
       } else if (
         quota.remaining <= 0 &&
         quota.featuredRemaining <= 0
       ) {
-        setError("استهلك المتجر كامل رصيد الإعلانات العادية والمميزة.");
+        setError("ط§ط³طھظ‡ظ„ظƒ ط§ظ„ظ…طھط¬ط± ظƒط§ظ…ظ„ ط±طµظٹط¯ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ط¹ط§ط¯ظٹط© ظˆط§ظ„ظ…ظ…ظٹط²ط©.");
       }
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
-          : "تعذر التحقق من رصيد المتجر."
+          : "طھط¹ط°ط± ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط±طµظٹط¯ ط§ظ„ظ…طھط¬ط±."
       );
     }
   }
@@ -402,10 +470,10 @@ export default function AddAd() {
 
     if (validFiles.length !== selectedFiles.length) {
       setError(
-        "الصور يجب أن تكون JPG أو PNG أو WEBP، وبحجم لا يتجاوز 5 ميغابايت للصورة."
+        "ط§ظ„طµظˆط± ظٹط¬ط¨ ط£ظ† طھظƒظˆظ† JPG ط£ظˆ PNG ط£ظˆ WEBPطŒ ظˆط¨ط­ط¬ظ… ظ„ط§ ظٹطھط¬ط§ظˆط² 5 ظ…ظٹط؛ط§ط¨ط§ظٹطھ ظ„ظ„طµظˆط±ط©."
       );
     } else if (validFiles.length > remainingSlots) {
-      setError("الحد الأقصى المسموح به هو 3 صور للإعلان الواحد.");
+      setError("ط§ظ„ط­ط¯ ط§ظ„ط£ظ‚طµظ‰ ط§ظ„ظ…ط³ظ…ظˆط­ ط¨ظ‡ ظ‡ظˆ 3 طµظˆط± ظ„ظ„ط¥ط¹ظ„ط§ظ† ط§ظ„ظˆط§ط­ط¯.");
     } else {
       setError("");
     }
@@ -420,10 +488,24 @@ export default function AddAd() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    // قفل فوري ومتزامن يمنع تنفيذ أكثر من عملية إرسال.
+    if (submitLockRef.current) return;
+
+    submitLockRef.current = true;
+    setSaving(true);
+    setWaitingForNetwork(!navigator.onLine);
     setError("");
     setSuccess("");
 
+    const stopWithError = (message: string) => {
+      setError(message);
+      setSaving(false);
+      setWaitingForNetwork(false);
+      submitLockRef.current = false;
+    };
+
     if (!userId) {
+      stopWithError("انتهت جلسة الدخول. يرجى تسجيل الدخول مجدداً.");
       navigate("/auth", {
         state: {
           from: selectedStoreId
@@ -434,205 +516,319 @@ export default function AddAd() {
       return;
     }
 
-    const { data: settings, error: settingsError } = await supabase
-      .from("site_settings")
-      .select("allow_new_ads")
-      .eq("id", 1)
-      .single();
+    // نتحقق من البيانات محلياً قبل بدء أي طلب للشبكة.
+    // عند وجود إرسال سابق غير مكتمل، نحتفظ بنفس بياناته ومفتاحه.
+    if (!submissionRef.current) {
+      if (!categoryId || !governorateId || !cityId) {
+        stopWithError("يرجى اختيار التصنيف والمحافظة والمدينة.");
+        return;
+      }
 
-    if (settingsError) {
-      setError("تعذر التحقق من حالة نشر الإعلانات. حاول مرة أخرى.");
-      return;
-    }
+      const selectedCity = cities.find(
+        (city) =>
+          city.id === Number(cityId) &&
+          city.governorate_id === Number(governorateId)
+      );
 
-    if (!settings.allow_new_ads) {
-      setAllowNewAds(false);
-      return;
-    }
-
-    if (!categoryId || !governorateId || !cityId) {
-      setError("يرجى اختيار التصنيف والمحافظة والمدينة.");
-      return;
-    }
-
-    const selectedCity = cities.find(
-      (city) =>
-        city.id === Number(cityId) &&
-        city.governorate_id === Number(governorateId)
-    );
-
-    if (!selectedCity) {
-      setError("المدينة المختارة لا تتبع المحافظة المحددة. يرجى اختيار المدينة من جديد.");
-      return;
-    }
-
-    if (title.trim().length < 5) {
-      setError("عنوان الإعلان يجب ألا يقل عن 5 أحرف.");
-      return;
-    }
-
-    if (title.trim().length > 150) {
-      setError("عنوان الإعلان يجب ألا يتجاوز 150 حرفاً.");
-      return;
-    }
-
-    if (description.trim().length < 10) {
-      setError("وصف الإعلان يجب ألا يقل عن 10 أحرف.");
-      return;
-    }
-
-    if (images.length > 3) {
-      setError("لا يمكن إضافة أكثر من 3 صور للإعلان الواحد.");
-      return;
-    }
-
-    if (selectedStoreId && listingType === "donation") {
-      setError("إعلانات التبرع لا يمكن ربطها بمتجر.");
-      return;
-    }
-
-    if (selectedStoreId) {
-      try {
-        const { data: store, error: storeError } = await supabase
-          .from("stores")
-          .select("id,status,owner_disabled,admin_disabled")
-          .eq("id", selectedStoreId)
-          .eq("owner_id", userId)
-          .maybeSingle();
-
-        if (storeError) throw storeError;
-
-        if (
-          !store ||
-          store.status !== "active" ||
-          store.owner_disabled ||
-          store.admin_disabled
-        ) {
-          setSelectedStoreId("");
-          setStoreQuota(null);
-          setError(
-            "هذا المتجر موقوف حالياً، ولا يمكنك نشر إعلان جديد باسمه."
-          );
-          return;
-        }
-
-        const quota = await getStoreQuota(selectedStoreId);
-        setStoreQuota(quota);
-
-        if (!quota.active) {
-          setError("اشتراك المتجر غير فعّال. يرجى تجديد الاشتراك.");
-          return;
-        }
-
-        if (requestedFeatured && quota.featuredRemaining <= 0) {
-          setError("لا يوجد رصيد متبقٍ للإعلانات المميزة في هذا المتجر.");
-          return;
-        }
-
-        if (!requestedFeatured && quota.remaining <= 0) {
-          setError("لا يوجد رصيد متبقٍ للإعلانات العادية في هذا المتجر.");
-          return;
-        }
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "تعذر التحقق من حالة المتجر واشتراكه."
+      if (!selectedCity) {
+        stopWithError(
+          "المدينة المختارة لا تتبع المحافظة المحددة. يرجى اختيار المدينة من جديد."
         );
         return;
       }
-    }
 
-    setSaving(true);
+      if (title.trim().length < 5) {
+        stopWithError("عنوان الإعلان يجب ألا يقل عن 5 أحرف.");
+        return;
+      }
 
-    try {
-      const { data: ad, error: adError } = await supabase
-        .from("ads")
-        .insert({
+      if (title.trim().length > 150) {
+        stopWithError("عنوان الإعلان يجب ألا يتجاوز 150 حرفاً.");
+        return;
+      }
+
+      if (description.trim().length < 10) {
+        stopWithError("وصف الإعلان يجب ألا يقل عن 10 أحرف.");
+        return;
+      }
+
+      if (images.length > 3) {
+        stopWithError("لا يمكن إضافة أكثر من 3 صور للإعلان الواحد.");
+        return;
+      }
+
+      if (selectedStoreId && listingType === "donation") {
+        stopWithError("إعلانات التبرع لا يمكن ربطها بمتجر.");
+        return;
+      }
+
+      const numericPrice =
+        listingType === "donation"
+          ? 0
+          : price.trim() === ""
+            ? 0
+            : Number(price);
+
+      if (!Number.isFinite(numericPrice) || numericPrice < 0) {
+        stopWithError("يرجى إدخال سعر صحيح.");
+        return;
+      }
+
+      // المفتاح والبيانات والصور تبقى نفسها عند كل إعادة محاولة.
+      submissionRef.current = {
+        key: crypto.randomUUID(),
+        adId: null,
+        preflightComplete: false,
+        files: [...images],
+        storeId: selectedStoreId,
+        listingType,
+        requestedFeatured: selectedStoreId ? requestedFeatured : false,
+        payload: {
           user_id: userId,
           category_id: Number(categoryId),
           city_id: Number(cityId),
           title: title.trim(),
           description: description.trim(),
-          price:
-            listingType === "donation"
-              ? 0
-              : price.trim() === ""
-                ? 0
-                : Number(price),
+          price: numericPrice,
           currency,
           listing_type: listingType,
           condition,
           status: "pending",
           store_id: selectedStoreId || null,
           requested_featured: selectedStoreId ? requestedFeatured : false,
-        })
-        .select("id")
-        .single();
+        },
+      };
+    }
 
-      if (adError) throw adError;
+    const submission = submissionRef.current;
+    if (!submission) {
+      stopWithError("تعذر تجهيز بيانات الإعلان. حاول مرة أخرى.");
+      return;
+    }
 
-      if (images.length > 0) {
-        const imageRecords = [];
+    let completed = false;
 
-        for (let i = 0; i < images.length; i++) {
+    while (!completed) {
+      await waitUntilOnline(setWaitingForNetwork);
 
-const originalFile = images[i];
-const file = await addSooqWatermark(originalFile);
+      try {
+        // فحوصات الموقع والمتجر تُنفّذ قبل إنشاء الإعلان.
+        // بعد إنشاء الإعلان، لا نعيد هذه الفحوصات عند استكمال صوره.
+        if (!submission.preflightComplete) {
+          const { data: settings, error: settingsError } = await supabase
+            .from("site_settings")
+            .select("allow_new_ads")
+            .eq("id", 1)
+            .single();
 
-const imagePath = `${userId}/${ad.id}/${crypto.randomUUID()}.jpg`;
+          if (settingsError) throw settingsError;
 
-const { error: uploadError } = await supabase.storage
-  .from("ad-images")
-  .upload(imagePath, file, {
-    contentType: "image/jpeg",
-    upsert: false,
-  });
+          if (!settings.allow_new_ads) {
+            setAllowNewAds(false);
+            throw new Error("نشر الإعلانات متوقف مؤقتاً.");
+          }
 
-if (uploadError) throw uploadError;
+          if (submission.storeId) {
+            const { data: store, error: storeError } = await supabase
+              .from("stores")
+              .select("id,status,owner_disabled,admin_disabled")
+              .eq("id", submission.storeId)
+              .eq("owner_id", userId)
+              .maybeSingle();
 
-imageRecords.push({
-  ad_id: ad.id,
-  image_path: imagePath,
-  sort_order: i,
-});
+            if (storeError) throw storeError;
 
+            if (
+              !store ||
+              store.status !== "active" ||
+              store.owner_disabled ||
+              store.admin_disabled
+            ) {
+              setSelectedStoreId("");
+              setStoreQuota(null);
+              throw new Error(
+                "هذا المتجر موقوف حالياً، ولا يمكنك نشر إعلان جديد باسمه."
+              );
+            }
+
+            const quota = await getStoreQuota(submission.storeId);
+            setStoreQuota(quota);
+
+            if (!quota.active) {
+              throw new Error("اشتراك المتجر غير فعّال. يرجى تجديد الاشتراك.");
+            }
+
+            if (
+              submission.requestedFeatured &&
+              quota.featuredRemaining <= 0
+            ) {
+              throw new Error(
+                "لا يوجد رصيد متبقٍ للإعلانات المميزة في هذا المتجر."
+              );
+            }
+
+            if (
+              !submission.requestedFeatured &&
+              quota.remaining <= 0
+            ) {
+              throw new Error(
+                "لا يوجد رصيد متبقٍ للإعلانات العادية في هذا المتجر."
+              );
+            }
+          }
+
+          submission.preflightComplete = true;
         }
 
-        const { error: imagesError } = await supabase
-          .from("ad_images")
-          .insert(imageRecords);
+        // نبحث عن الإعلان أولاً؛ فقد يكون الخادم أنشأه
+        // في محاولة سابقة ولم يصل رد النجاح إلى المتصفح.
+        if (!submission.adId) {
+          const { data: existingAd, error: lookupError } = await supabase
+            .from("ads")
+            .select("id")
+            .eq("submission_key", submission.key)
+            .eq("user_id", userId)
+            .maybeSingle();
 
-        if (imagesError) throw imagesError;
-      }
+          if (lookupError) throw lookupError;
 
-      setSuccess(
-        selectedStoreId
-          ? "تم إرسال منتج المتجر للمراجعة بنجاح."
-          : listingType === "donation"
-            ? "تم إرسال التبرع بنجاح، وهو الآن بانتظار المراجعة."
-            : "تم إرسال إعلانك بنجاح، وهو الآن بانتظار المراجعة."
-      );
+          if (existingAd?.id) {
+            submission.adId = existingAd.id;
+          } else {
+            const { data: newAd, error: insertError } = await supabase
+              .from("ads")
+              .insert({
+                ...submission.payload,
+                submission_key: submission.key,
+              })
+              .select("id")
+              .single();
 
-      setTimeout(() => {
-        if (selectedStoreId) {
-          navigate(`/store/${selectedStoreId}`);
-        } else {
-          navigate("/");
+            if (insertError) {
+              // قد تكون محاولة سابقة أنشأت الإعلان بالفعل.
+              // عند تعارض المفتاح نبحث عنه بدلاً من إنشاء إعلان آخر.
+              if (insertError.code === "23505") {
+                const { data: duplicateAd, error: duplicateLookupError } =
+                  await supabase
+                    .from("ads")
+                    .select("id")
+                    .eq("submission_key", submission.key)
+                    .eq("user_id", userId)
+                    .maybeSingle();
+
+                if (duplicateLookupError) throw duplicateLookupError;
+
+                if (!duplicateAd?.id) throw insertError;
+
+                submission.adId = duplicateAd.id;
+              } else {
+                throw insertError;
+              }
+            } else {
+              submission.adId = newAd.id;
+            }
+          }
         }
-      }, 2000);
-    } catch (err: any) {
-      console.error("خطأ نشر الإعلان:", err);
 
-      setError(
-        err?.message ||
+        // مسار ثابت لكل صورة: إعادة المحاولة لا تنشئ ملفات مكررة.
+        const imageRecords: {
+          ad_id: string;
+          image_path: string;
+          sort_order: number;
+        }[] = [];
+
+        for (let i = 0; i < submission.files.length; i++) {
+          const originalFile = submission.files[i];
+          const file = await addSooqWatermark(originalFile);
+
+          const imagePath =
+            `${userId}/${submission.adId}/${submission.key}-${i}.jpg`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("ad-images")
+            .upload(imagePath, file, {
+              contentType: "image/jpeg",
+              upsert: false,
+            });
+
+          // إذا كانت الصورة موجودة من محاولة سابقة، نكمل.
+          // لا نستخدم upsert لأن سياسات التخزين لا تسمح بتحديثها.
+          if (uploadError && !isDuplicateStorageUpload(uploadError)) {
+            throw uploadError;
+          }
+
+          imageRecords.push({
+            ad_id: submission.adId!,
+            image_path: imagePath,
+            sort_order: i,
+          });
+        }
+
+        if (imageRecords.length > 0) {
+          const { error: imagesError } = await supabase
+            .from("ad_images")
+            .upsert(imageRecords, {
+              onConflict: "ad_id,image_path",
+              ignoreDuplicates: true,
+            });
+
+          if (imagesError) throw imagesError;
+        }
+
+        completed = true;
+        setWaitingForNetwork(false);
+
+        setSuccess(
+          submission.storeId
+            ? "تم إرسال منتج المتجر للمراجعة بنجاح."
+            : submission.listingType === "donation"
+              ? "تم إرسال التبرع بنجاح، وهو الآن بانتظار المراجعة."
+              : "تم إرسال إعلانك بنجاح، وهو الآن بانتظار المراجعة."
+        );
+
+        setTimeout(() => {
+          if (submission.storeId) {
+            navigate(`/store/${submission.storeId}`);
+          } else {
+            navigate("/");
+          }
+        }, 2000);
+      } catch (err: any) {
+        console.error("خطأ نشر الإعلان:", err);
+
+        if (isNetworkError(err)) {
+          setWaitingForNetwork(true);
+          setError(
+            "الاتصال بالإنترنت غير مستقر. تم الاحتفاظ ببيانات إعلانك، وستتم إعادة المحاولة تلقائياً..."
+          );
+
+          await retryDelay();
+          continue;
+        }
+
+        const message =
+          err?.message ||
           err?.details ||
           err?.hint ||
-          "حدث خطأ أثناء نشر الإعلان."
-      );
-    } finally {
-      setSaving(false);
+          "حدث خطأ أثناء نشر الإعلان.";
+
+        if (submission.adId) {
+          setError(
+            `تم إنشاء الإعلان، لكن لم يكتمل حفظ جميع صوره. اضغط إعادة المحاولة لإكمال نفس الإعلان دون إنشاء إعلان جديد. التفاصيل: ${message}`
+          );
+        } else {
+          setError(message);
+          submissionRef.current = null;
+        }
+
+        setWaitingForNetwork(false);
+        setSaving(false);
+        submitLockRef.current = false;
+        return;
+      }
     }
+
+        // يبقى القفل مفعلاً بعد النجاح حتى يتم التحويل.
   }
 
   const inputClass =
@@ -657,7 +853,7 @@ imageRecords.push({
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-10 py-8 shadow-sm">
           <RefreshCw size={28} className="animate-spin text-emerald-600" />
           <p className="text-sm font-bold text-slate-500">
-            جارٍ تجهيز صفحة إضافة الإعلان...
+            ط¬ط§ط±ظچ طھط¬ظ‡ظٹط² طµظپط­ط© ط¥ط¶ط§ظپط© ط§ظ„ط¥ط¹ظ„ط§ظ†...
           </p>
         </div>
       </main>
@@ -676,12 +872,12 @@ imageRecords.push({
           </div>
 
           <h2 className="mt-5 text-xl font-black text-slate-800">
-            نشر الإعلانات متوقف مؤقتاً
+            ظ†ط´ط± ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ظ…طھظˆظ‚ظپ ظ…ط¤ظ‚طھط§ظ‹
           </h2>
 
           <p className="mt-3 text-sm leading-7 text-slate-500">
-            نعتذر منك، لا يمكن إضافة إعلانات جديدة في الوقت الحالي.
-            يمكنك تصفح الإعلانات الموجودة والعودة لاحقاً.
+            ظ†ط¹طھط°ط± ظ…ظ†ظƒطŒ ظ„ط§ ظٹظ…ظƒظ† ط¥ط¶ط§ظپط© ط¥ط¹ظ„ط§ظ†ط§طھ ط¬ط¯ظٹط¯ط© ظپظٹ ط§ظ„ظˆظ‚طھ ط§ظ„ط­ط§ظ„ظٹ.
+            ظٹظ…ظƒظ†ظƒ طھطµظپط­ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ظ…ظˆط¬ظˆط¯ط© ظˆط§ظ„ط¹ظˆط¯ط© ظ„ط§ط­ظ‚ط§ظ‹.
           </p>
 
           <Link
@@ -689,7 +885,7 @@ imageRecords.push({
             className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 font-bold text-white transition hover:bg-emerald-700"
           >
             <ArrowRight size={18} />
-            العودة للرئيسية
+            ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ط±ط¦ظٹط³ظٹط©
           </Link>
         </div>
       </main>
@@ -709,7 +905,7 @@ imageRecords.push({
           >
             <ArrowRight size={19} />
             <span>
-              {selectedStoreId ? "العودة للمتجر" : "العودة للرئيسية"}
+              {selectedStoreId ? "ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ظ…طھط¬ط±" : "ط§ظ„ط¹ظˆط¯ط© ظ„ظ„ط±ط¦ظٹط³ظٹط©"}
             </span>
           </Link>
 
@@ -728,23 +924,23 @@ imageRecords.push({
         <div className="mb-7">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
             <Sparkles size={14} />
-            <span>سوقك أقرب وأسهل</span>
+            <span>ط³ظˆظ‚ظƒ ط£ظ‚ط±ط¨ ظˆط£ط³ظ‡ظ„</span>
           </div>
 
           <h1 className="text-2xl font-black leading-tight text-slate-900 sm:text-3xl">
             {listingType === "donation"
-              ? "أضف تبرعاً جديداً"
+              ? "ط£ط¶ظپ طھط¨ط±ط¹ط§ظ‹ ط¬ط¯ظٹط¯ط§ظ‹"
               : selectedStoreId
-                ? "إضافة منتج للمتجر"
-                : "أضف إعلانك الجديد"}
+                ? "ط¥ط¶ط§ظپط© ظ…ظ†طھط¬ ظ„ظ„ظ…طھط¬ط±"
+                : "ط£ط¶ظپ ط¥ط¹ظ„ط§ظ†ظƒ ط§ظ„ط¬ط¯ظٹط¯"}
           </h1>
 
           <p className="mt-2 max-w-xl text-sm leading-7 text-slate-500">
             {listingType === "donation"
-              ? "شارك غرضاً لم تعد بحاجة إليه، وساعد شخصاً آخر على الاستفادة منه."
+              ? "ط´ط§ط±ظƒ ط؛ط±ط¶ط§ظ‹ ظ„ظ… طھط¹ط¯ ط¨ط­ط§ط¬ط© ط¥ظ„ظٹظ‡طŒ ظˆط³ط§ط¹ط¯ ط´ط®طµط§ظ‹ ط¢ط®ط± ط¹ظ„ظ‰ ط§ظ„ط§ط³طھظپط§ط¯ط© ظ…ظ†ظ‡."
               : selectedStoreId
-                ? "أضف منتجاً جديداً إلى متجرك ليصل إلى المهتمين."
-                : "املأ تفاصيل إعلانك وأضف الصور، ودع إعلانك يصل إلى الأشخاص المهتمين."}
+                ? "ط£ط¶ظپ ظ…ظ†طھط¬ط§ظ‹ ط¬ط¯ظٹط¯ط§ظ‹ ط¥ظ„ظ‰ ظ…طھط¬ط±ظƒ ظ„ظٹطµظ„ ط¥ظ„ظ‰ ط§ظ„ظ…ظ‡طھظ…ظٹظ†."
+                : "ط§ظ…ظ„ط£ طھظپط§طµظٹظ„ ط¥ط¹ظ„ط§ظ†ظƒ ظˆط£ط¶ظپ ط§ظ„طµظˆط±طŒ ظˆط¯ط¹ ط¥ط¹ظ„ط§ظ†ظƒ ظٹطµظ„ ط¥ظ„ظ‰ ط§ظ„ط£ط´ط®ط§طµ ط§ظ„ظ…ظ‡طھظ…ظٹظ†."}
           </p>
 
           <div className="mt-5 flex items-center gap-2">
@@ -752,7 +948,7 @@ imageRecords.push({
               <div className="h-full w-full rounded-full bg-emerald-500" />
             </div>
             <span className="text-xs font-bold text-emerald-700">
-              نموذج إضافة إعلان
+              ظ†ظ…ظˆط°ط¬ ط¥ط¶ط§ظپط© ط¥ط¹ظ„ط§ظ†
             </span>
           </div>
         </div>
@@ -766,17 +962,17 @@ imageRecords.push({
                 </div>
                 <div>
                   <h2 className="font-black text-slate-800">
-                    مكان نشر الإعلان
+                    ظ…ظƒط§ظ† ظ†ط´ط± ط§ظ„ط¥ط¹ظ„ط§ظ†
                   </h2>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    اختر إن كنت تريد النشر باسم متجرك أو حسابك الشخصي
+                    ط§ط®طھط± ط¥ظ† ظƒظ†طھ طھط±ظٹط¯ ط§ظ„ظ†ط´ط± ط¨ط§ط³ظ… ظ…طھط¬ط±ظƒ ط£ظˆ ط­ط³ط§ط¨ظƒ ط§ظ„ط´ط®طµظٹ
                   </p>
                 </div>
               </div>
 
               <div className="p-5">
                 <label className={labelClass}>
-                  اختر المتجر
+                  ط§ط®طھط± ط§ظ„ظ…طھط¬ط±
                 </label>
 
                 <select
@@ -784,7 +980,7 @@ imageRecords.push({
                   onChange={(event) => handleStoreChange(event.target.value)}
                   className={inputClass}
                 >
-                  <option value="">إعلان شخصي - بدون متجر</option>
+                  <option value="">ط¥ط¹ظ„ط§ظ† ط´ط®طµظٹ - ط¨ط¯ظˆظ† ظ…طھط¬ط±</option>
                   {stores.map((store) => (
                     <option key={store.id} value={store.id}>
                       {store.name}
@@ -797,40 +993,40 @@ imageRecords.push({
                     {quotaLoading ? (
                       <div className="flex items-center gap-2 text-sm text-slate-500">
                         <RefreshCw size={16} className="animate-spin" />
-                        جارٍ التحقق من رصيد المتجر...
+                        ط¬ط§ط±ظچ ط§ظ„طھط­ظ‚ظ‚ ظ…ظ† ط±طµظٹط¯ ط§ظ„ظ…طھط¬ط±...
                       </div>
                     ) : storeQuota?.active ? (
                       <>
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-sm font-black text-emerald-800">
-                            رصيد المتجر
+                            ط±طµظٹط¯ ط§ظ„ظ…طھط¬ط±
                           </p>
                           <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-emerald-700">
-                            اشتراك فعّال
+                            ط§ط´طھط±ط§ظƒ ظپط¹ظ‘ط§ظ„
                           </span>
                         </div>
 
                         <div className="mt-3 grid grid-cols-2 gap-3">
                           <div className="rounded-lg bg-white/80 p-3">
                             <p className="text-xs font-bold text-slate-500">
-                              الإعلانات العادية
+                              ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ط¹ط§ط¯ظٹط©
                             </p>
                             <p className="mt-1 text-base font-black text-slate-800">
                               {storeQuota.remaining}
                               <span className="mx-1 text-xs font-medium text-slate-400">
-                                متبقي من {storeQuota.limit}
+                                ظ…طھط¨ظ‚ظٹ ظ…ظ† {storeQuota.limit}
                               </span>
                             </p>
                           </div>
 
                           <div className="rounded-lg bg-white/80 p-3">
                             <p className="text-xs font-bold text-amber-700">
-                              الإعلانات المميزة ⭐
+                              ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ظ…ظ…ظٹط²ط© â­گ
                             </p>
                             <p className="mt-1 text-base font-black text-slate-800">
                               {storeQuota.featuredRemaining}
                               <span className="mx-1 text-xs font-medium text-slate-400">
-                                متبقي من {storeQuota.featuredLimit}
+                                ظ…طھط¨ظ‚ظٹ ظ…ظ† {storeQuota.featuredLimit}
                               </span>
                             </p>
                           </div>
@@ -838,7 +1034,7 @@ imageRecords.push({
 
                         {storeQuota.endAt && (
                           <p className="mt-3 text-xs text-slate-500">
-                            ينتهي الاشتراك بتاريخ:{" "}
+                            ظٹظ†طھظ‡ظٹ ط§ظ„ط§ط´طھط±ط§ظƒ ط¨طھط§ط±ظٹط®:{" "}
                             {new Date(storeQuota.endAt).toLocaleDateString(
                               "ar-SY"
                             )}
@@ -847,7 +1043,7 @@ imageRecords.push({
 
                         <div className="mt-4 border-t border-emerald-100 pt-4">
                           <p className="mb-3 text-xs font-bold text-slate-600">
-                            اختر نوع الإعلان:
+                            ط§ط®طھط± ظ†ظˆط¹ ط§ظ„ط¥ط¹ظ„ط§ظ†:
                           </p>
 
                           <div className="flex flex-wrap items-center gap-2">
@@ -873,7 +1069,7 @@ imageRecords.push({
                                     <CheckCircle2 size={11} strokeWidth={3} />
                                   )}
                                 </span>
-                                إعلان عادي
+                                ط¥ط¹ظ„ط§ظ† ط¹ط§ط¯ظٹ
                               </button>
                             )}
 
@@ -907,7 +1103,7 @@ imageRecords.push({
                                       : "text-amber-500"
                                   }
                                 />
-                                إعلان مميز
+                                ط¥ط¹ظ„ط§ظ† ظ…ظ…ظٹط²
                               </button>
                             )}
                           </div>
@@ -915,19 +1111,19 @@ imageRecords.push({
                           {storeQuota.remaining <= 0 &&
                             storeQuota.featuredRemaining <= 0 && (
                               <p className="mt-2 text-xs font-bold text-red-600">
-                                انتهى رصيد الإعلانات العادية والمميزة.
+                                ط§ظ†طھظ‡ظ‰ ط±طµظٹط¯ ط§ظ„ط¥ط¹ظ„ط§ظ†ط§طھ ط§ظ„ط¹ط§ط¯ظٹط© ظˆط§ظ„ظ…ظ…ظٹط²ط©.
                               </p>
                             )}
 
                           <p className="mt-2 text-[11px] text-slate-400">
-                            سيتم احتساب الرصيد بعد موافقة الإدارة على الإعلان.
+                            ط³ظٹطھظ… ط§ط­طھط³ط§ط¨ ط§ظ„ط±طµظٹط¯ ط¨ط¹ط¯ ظ…ظˆط§ظپظ‚ط© ط§ظ„ط¥ط¯ط§ط±ط© ط¹ظ„ظ‰ ط§ظ„ط¥ط¹ظ„ط§ظ†.
                           </p>
                         </div>
                       </>
                     ) : (
                       <div className="flex items-center gap-2 text-sm font-bold text-red-600">
                         <AlertCircle size={17} />
-                        لا يوجد اشتراك فعّال لهذا المتجر.
+                        ظ„ط§ ظٹظˆط¬ط¯ ط§ط´طھط±ط§ظƒ ظپط¹ظ‘ط§ظ„ ظ„ظ‡ط°ط§ ط§ظ„ظ…طھط¬ط±.
                       </div>
                     )}
                   </div>
@@ -943,17 +1139,17 @@ imageRecords.push({
               </div>
               <div>
                 <h2 className="font-black text-slate-800">
-                  تفاصيل الإعلان
+                  طھظپط§طµظٹظ„ ط§ظ„ط¥ط¹ظ„ط§ظ†
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  اكتب معلومات واضحة تساعد المشتري على فهم إعلانك
+                  ط§ظƒطھط¨ ظ…ط¹ظ„ظˆظ…ط§طھ ظˆط§ط¶ط­ط© طھط³ط§ط¹ط¯ ط§ظ„ظ…ط´طھط±ظٹ ط¹ظ„ظ‰ ظپظ‡ظ… ط¥ط¹ظ„ط§ظ†ظƒ
                 </p>
               </div>
             </div>
 
             <div>
               <label className={labelClass}>
-                عنوان الإعلان
+                ط¹ظ†ظˆط§ظ† ط§ظ„ط¥ط¹ظ„ط§ظ†
                 <span className="mr-1 text-red-500">*</span>
               </label>
 
@@ -963,7 +1159,7 @@ imageRecords.push({
                 maxLength={150}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="مثلاً: سيارة للبيع بحالة ممتازة"
+                placeholder="ظ…ط«ظ„ط§ظ‹: ط³ظٹط§ط±ط© ظ„ظ„ط¨ظٹط¹ ط¨ط­ط§ظ„ط© ظ…ظ…طھط§ط²ط©"
                 className={inputClass}
               />
 
@@ -974,7 +1170,7 @@ imageRecords.push({
 
             <div className="mt-5">
               <label className={labelClass}>
-                وصف الإعلان
+                ظˆطµظپ ط§ظ„ط¥ط¹ظ„ط§ظ†
                 <span className="mr-1 text-red-500">*</span>
               </label>
 
@@ -987,14 +1183,14 @@ imageRecords.push({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={
                   listingType === "donation"
-                    ? "اكتب تفاصيل الغرض الذي تريد التبرع به..."
-                    : "اكتب تفاصيل الإعلان، والمواصفات، والحالة، وأي معلومات مهمة..."
+                    ? "ط§ظƒطھط¨ طھظپط§طµظٹظ„ ط§ظ„ط؛ط±ط¶ ط§ظ„ط°ظٹ طھط±ظٹط¯ ط§ظ„طھط¨ط±ط¹ ط¨ظ‡..."
+                    : "ط§ظƒطھط¨ طھظپط§طµظٹظ„ ط§ظ„ط¥ط¹ظ„ط§ظ†طŒ ظˆط§ظ„ظ…ظˆط§طµظپط§طھطŒ ظˆط§ظ„ط­ط§ظ„ط©طŒ ظˆط£ظٹ ظ…ط¹ظ„ظˆظ…ط§طھ ظ…ظ‡ظ…ط©..."
                 }
                 className={`${inputClass} min-h-36 resize-y leading-7`}
               />
 
               <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                <span>يفضل كتابة وصف واضح ومفصل.</span>
+                <span>ظٹظپط¶ظ„ ظƒطھط§ط¨ط© ظˆطµظپ ظˆط§ط¶ط­ ظˆظ…ظپطµظ„.</span>
                 <span>{description.length} / 10000</span>
               </div>
             </div>
@@ -1007,10 +1203,10 @@ imageRecords.push({
               </div>
               <div>
                 <h2 className="font-black text-slate-800">
-                  التصنيف والموقع
+                  ط§ظ„طھطµظ†ظٹظپ ظˆط§ظ„ظ…ظˆظ‚ط¹
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  حدد القسم والمحافظة والمدينة المناسبة لإعلانك
+                  ط­ط¯ط¯ ط§ظ„ظ‚ط³ظ… ظˆط§ظ„ظ…ط­ط§ظپط¸ط© ظˆط§ظ„ظ…ط¯ظٹظ†ط© ط§ظ„ظ…ظ†ط§ط³ط¨ط© ظ„ط¥ط¹ظ„ط§ظ†ظƒ
                 </p>
               </div>
             </div>
@@ -1020,7 +1216,7 @@ imageRecords.push({
                 <label className={labelClass}>
                   <span className="inline-flex items-center gap-1.5">
                     <Tag size={15} className="text-slate-400" />
-                    التصنيف
+                    ط§ظ„طھطµظ†ظٹظپ
                   </span>
                   <span className="mr-1 text-red-500">*</span>
                 </label>
@@ -1031,7 +1227,7 @@ imageRecords.push({
                   onChange={(e) => setCategoryId(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="">اختر التصنيف</option>
+                  <option value="">ط§ط®طھط± ط§ظ„طھطµظ†ظٹظپ</option>
                   {categories.map((category) => {
                     const parent = categories.find(
                       (item) => item.id === category.parent_id
@@ -1052,7 +1248,7 @@ imageRecords.push({
                 <label className={labelClass}>
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin size={15} className="text-slate-400" />
-                    المحافظة
+                    ط§ظ„ظ…ط­ط§ظپط¸ط©
                   </span>
                   <span className="mr-1 text-red-500">*</span>
                 </label>
@@ -1063,7 +1259,7 @@ imageRecords.push({
                   onChange={(e) => handleGovernorateChange(e.target.value)}
                   className={inputClass}
                 >
-                  <option value="">اختر المحافظة</option>
+                  <option value="">ط§ط®طھط± ط§ظ„ظ…ط­ط§ظپط¸ط©</option>
                   {governorates.map((governorate) => (
                     <option key={governorate.id} value={governorate.id}>
                       {governorate.name_ar}
@@ -1076,7 +1272,7 @@ imageRecords.push({
                 <label className={labelClass}>
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin size={15} className="text-slate-400" />
-                    المدينة
+                    ط§ظ„ظ…ط¯ظٹظ†ط©
                   </span>
                   <span className="mr-1 text-red-500">*</span>
                 </label>
@@ -1090,10 +1286,10 @@ imageRecords.push({
                 >
                   <option value="">
                     {!governorateId
-                      ? "اختر المحافظة أولاً"
+                      ? "ط§ط®طھط± ط§ظ„ظ…ط­ط§ظپط¸ط© ط£ظˆظ„ط§ظ‹"
                       : filteredCities.length > 0
-                        ? "اختر المدينة"
-                        : "لا توجد مدن متاحة في هذه المحافظة"}
+                        ? "ط§ط®طھط± ط§ظ„ظ…ط¯ظٹظ†ط©"
+                        : "ظ„ط§ طھظˆط¬ط¯ ظ…ط¯ظ† ظ…طھط§ط­ط© ظپظٹ ظ‡ط°ظ‡ ط§ظ„ظ…ط­ط§ظپط¸ط©"}
                   </option>
 
                   {filteredCities.map((city) => (
@@ -1113,10 +1309,10 @@ imageRecords.push({
               </div>
               <div>
                 <h2 className="font-black text-slate-800">
-                  السعر وحالة المنتج
+                  ط§ظ„ط³ط¹ط± ظˆط­ط§ظ„ط© ط§ظ„ظ…ظ†طھط¬
                 </h2>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  أضف السعر وحدد حالة المنتج
+                  ط£ط¶ظپ ط§ظ„ط³ط¹ط± ظˆط­ط¯ط¯ ط­ط§ظ„ط© ط§ظ„ظ…ظ†طھط¬
                 </p>
               </div>
             </div>
@@ -1124,20 +1320,20 @@ imageRecords.push({
             {listingType === "donation" ? (
               <div className="rounded-xl border border-rose-100 bg-rose-50/70 p-4">
                 <div className="flex items-center gap-2 font-black text-rose-700">
-                  <span className="text-xl">❤️</span>
-                  هذا الغرض للتبرع مجاناً
+                  <span className="text-xl">â‌¤ï¸ڈ</span>
+                  ظ‡ط°ط§ ط§ظ„ط؛ط±ط¶ ظ„ظ„طھط¨ط±ط¹ ظ…ط¬ط§ظ†ط§ظ‹
                 </div>
                 <p className="mt-2 text-sm leading-6 text-rose-600">
-                  لن يُطلب من المستفيد دفع أي مبلغ مقابل هذا الغرض.
+                  ظ„ظ† ظٹظڈط·ظ„ط¨ ظ…ظ† ط§ظ„ظ…ط³طھظپظٹط¯ ط¯ظپط¹ ط£ظٹ ظ…ط¨ظ„ط؛ ظ…ظ‚ط§ط¨ظ„ ظ‡ط°ط§ ط§ظ„ط؛ط±ط¶.
                 </p>
               </div>
             ) : (
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <label className={labelClass}>
-                    السعر
+                    ط§ظ„ط³ط¹ط±
                     <span className="mr-1 text-xs font-normal text-slate-400">
-                      (اختياري)
+                      (ط§ط®طھظٹط§ط±ظٹ)
                     </span>
                   </label>
 
@@ -1147,14 +1343,14 @@ imageRecords.push({
                     step="any"
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
-                    placeholder="أدخل السعر"
+                    placeholder="ط£ط¯ط®ظ„ ط§ظ„ط³ط¹ط±"
                     className={inputClass}
                   />
                 </div>
 
                 <div>
                   <label className={labelClass}>
-                    العملة
+                    ط§ظ„ط¹ظ…ظ„ط©
                   </label>
 
                   <select
@@ -1162,8 +1358,8 @@ imageRecords.push({
                     onChange={(e) => setCurrency(e.target.value)}
                     className={inputClass}
                   >
-                    <option value="USD">دولار أمريكي</option>
-                    <option value="SYP">ليرة سورية</option>
+                    <option value="USD">ط¯ظˆظ„ط§ط± ط£ظ…ط±ظٹظƒظٹ</option>
+                    <option value="SYP">ظ„ظٹط±ط© ط³ظˆط±ظٹط©</option>
                   </select>
                 </div>
               </div>
@@ -1171,7 +1367,7 @@ imageRecords.push({
 
             <div className="mt-5">
               <label className={labelClass}>
-                حالة المنتج
+                ط­ط§ظ„ط© ط§ظ„ظ…ظ†طھط¬
               </label>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1186,7 +1382,7 @@ imageRecords.push({
                 >
                   <span className="flex items-center justify-center gap-2">
                     {condition === "new" && <CheckCircle2 size={17} />}
-                    جديد
+                    ط¬ط¯ظٹط¯
                   </span>
                 </button>
 
@@ -1201,7 +1397,7 @@ imageRecords.push({
                 >
                   <span className="flex items-center justify-center gap-2">
                     {condition === "used" && <CheckCircle2 size={17} />}
-                    مستعمل
+                    ظ…ط³طھط¹ظ…ظ„
                   </span>
                 </button>
               </div>
@@ -1216,10 +1412,10 @@ imageRecords.push({
                 </div>
                 <div>
                   <h2 className="font-black text-slate-800">
-                    صور الإعلان
+                    طµظˆط± ط§ظ„ط¥ط¹ظ„ط§ظ†
                   </h2>
                   <p className="mt-0.5 text-xs text-slate-400">
-                    الصور الواضحة تزيد اهتمام المشترين
+                    ط§ظ„طµظˆط± ط§ظ„ظˆط§ط¶ط­ط© طھط²ظٹط¯ ط§ظ‡طھظ…ط§ظ… ط§ظ„ظ…ط´طھط±ظٹظ†
                   </p>
                 </div>
               </div>
@@ -1236,15 +1432,15 @@ imageRecords.push({
                 </div>
 
                 <span className="mt-4 text-sm font-black text-slate-700 transition group-hover:text-emerald-700">
-                  اضغط هنا لاختيار الصور
+                  ط§ط¶ط؛ط· ظ‡ظ†ط§ ظ„ط§ط®طھظٹط§ط± ط§ظ„طµظˆط±
                 </span>
 
                 <span className="mt-2 text-xs text-slate-400">
-                  JPG أو PNG أو WEBP
+                  JPG ط£ظˆ PNG ط£ظˆ WEBP
                 </span>
 
                 <span className="mt-1 text-xs text-slate-400">
-                  الحد الأقصى 5 ميغابايت للصورة
+                  ط§ظ„ط­ط¯ ط§ظ„ط£ظ‚طµظ‰ 5 ظ…ظٹط؛ط§ط¨ط§ظٹطھ ظ„ظ„طµظˆط±ط©
                 </span>
 
                 <input
@@ -1280,7 +1476,7 @@ imageRecords.push({
                       type="button"
                       onClick={() => removeImage(index)}
                       className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-red-600 shadow-sm transition hover:bg-red-600 hover:text-white"
-                      aria-label="حذف الصورة"
+                      aria-label="ط­ط°ظپ ط§ظ„طµظˆط±ط©"
                     >
                       <X size={15} />
                     </button>
@@ -1290,8 +1486,8 @@ imageRecords.push({
             )}
 
             <p className="mt-3 text-xs leading-6 text-slate-400">
-              يمكنك إضافة 3 صور كحد أقصى. تأكد أن الصور واضحة وتعبر عن المنتج
-              أو الغرض المعروض.
+              ظٹظ…ظƒظ†ظƒ ط¥ط¶ط§ظپط© 3 طµظˆط± ظƒط­ط¯ ط£ظ‚طµظ‰. طھط£ظƒط¯ ط£ظ† ط§ظ„طµظˆط± ظˆط§ط¶ط­ط© ظˆطھط¹ط¨ط± ط¹ظ† ط§ظ„ظ…ظ†طھط¬
+              ط£ظˆ ط§ظ„ط؛ط±ط¶ ط§ظ„ظ…ط¹ط±ظˆط¶.
             </p>
           </section>
 
@@ -1308,7 +1504,7 @@ imageRecords.push({
               <div>
                 <p className="font-black">{success}</p>
                 <p className="mt-1 text-xs text-emerald-600">
-                  سيتم تحويلك تلقائياً بعد قليل...
+                  ط³ظٹطھظ… طھط­ظˆظٹظ„ظƒ طھظ„ظ‚ط§ط¦ظٹط§ظ‹ ط¨ط¹ط¯ ظ‚ظ„ظٹظ„...
                 </p>
               </div>
             </div>
@@ -1330,28 +1526,29 @@ imageRecords.push({
               {saving ? (
                 <>
                   <RefreshCw size={19} className="animate-spin" />
-                  جارٍ إرسال الإعلان...
+                  {waitingForNetwork ? "بانتظار عودة الاتصال..." : "جارٍ إرسال الإعلان..."}
                 </>
               ) : (
                 <>
                   <CheckCircle2 size={19} />
                   {listingType === "donation"
-                    ? "إرسال التبرع للمراجعة"
-                    : "إرسال الإعلان للمراجعة"}
+                    ? "ط¥ط±ط³ط§ظ„ ط§ظ„طھط¨ط±ط¹ ظ„ظ„ظ…ط±ط§ط¬ط¹ط©"
+                    : "ط¥ط±ط³ط§ظ„ ط§ظ„ط¥ط¹ظ„ط§ظ† ظ„ظ„ظ…ط±ط§ط¬ط¹ط©"}
                 </>
               )}
             </button>
 
             <p className="mt-3 text-center text-xs leading-6 text-slate-400">
-              سيتم مراجعة الإعلان من الإدارة قبل ظهوره للزوار.
+              ط³ظٹطھظ… ظ…ط±ط§ط¬ط¹ط© ط§ظ„ط¥ط¹ظ„ط§ظ† ظ…ظ† ط§ظ„ط¥ط¯ط§ط±ط© ظ‚ط¨ظ„ ط¸ظ‡ظˆط±ظ‡ ظ„ظ„ط²ظˆط§ط±.
             </p>
           </div>
         </form>
 
         <p className="mt-6 text-center text-xs text-slate-400">
-          شكراً لاستخدامك Sooq.sy ❤️
+          ط´ظƒط±ط§ظ‹ ظ„ط§ط³طھط®ط¯ط§ظ…ظƒ Sooq.sy â‌¤ï¸ڈ
         </p>
       </div>
     </main>
   );
 }
+

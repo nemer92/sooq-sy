@@ -18,6 +18,7 @@ import {
   CheckCircle,
   AlertCircle,
   Package,
+  Map,
 } from "lucide-react";
 
 type Governorate = {
@@ -94,6 +95,7 @@ export default function DeliveryRequestModal({
 
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
+  const [showMap, setShowMap] = useState(false);
 
   const [drivers, setDrivers] = useState<DeliveryDriver[]>([]);
   const [selectedDriver, setSelectedDriver] = useState("");
@@ -168,8 +170,6 @@ export default function DeliveryRequestModal({
       if (error) throw error;
 
       const result = data as any;
-
-      // لا نطلب إحداثيات موقع الاستلام من الدالة؛ فهي خاصة بالبائع.
       setDrivers((result?.drivers || []) as DeliveryDriver[]);
     } catch (error: any) {
       console.error("خطأ جلب عمال التوصيل:", error);
@@ -206,13 +206,16 @@ export default function DeliveryRequestModal({
       return;
     }
 
-    if (latitude === null || longitude === null) {
-      setMessage("يرجى تحديد موقع التسليم على الخريطة.");
+    if (!selectedDriver) {
+      setMessage("يرجى اختيار عامل التوصيل.");
       return;
     }
 
-    if (!selectedDriver) {
-      setMessage("يرجى اختيار عامل التوصيل.");
+    if (
+      (latitude === null && longitude !== null) ||
+      (latitude !== null && longitude === null)
+    ) {
+      setMessage("موقع الخريطة غير مكتمل. يرجى تحديد الموقع مجدداً أو إخفاء الخريطة.");
       return;
     }
 
@@ -279,7 +282,7 @@ export default function DeliveryRequestModal({
               طلب توصيل السلعة
             </h2>
             <p className="mt-1 text-xs text-slate-400">
-              حدد موقع التسليم واختر عامل التوصيل
+              اختر مدينة التسليم وعامل التوصيل. تحديد الموقع اختياري.
             </p>
           </div>
 
@@ -346,62 +349,97 @@ export default function DeliveryRequestModal({
           </section>
 
           <section className="space-y-3">
-            <div>
-              <h3 className="text-sm font-black text-slate-800">
-                2. موقع التسليم
-              </h3>
-              <p className="mt-1 text-xs leading-6 text-slate-400">
-                اضغط على الخريطة لتحديد مكان التسليم، ويمكنك تحريك العلامة
-                لتعديل الموقع.
-              </p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-800">
+                  2. موقع التسليم
+                  <span className="mr-2 text-xs font-semibold text-slate-400">
+                    اختياري
+                  </span>
+                </h3>
+                <p className="mt-1 text-xs leading-6 text-slate-400">
+                  يمكنك تحديد الموقع على الخريطة لمساعدة العامل، أو تركه فارغاً.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowMap((current) => !current)}
+                className="flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+              >
+                <Map size={16} />
+                {showMap ? "إخفاء الخريطة" : "فتح الخريطة"}
+              </button>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-slate-200">
-              <div dir="ltr" className="h-[300px] w-full">
-                <MapContainer
-                  center={[35, 38.5]}
-                  zoom={6}
-                  scrollWheelZoom
-                  style={{ width: "100%", height: "100%" }}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
+            {showMap && (
+              <>
+                <div className="overflow-hidden rounded-2xl border border-slate-200">
+                  <div dir="ltr" className="h-[300px] w-full">
+                    <MapContainer
+                      center={[35, 38.5]}
+                      zoom={6}
+                      scrollWheelZoom
+                      style={{ width: "100%", height: "100%" }}
+                    >
+                      <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      />
 
-                  <MapClickHandler
-                    onChange={(lat, lng) => {
-                      setLatitude(lat);
-                      setLongitude(lng);
-                    }}
-                  />
+                      <MapClickHandler
+                        onChange={(lat, lng) => {
+                          setLatitude(lat);
+                          setLongitude(lng);
+                        }}
+                      />
 
-                  {latitude !== null && longitude !== null && (
-                    <Marker
-                      position={[latitude, longitude]}
-                      icon={deliveryIcon}
-                      draggable
-                      eventHandlers={{
-                        dragend(event) {
-                          const position = event.target.getLatLng();
-                          setLatitude(position.lat);
-                          setLongitude(position.lng);
-                        },
+                      {latitude !== null && longitude !== null && (
+                        <Marker
+                          position={[latitude, longitude]}
+                          icon={deliveryIcon}
+                          draggable
+                          eventHandlers={{
+                            dragend(event) {
+                              const position = event.target.getLatLng();
+                              setLatitude(position.lat);
+                              setLongitude(position.lng);
+                            },
+                          }}
+                        />
+                      )}
+                    </MapContainer>
+                  </div>
+                </div>
+
+                {latitude !== null && longitude !== null ? (
+                  <div className="flex items-center justify-between gap-2 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">
+                    <span className="flex items-center gap-2">
+                      <MapPin size={17} />
+                      تم تحديد موقع التسليم
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLatitude(null);
+                        setLongitude(null);
                       }}
-                    />
-                  )}
-                </MapContainer>
-              </div>
-            </div>
+                      className="font-bold text-rose-600"
+                    >
+                      حذف الموقع
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs font-semibold text-amber-600">
+                    لم يتم تحديد موقع. يمكنك إرسال الطلب بدونه.
+                  </p>
+                )}
+              </>
+            )}
 
-            {latitude !== null && longitude !== null ? (
-              <div className="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-700">
-                <MapPin size={17} />
-                تم تحديد موقع التسليم بنجاح
-              </div>
-            ) : (
-              <p className="text-xs font-semibold text-amber-600">
-                لم يتم تحديد موقع التسليم بعد.
+            {!showMap && (
+              <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+                لم يتم تحديد موقع التسليم، وهذا لا يمنع إرسال الطلب.
               </p>
             )}
           </section>
@@ -551,9 +589,7 @@ export default function DeliveryRequestModal({
                 submitting ||
                 loadingDrivers ||
                 !cityId ||
-                !selectedDriver ||
-                latitude === null ||
-                longitude === null
+                !selectedDriver
               }
               className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >

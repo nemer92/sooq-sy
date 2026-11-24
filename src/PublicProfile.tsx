@@ -35,6 +35,19 @@ type Review = {
   reviewer_avatar?: string | null;
 };
 
+type DeliveryDriverReview = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+};
+
+type DeliveryDriverReviewsData = {
+  average_rating: number;
+  reviews_count: number;
+  reviews: DeliveryDriverReview[];
+};
+
 type FollowUser = {
   user_id: string;
   display_name: string | null;
@@ -52,6 +65,7 @@ export default function PublicProfile() {
   const [ads, setAds] = useState<any[]>([]);
   const [cities, setCities] = useState<Record<string, string>>({});
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [driverReviews, setDriverReviews] = useState<DeliveryDriverReviewsData | null>(null);
   const [successfulSales, setSuccessfulSales] = useState(0);
   const [isVerified, setIsVerified] = useState(false);
   const [publicPhone, setPublicPhone] = useState<string | null>(null);
@@ -119,6 +133,7 @@ export default function PublicProfile() {
           reviewsResult,
           salesResult,
           countsResult,
+        driverReviewsResult,
         ] = await Promise.all([
           supabase.rpc("get_public_verification_status", {
             p_user_id: id,
@@ -150,6 +165,10 @@ export default function PublicProfile() {
           supabase.rpc("get_user_follow_counts", {
             p_user_id: id,
           }),
+
+          supabase.rpc("get_public_delivery_driver_reviews", {
+            p_driver_id: id,
+          }),
         ]);
 
         if (verificationResult.error) throw verificationResult.error;
@@ -172,6 +191,13 @@ export default function PublicProfile() {
 
         setAds(loadedAds);
         setReviews(loadedReviews);
+
+        if (driverReviewsResult.error) {
+          console.error("تعذر تحميل تقييمات عامل التوصيل:", driverReviewsResult.error);
+          setDriverReviews(null);
+        } else {
+          setDriverReviews(driverReviewsResult.data as DeliveryDriverReviewsData | null);
+        }
 
         if (!salesResult.error) {
           setSuccessfulSales(Number(salesResult.data || 0));
@@ -869,6 +895,47 @@ function formatLastSeen(value: string | null | undefined) {
             </>
           )}
         </section>
+
+        {driverReviews && driverReviews.reviews_count > 0 && (
+          <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-sm font-black text-slate-800">
+                <Award size={17} className="text-emerald-600" />
+                تقييمه كـ عامل توصيل
+              </h2>
+              <span className="text-xs text-slate-400">
+                {driverReviews.reviews_count} تقييم
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-black text-slate-800">
+                {Number(driverReviews.average_rating).toFixed(1)}
+              </span>
+              <div>
+                {renderStars(Number(driverReviews.average_rating), 14)}
+                <p className="mt-1 text-[11px] text-slate-400">
+                  من {driverReviews.reviews_count} تقييم
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 space-y-3">
+              {driverReviews.reviews.map((review) => (
+                <div key={review.id} className="border-t border-slate-100 pt-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-700">تقييم عميل</span>
+                    {renderStars(Number(review.rating), 12)}
+                  </div>
+                  {review.comment && (
+                    <p className="mt-1 text-xs leading-5 text-slate-500">{review.comment}</p>
+                  )}
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    {new Date(review.created_at).toLocaleDateString("ar-SY")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="mt-6">
           <div className="mb-3 flex items-center justify-between gap-3">

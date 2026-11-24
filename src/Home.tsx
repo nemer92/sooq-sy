@@ -194,6 +194,73 @@ const loadNotifications = async (userId: string) => {
     (data || []).filter((item: any) => !item.read_at).length
   );
 };
+
+useEffect(() => {
+  let channel: ReturnType<typeof supabase.channel> | null = null;
+  let currentUserId: string | null = null;
+
+  const subscribeToUser = (userId: string | null) => {
+    if (currentUserId === userId) return;
+
+    if (channel) {
+      void supabase.removeChannel(channel);
+      channel = null;
+    }
+
+    currentUserId = userId;
+
+    if (!userId) {
+      setNotifications([]);
+      setUnreadNotificationsCount(0);
+      return;
+    }
+
+    void loadNotifications(userId);
+
+    channel = supabase
+      .channel(`home-user-notifications-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void loadNotifications(userId);
+        }
+      )
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR") {
+          console.error("Realtime notifications channel error");
+        }
+      });
+  };
+
+  void supabase.auth.getSession().then(({ data, error }) => {
+    if (error) {
+      console.error("Error getting session for notifications:", error);
+      return;
+    }
+
+    subscribeToUser(data.session?.user.id ?? null);
+  });
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    subscribeToUser(session?.user.id ?? null);
+  });
+
+  return () => {
+    subscription.unsubscribe();
+
+    if (channel) {
+      void supabase.removeChannel(channel);
+    }
+  };
+}, []);
 const confirmDeleteNotification = async () => {
   if (!deleteTarget || isDeletingNotification) return;
 

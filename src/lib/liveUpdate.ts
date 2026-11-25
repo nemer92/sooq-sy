@@ -30,8 +30,8 @@ let state: LiveUpdateState = {
   status: "idle",
   progress: 0,
   message: "",
-  currentVersion: "2.1",
-  latestVersion: "2.1",
+  currentVersion: "1.0",
+  latestVersion: "1.0",
 };
 
 const listeners = new Set<() => void>();

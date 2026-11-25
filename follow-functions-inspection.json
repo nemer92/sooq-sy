@@ -1,0 +1,18 @@
+﻿[
+  {
+    "definition": "CREATE OR REPLACE FUNCTION public.follow_user(p_followed_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\r\ndeclare\r\n  v_follower_id uuid;\r\n  v_follower_name text;\r\n  v_follow_id uuid;\r\nbegin\r\n  v_follower_id := auth.uid();\r\n\r\n  if v_follower_id is null then\r\n    raise exception '┘è╪ش╪ذ ╪ز╪│╪ش┘è┘ ╪د┘╪»╪«┘ê┘ ╪ث┘ê┘╪د┘ï';\r\n  end if;\r\n\r\n  if p_followed_id is null or p_followed_id = v_follower_id then\r\n    raise exception '┘╪د ┘è┘à┘â┘┘â ┘à╪ز╪د╪ذ╪╣╪ر ┘ç╪░╪د ╪د┘╪ص╪│╪د╪ذ';\r\n  end if;\r\n\r\n  if not exists (\r\n    select 1 from public.profiles\r\n    where id = p_followed_id\r\n  ) then\r\n    raise exception '╪د┘╪ص╪│╪د╪ذ ╪║┘è╪▒ ┘à┘ê╪ش┘ê╪»';\r\n  end if;\r\n\r\n  insert into public.user_follows (follower_id, followed_id)\r\n  values (v_follower_id, p_followed_id)\r\n  on conflict (follower_id, followed_id) do nothing\r\n  returning id into v_follow_id;\r\n\r\n  -- ╪ح╪░╪د ┘â╪د┘╪ز ╪د┘┘à╪ز╪د╪ذ╪╣╪ر ┘à┘ê╪ش┘ê╪»╪ر ┘à╪│╪ذ┘é╪د┘ï╪î ┘╪د ┘╪▒╪│┘ ╪ح╪┤╪╣╪د╪▒╪د┘ï ╪ش╪»┘è╪»╪د┘ï\r\n  if v_follow_id is null then\r\n    return false;\r\n  end if;\r\n\r\n  select coalesce(nullif(display_name, ''), '┘à╪│╪ز╪«╪»┘à ╪ش╪»┘è╪»')\r\n  into v_follower_name\r\n  from public.profiles\r\n  where id = v_follower_id;\r\n\r\n  perform public.create_sale_notification(\r\n    p_followed_id,\r\n    '┘à╪ز╪د╪ذ╪╣ ╪ش╪»┘è╪»',\r\n    v_follower_name || ' ╪ذ╪»╪ث ╪ذ┘à╪ز╪د╪ذ╪╣╪ز┘â',\r\n    '/user/' || v_follower_id::text\r\n  );\r\n\r\n  return true;\r\nend;\r\n$function$\n",
+    "proname": "follow_user"
+  },
+  {
+    "definition": "CREATE OR REPLACE FUNCTION public.get_public_followers(p_user_id uuid)\n RETURNS TABLE(user_id uuid, display_name text, avatar_url text, followed_at timestamp with time zone)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n  select\r\n    p.id,\r\n    p.display_name,\r\n    p.avatar_url,\r\n    f.created_at\r\n  from public.user_follows f\r\n  join public.profiles p on p.id = f.follower_id\r\n  where f.followed_id = p_user_id\r\n  order by f.created_at desc;\r\n$function$\n",
+    "proname": "get_public_followers"
+  },
+  {
+    "definition": "CREATE OR REPLACE FUNCTION public.get_user_follow_counts(p_user_id uuid)\n RETURNS TABLE(followers_count bigint, following_count bigint)\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public'\nAS $function$\r\n  select\r\n    (select count(*) from public.user_follows\r\n     where followed_id = p_user_id),\r\n    (select count(*) from public.user_follows\r\n     where follower_id = p_user_id);\r\n$function$\n",
+    "proname": "get_user_follow_counts"
+  },
+  {
+    "definition": "CREATE OR REPLACE FUNCTION public.unfollow_user(p_followed_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\r\ndeclare\r\n  v_follower_id uuid;\r\n  v_deleted_count integer;\r\nbegin\r\n  v_follower_id := auth.uid();\r\n\r\n  if v_follower_id is null then\r\n    raise exception '┘è╪ش╪ذ ╪ز╪│╪ش┘è┘ ╪د┘╪»╪«┘ê┘ ╪ث┘ê┘╪د┘ï';\r\n  end if;\r\n\r\n  delete from public.user_follows\r\n  where follower_id = v_follower_id\r\n    and followed_id = p_followed_id;\r\n\r\n  get diagnostics v_deleted_count = row_count;\r\n\r\n  return v_deleted_count \u003e 0;\r\nend;\r\n$function$\n",
+    "proname": "unfollow_user"
+  }
+]

@@ -2428,3 +2428,44 @@ html.dark body .admin-app-scroll-layout .content textarea:focus {
     padding-inline: 6px !important;
   }
 }
+
+.admin-gold-cover {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(115deg, #09090b 0%, #3b2a12 28%, #111018 52%, #38204d 76%, #09090b 100%);
+  background-size: 240% 100%;
+  animation: adminGoldFlow 9s ease-in-out infinite alternate;
+}
+.admin-gold-cover::after {
+  content: "";
+  position: absolute;
+  inset: -60% -30%;
+  background: linear-gradient(110deg, transparent 38%, rgba(255,220,130,.08) 44%, rgba(255,236,180,.65) 49%, rgba(190,145,255,.22) 53%, transparent 60%);
+  transform: translateX(-65%);
+  animation: adminGoldShine 5s ease-in-out infinite;
+}
+.admin-gold-avatar {
+  border-color: #d6a83e !important;
+  box-shadow: 0 0 0 2px #3b2a12, 0 0 15px rgba(218,165,55,.65), 0 0 24px rgba(150,90,220,.28);
+}
+.admin-gold-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #d6a83e;
+  border-radius: 9999px;
+  padding: 3px 10px;
+  color: #f6d889;
+  background: linear-gradient(110deg, #211708, #493313, #24152f);
+  box-shadow: 0 0 12px rgba(218,165,55,.25);
+  font-size: 10px;
+  font-weight: 900;
+}
+@keyframes adminGoldFlow {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+@keyframes adminGoldShine {
+  0%, 15% { transform: translateX(-65%); }
+  75%, 100% { transform: translateX(65%); }
+}

@@ -68,6 +68,7 @@ export default function PublicProfile() {
   const [driverReviews, setDriverReviews] = useState<DeliveryDriverReviewsData | null>(null);
   const [successfulSales, setSuccessfulSales] = useState(0);
   const [isVerified, setIsVerified] = useState(false);
+  const [isGeneralAdmin, setIsGeneralAdmin] = useState(false);
   const [publicPhone, setPublicPhone] = useState<string | null>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -125,6 +126,9 @@ export default function PublicProfile() {
 
         if (cancelled) return;
         setProfile(profileData);
+
+        const { data: adminCheck, error: adminCheckError } = await supabase.rpc("is_admin_profile", { p_user_id: id });
+        if (!cancelled) setIsGeneralAdmin(!adminCheckError && adminCheck === true);
 
         const [
           verificationResult,
@@ -335,6 +339,7 @@ export default function PublicProfile() {
 
   async function openFollowList(type: FollowListType) {
     if (!id || followListLoading) return;
+    if (type === "followers" && isGeneralAdmin && !isOwnProfile) return;
 
     setFollowListType(type);
     setFollowList([]);
@@ -534,11 +539,11 @@ function formatLastSeen(value: string | null | undefined) {
 
       <div className="mx-auto max-w-4xl px-3 py-6 sm:px-5">
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="h-28 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-36" />
+          <div className={isGeneralAdmin ? "admin-gold-cover h-28 sm:h-36" : "h-28 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-36"} />
 
           <div className="px-5 pb-5 sm:px-8">
             <div className="-mt-12 flex flex-wrap items-end gap-4">
-              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-emerald-50 text-emerald-700 shadow-md">
+              <div className={`flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 bg-emerald-50 text-emerald-700 shadow-md ${isGeneralAdmin ? "admin-gold-avatar" : "border-white"}`}>
                 {profile.avatar_url ? (
                   <img
                     src={profile.avatar_url}
@@ -557,11 +562,9 @@ function formatLastSeen(value: string | null | undefined) {
                     {profile.display_name || "مستخدم Sooq.sy"}
                   </h1>
 
+                  {isGeneralAdmin && <span className="admin-gold-label"><span className="text-base">♛</span> الأدمن العام</span>}
                   {isVerified ? (
-                    <span
-                      title="حساب موثّق"
-                      className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-extrabold text-blue-700"
-                    >
+                    <span title="حساب موثّق" className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-extrabold ${isGeneralAdmin ? "border-amber-300 bg-amber-100 text-amber-800" : "border-blue-200 bg-blue-50 text-blue-700"}`}>
                       <ShieldCheck size={14} />
                       حساب موثّق
                     </span>
@@ -657,6 +660,8 @@ function formatLastSeen(value: string | null | undefined) {
               <button
                 type="button"
                 onClick={() => openFollowList("followers")}
+                disabled={isGeneralAdmin && !isOwnProfile}
+                className={`flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition ${isGeneralAdmin && !isOwnProfile ? "cursor-default" : "hover:border-emerald-300 hover:bg-emerald-50"}`}
                 className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition hover:border-emerald-300 hover:bg-emerald-50"
               >
                 <Users size={17} className="text-emerald-600" />

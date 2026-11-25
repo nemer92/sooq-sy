@@ -63,6 +63,7 @@ export default function Profile() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [userId, setUserId] = useState("");
+  const [isGeneralAdmin, setIsGeneralAdmin] = useState(false);
   const [referralCode, setReferralCode] = useState("");
   const [pointsBalance, setPointsBalance] = useState(0);
 
@@ -300,6 +301,8 @@ export default function Profile() {
 
       const id = authData.user.id;
       setUserId(id);
+      const { data: adminCheck } = await supabase.rpc("is_admin_profile", { p_user_id: id });
+      setIsGeneralAdmin(adminCheck === true);
 
       // تحميل حالة حساب التوصيل والطلب الحالي للمستخدم
       const [
@@ -842,7 +845,7 @@ export default function Profile() {
 
         {/* بطاقة الملف الشخصي */}
         <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="relative h-20 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-400 sm:h-24">
+          <div className={`relative h-20 sm:h-24 ${isGeneralAdmin ? "admin-gold-cover" : "bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-400"}`}>
             <div className="absolute left-3 top-3 z-10">
               <div className="flex items-center gap-2 rounded-lg border border-white/40 bg-white/95 px-2.5 py-1.5 shadow-sm">
                 <Coins size={16} className="text-emerald-700" />
@@ -860,7 +863,7 @@ export default function Profile() {
 
           <div className="relative z-20 px-3 pb-3 sm:px-4">
             <div className="-mt-9 flex flex-wrap items-end gap-3">
-              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border-[3px] border-white bg-emerald-50 shadow-sm">
+              <div className={`relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border-[3px] bg-emerald-50 shadow-sm ${isGeneralAdmin ? "admin-gold-avatar" : "border-white"}`}>
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
@@ -884,30 +887,18 @@ export default function Profile() {
                     {name || "الملف الشخصي"}
                   </h1>
 
+                  {isGeneralAdmin && <span className="admin-gold-label"><span className="text-base">♛</span> الأدمن العام</span>}
                   {activeVerification ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5">
-                      <span
-                        title="حساب موثّق"
-                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-blue-500 text-white"
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          className="h-2.5 w-2.5"
-                          fill="currentColor"
-                        >
-                          <path d="M9.2 16.2 4.9 12l-1.4 1.4 5.7 5.7L21 7.3l-1.4-1.4z" />
-                        </svg>
+                    <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 ${isGeneralAdmin ? "border-amber-300 bg-amber-100" : "border-blue-200 bg-blue-50"}`}>
+                      <span title="حساب موثّق" className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white ${isGeneralAdmin ? "bg-amber-500" : "bg-blue-500"}`}>
+                        <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="currentColor"><path d="M9.2 16.2 4.9 12l-1.4 1.4 5.7 5.7L21 7.3l-1.4-1.4z" /></svg>
                       </span>
-                      <span className="text-[9px] font-extrabold text-blue-700">
-                        حساب موثّق
-                      </span>
+                      <span className={`text-[9px] font-extrabold ${isGeneralAdmin ? "text-amber-800" : "text-blue-700"}`}>حساب موثّق</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5">
                       <ShieldCheck size={12} className="text-slate-400" />
-                      <span className="text-[9px] font-bold text-slate-500">
-                        حساب غير موثّق
-                      </span>
+                      <span className="text-[9px] font-bold text-slate-500">حساب غير موثّق</span>
                     </span>
                   )}
                 </div>

@@ -843,7 +843,12 @@ export default function Profile() {
           العودة إلى السوق
         </Link>
 
-        {/* بطاقة الملف الشخصي */}
+        {isGeneralAdmin && (
+          <button type="button" onClick={() => navigate("/admin")} className="mb-3 inline-flex min-h-9 items-center gap-2 rounded-lg bg-emerald-700 px-3 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800">
+            <ShieldCheck size={15} />
+            لوحة الإدارة
+          </button>
+        )}        {/* بطاقة الملف الشخصي */}
         <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className={`relative h-20 sm:h-24 ${isGeneralAdmin ? "admin-gold-cover" : "bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-400"}`}>
             <div className="absolute left-3 top-3 z-10">

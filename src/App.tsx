@@ -3583,6 +3583,7 @@ async function loadNotifications() {
         status,
         created_at
       `)
+      .not("created_by", "is", null)
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -4800,7 +4801,10 @@ function getSubCategories(categoryId: number) {
           </div>
 
           <div className="top-actions">
-            <button className="icon-button">
+          <button type="button" onClick={() => navigate("/")} className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100">
+            <Store size={16} />
+            العودة للمتجر
+          </button>            <button className="icon-button">
               <Bell size={20} />
             </button>
 
@@ -6826,7 +6830,7 @@ function getSubCategories(categoryId: number) {
         <p>جارٍ تحميل المدن...</p>
       </div>
     ) : (
-      <div className="categories-list">
+      <div className="categories-list admin-cities-premium-list">
         {cities.length === 0 ? (
           <div className="empty-state">
             <p>لا توجد مدن حالياً.</p>
@@ -6906,7 +6910,7 @@ function getSubCategories(categoryId: number) {
       <div className="data-error mb-4">{supportError}</div>
     )}
 
-<div className="grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 items-start">
+<div className="admin-support-layout grid grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)] gap-4 items-start">
 
   {/* قائمة المحادثات */}
   <div className="category-card admin-support-panel max-h-[80vh] min-h-0 p-0">
@@ -7130,6 +7134,7 @@ function getSubCategories(categoryId: number) {
         تحديث
       </button>
     </div>
+        <div className="admin-reports-section">
         <div className="report-stats">
   <button
     type="button"
@@ -7331,9 +7336,11 @@ onClick={() => {
   ))}
 </div>
     )}
+    </div>
   </>
 )}
 {activeMenu === "الإعدادات" && (
+  <div className="admin-settings-section">
   <div className="admin-section">
     <h2>إعدادات الموقع</h2>
 
@@ -7572,9 +7579,10 @@ onClick={() => {
 
 
 </div>
+  </div>
 )}
 {activeMenu === "الإشعارات" && (
-  <div className="admin-section">
+  <div className="admin-section admin-notifications-section">
     <h2>إدارة الإشعارات</h2>
 
     <div className="category-card">

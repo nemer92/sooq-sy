@@ -4711,7 +4711,15 @@ function getSubCategories(categoryId: number) {
             padding-block: 6px;
           }
         }
-      `}</style>
+        @media (max-width: 768px) {
+          .admin-app-scroll-layout > .main > .content > .admin-section {
+            flex: 0 0 auto !important;
+            min-height: max-content !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+        }      `}</style>
       {/* القائمة الجانبية */}
       <aside className="sidebar">
         <div className="brand">

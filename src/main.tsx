@@ -37,6 +37,7 @@ import LiveUpdateReady from "./LiveUpdateReady";
 import FeaturedCampaign from "./FeaturedCampaign.tsx";
 import Subscriptions from "./Subscriptions.tsx";
 import AllAds from "./AllAds.tsx";
+import PublicAds from "./PublicAds.tsx";
 import Stores from "./Stores";
 import StoreDetails from "./StoreDetails";
 import MyStores from "./MyStores";
@@ -634,8 +635,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/subscriptions" element={<Subscriptions />} />
-          <Route path="/featured-ads" element={<AllAds />} />
-          <Route path="/regular-ads" element={<AllAds />} />
+          <Route path="/featured-ads" element={<PublicAds />} />
+          <Route path="/regular-ads" element={<PublicAds />} />
           <Route path="/donations" element={<AllAds />} />
           <Route path="/stores" element={<Stores />} />
           <Route path="/store/:id" element={<StoreDetails />} />

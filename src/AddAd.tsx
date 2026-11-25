@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 
-import { addSooqWatermark } from "./lib/imageWatermark";
 
 import {
   ArrowRight,
@@ -22,61 +21,6 @@ import {
   Star,
 } from "lucide-react";
 
-function isNetworkError(error: any): boolean {
-  if (error instanceof TypeError) return true;
-
-  const message = String(error?.message ?? error ?? "").toLowerCase();
-
-  return (
-    message.includes("failed to fetch") ||
-    message.includes("networkerror") ||
-    message.includes("network request failed") ||
-    message.includes("load failed") ||
-    message.includes("fetch failed") ||
-    message.includes("internet disconnected") ||
-    message.includes("connection refused") ||
-    message.includes("connection reset") ||
-    message.includes("timeout")
-  );
-}
-
-function waitUntilOnline(
-  setWaiting: (value: boolean) => void
-): Promise<void> {
-  if (navigator.onLine) {
-    setWaiting(false);
-    return Promise.resolve();
-  }
-
-  setWaiting(true);
-
-  return new Promise((resolve) => {
-    window.addEventListener(
-      "online",
-      () => {
-        setWaiting(false);
-        resolve();
-      },
-      { once: true }
-    );
-  });
-}
-
-function retryDelay(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 2500));
-}
-
-function isDuplicateStorageUpload(error: any): boolean {
-  const status = String(error?.statusCode ?? error?.status ?? "");
-  const message = String(error?.message ?? "").toLowerCase();
-
-  return (
-    status === "409" ||
-    message.includes("already exists") ||
-    message.includes("duplicate") ||
-    message.includes("resource already")
-  );
-}
 type Category = {
   id: number;
   name_ar: string;
@@ -488,12 +432,11 @@ export default function AddAd() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    // قفل فوري ومتزامن يمنع تنفيذ أكثر من عملية إرسال.
     if (submitLockRef.current) return;
 
     submitLockRef.current = true;
     setSaving(true);
-    setWaitingForNetwork(!navigator.onLine);
+    setWaitingForNetwork(false);
     setError("");
     setSuccess("");
 
@@ -504,21 +447,24 @@ export default function AddAd() {
       submitLockRef.current = false;
     };
 
-    if (!userId) {
-      stopWithError("انتهت جلسة الدخول. يرجى تسجيل الدخول مجدداً.");
-      navigate("/auth", {
-        state: {
-          from: selectedStoreId
-            ? `/add-ad?store_id=${selectedStoreId}`
-            : "/add-ad",
-        },
-      });
-      return;
-    }
+    try {
+      if (!userId) {
+        stopWithError("انتهت جلسة الدخول. يرجى تسجيل الدخول مجدداً.");
+        navigate("/auth", {
+          state: {
+            from: selectedStoreId
+              ? `/add-ad?store_id=${selectedStoreId}`
+              : "/add-ad",
+          },
+        });
+        return;
+      }
 
-    // نتحقق من البيانات محلياً قبل بدء أي طلب للشبكة.
-    // عند وجود إرسال سابق غير مكتمل، نحتفظ بنفس بياناته ومفتاحه.
-    if (!submissionRef.current) {
+      if (!navigator.onLine) {
+        stopWithError("يرجى الاتصال بالإنترنت أولاً للتحقق من صلاحية نشر الإعلان.");
+        return;
+      }
+
       if (!categoryId || !governorateId || !cityId) {
         stopWithError("يرجى اختيار التصنيف والمحافظة والمدينة.");
         return;
@@ -531,24 +477,22 @@ export default function AddAd() {
       );
 
       if (!selectedCity) {
-        stopWithError(
-          "المدينة المختارة لا تتبع المحافظة المحددة. يرجى اختيار المدينة من جديد."
-        );
+        stopWithError("المدينة المختارة لا تتبع المحافظة المحددة. يرجى اختيار المدينة من جديد.");
         return;
       }
 
-      if (title.trim().length < 5) {
-        stopWithError("عنوان الإعلان يجب ألا يقل عن 5 أحرف.");
-        return;
-      }
-
-      if (title.trim().length > 150) {
-        stopWithError("عنوان الإعلان يجب ألا يتجاوز 150 حرفاً.");
+      if (title.trim().length < 5 || title.trim().length > 150) {
+        stopWithError("عنوان الإعلان يجب أن يكون بين 5 و150 حرفاً.");
         return;
       }
 
       if (description.trim().length < 10) {
         stopWithError("وصف الإعلان يجب ألا يقل عن 10 أحرف.");
+        return;
+      }
+
+      if (images.length < 1) {
+        stopWithError("يرجى اختيار صورة واحدة على الأقل للإعلان.");
         return;
       }
 
@@ -574,263 +518,101 @@ export default function AddAd() {
         return;
       }
 
-      // المفتاح والبيانات والصور تبقى نفسها عند كل إعادة محاولة.
-      submissionRef.current = {
-        key: crypto.randomUUID(),
-        adId: null,
-        preflightComplete: false,
-        files: [...images],
-        storeId: selectedStoreId,
-        listingType,
-        requestedFeatured: selectedStoreId ? requestedFeatured : false,
-        payload: {
-          user_id: userId,
-          category_id: Number(categoryId),
-          city_id: Number(cityId),
-          title: title.trim(),
-          description: description.trim(),
-          price: numericPrice,
-          currency,
-          listing_type: listingType,
-          condition,
-          status: "pending",
-          store_id: selectedStoreId || null,
-          requested_featured: selectedStoreId ? requestedFeatured : false,
-        },
-      };
-    }
+      const { data: settings, error: settingsError } = await supabase
+        .from("site_settings")
+        .select("allow_new_ads")
+        .eq("id", 1)
+        .single();
 
-    const submission = submissionRef.current;
-    if (!submission) {
-      stopWithError("تعذر تجهيز بيانات الإعلان. حاول مرة أخرى.");
-      return;
-    }
+      if (settingsError) throw settingsError;
 
-    let completed = false;
-
-    while (!completed) {
-      await waitUntilOnline(setWaitingForNetwork);
-
-      try {
-        // فحوصات الموقع والمتجر تُنفّذ قبل إنشاء الإعلان.
-        // بعد إنشاء الإعلان، لا نعيد هذه الفحوصات عند استكمال صوره.
-        if (!submission.preflightComplete) {
-          const { data: settings, error: settingsError } = await supabase
-            .from("site_settings")
-            .select("allow_new_ads")
-            .eq("id", 1)
-            .single();
-
-          if (settingsError) throw settingsError;
-
-          if (!settings.allow_new_ads) {
-            setAllowNewAds(false);
-            throw new Error("نشر الإعلانات متوقف مؤقتاً.");
-          }
-
-          if (submission.storeId) {
-            const { data: store, error: storeError } = await supabase
-              .from("stores")
-              .select("id,status,owner_disabled,admin_disabled")
-              .eq("id", submission.storeId)
-              .eq("owner_id", userId)
-              .maybeSingle();
-
-            if (storeError) throw storeError;
-
-            if (
-              !store ||
-              store.status !== "active" ||
-              store.owner_disabled ||
-              store.admin_disabled
-            ) {
-              setSelectedStoreId("");
-              setStoreQuota(null);
-              throw new Error(
-                "هذا المتجر موقوف حالياً، ولا يمكنك نشر إعلان جديد باسمه."
-              );
-            }
-
-            const quota = await getStoreQuota(submission.storeId);
-            setStoreQuota(quota);
-
-            if (!quota.active) {
-              throw new Error("اشتراك المتجر غير فعّال. يرجى تجديد الاشتراك.");
-            }
-
-            if (
-              submission.requestedFeatured &&
-              quota.featuredRemaining <= 0
-            ) {
-              throw new Error(
-                "لا يوجد رصيد متبقٍ للإعلانات المميزة في هذا المتجر."
-              );
-            }
-
-            if (
-              !submission.requestedFeatured &&
-              quota.remaining <= 0
-            ) {
-              throw new Error(
-                "لا يوجد رصيد متبقٍ للإعلانات العادية في هذا المتجر."
-              );
-            }
-          }
-
-          submission.preflightComplete = true;
-        }
-
-        // نبحث عن الإعلان أولاً؛ فقد يكون الخادم أنشأه
-        // في محاولة سابقة ولم يصل رد النجاح إلى المتصفح.
-        if (!submission.adId) {
-          const { data: existingAd, error: lookupError } = await supabase
-            .from("ads")
-            .select("id")
-            .eq("submission_key", submission.key)
-            .eq("user_id", userId)
-            .maybeSingle();
-
-          if (lookupError) throw lookupError;
-
-          if (existingAd?.id) {
-            submission.adId = existingAd.id;
-          } else {
-            const { data: newAd, error: insertError } = await supabase
-              .from("ads")
-              .insert({
-                ...submission.payload,
-                submission_key: submission.key,
-              })
-              .select("id")
-              .single();
-
-            if (insertError) {
-              // قد تكون محاولة سابقة أنشأت الإعلان بالفعل.
-              // عند تعارض المفتاح نبحث عنه بدلاً من إنشاء إعلان آخر.
-              if (insertError.code === "23505") {
-                const { data: duplicateAd, error: duplicateLookupError } =
-                  await supabase
-                    .from("ads")
-                    .select("id")
-                    .eq("submission_key", submission.key)
-                    .eq("user_id", userId)
-                    .maybeSingle();
-
-                if (duplicateLookupError) throw duplicateLookupError;
-
-                if (!duplicateAd?.id) throw insertError;
-
-                submission.adId = duplicateAd.id;
-              } else {
-                throw insertError;
-              }
-            } else {
-              submission.adId = newAd.id;
-            }
-          }
-        }
-
-        // مسار ثابت لكل صورة: إعادة المحاولة لا تنشئ ملفات مكررة.
-        const imageRecords: {
-          ad_id: string;
-          image_path: string;
-          sort_order: number;
-        }[] = [];
-
-        for (let i = 0; i < submission.files.length; i++) {
-          const originalFile = submission.files[i];
-          const file = await addSooqWatermark(originalFile);
-
-          const imagePath =
-            `${userId}/${submission.adId}/${submission.key}-${i}.jpg`;
-
-          const { error: uploadError } = await supabase.storage
-            .from("ad-images")
-            .upload(imagePath, file, {
-              contentType: "image/jpeg",
-              upsert: false,
-            });
-
-          // إذا كانت الصورة موجودة من محاولة سابقة، نكمل.
-          // لا نستخدم upsert لأن سياسات التخزين لا تسمح بتحديثها.
-          if (uploadError && !isDuplicateStorageUpload(uploadError)) {
-            throw uploadError;
-          }
-
-          imageRecords.push({
-            ad_id: submission.adId!,
-            image_path: imagePath,
-            sort_order: i,
-          });
-        }
-
-        if (imageRecords.length > 0) {
-          const { error: imagesError } = await supabase
-            .from("ad_images")
-            .upsert(imageRecords, {
-              onConflict: "ad_id,image_path",
-              ignoreDuplicates: true,
-            });
-
-          if (imagesError) throw imagesError;
-        }
-
-        completed = true;
-        setWaitingForNetwork(false);
-
-        setSuccess(
-          submission.storeId
-            ? "تم إرسال منتج المتجر للمراجعة بنجاح."
-            : submission.listingType === "donation"
-              ? "تم إرسال التبرع بنجاح، وهو الآن بانتظار المراجعة."
-              : "تم إرسال إعلانك بنجاح، وهو الآن بانتظار المراجعة."
-        );
-
-        setTimeout(() => {
-          if (submission.storeId) {
-            navigate(`/store/${submission.storeId}`);
-          } else {
-            navigate("/");
-          }
-        }, 2000);
-      } catch (err: any) {
-        console.error("خطأ نشر الإعلان:", err);
-
-        if (isNetworkError(err)) {
-          setWaitingForNetwork(true);
-          setError(
-            "الاتصال بالإنترنت غير مستقر. تم الاحتفاظ ببيانات إعلانك، وستتم إعادة المحاولة تلقائياً..."
-          );
-
-          await retryDelay();
-          continue;
-        }
-
-        const message =
-          err?.message ||
-          err?.details ||
-          err?.hint ||
-          "حدث خطأ أثناء نشر الإعلان.";
-
-        if (submission.adId) {
-          setError(
-            `تم إنشاء الإعلان، لكن لم يكتمل حفظ جميع صوره. اضغط إعادة المحاولة لإكمال نفس الإعلان دون إنشاء إعلان جديد. التفاصيل: ${message}`
-          );
-        } else {
-          setError(message);
-          submissionRef.current = null;
-        }
-
-        setWaitingForNetwork(false);
-        setSaving(false);
-        submitLockRef.current = false;
-        return;
+      if (!settings.allow_new_ads) {
+        setAllowNewAds(false);
+        throw new Error("نشر الإعلانات متوقف مؤقتاً.");
       }
+
+      if (selectedStoreId) {
+        const { data: store, error: storeError } = await supabase
+          .from("stores")
+          .select("id,status,owner_disabled,admin_disabled")
+          .eq("id", selectedStoreId)
+          .eq("owner_id", userId)
+          .maybeSingle();
+
+        if (storeError) throw storeError;
+
+        if (
+          !store ||
+          store.status !== "active" ||
+          store.owner_disabled ||
+          store.admin_disabled
+        ) {
+          setSelectedStoreId("");
+          setStoreQuota(null);
+          throw new Error("هذا المتجر موقوف حالياً، ولا يمكنك نشر إعلان جديد باسمه.");
+        }
+
+        const quota = await getStoreQuota(selectedStoreId);
+        setStoreQuota(quota);
+
+        if (!quota.active) {
+          throw new Error("اشتراك المتجر غير فعّال. يرجى تجديد الاشتراك.");
+        }
+
+        if (requestedFeatured && quota.featuredRemaining <= 0) {
+          throw new Error("لا يوجد رصيد متبقٍ للإعلانات المميزة في هذا المتجر.");
+        }
+
+        if (!requestedFeatured && quota.remaining <= 0) {
+          throw new Error("لا يوجد رصيد متبقٍ للإعلانات العادية في هذا المتجر.");
+        }
+      }
+
+      const key = crypto.randomUUID();
+
+      const payload = {
+        user_id: userId,
+        category_id: Number(categoryId),
+        city_id: Number(cityId),
+        title: title.trim(),
+        description: description.trim(),
+        price: numericPrice,
+        currency,
+        listing_type: listingType,
+        condition,
+        store_id: selectedStoreId || null,
+        requested_featured: selectedStoreId ? requestedFeatured : false,
+      };
+
+      const { enqueueAdUpload } = await import("./lib/adUploadQueue");
+
+      await enqueueAdUpload({
+        key,
+        userId,
+        payload,
+        files: [...images],
+      });
+
+      setSaving(false);
+      setWaitingForNetwork(false);
+      submissionRef.current = null;
+
+      window.alert("تم استلام طلبك وحفظ الصور على جهازك بنجاح. سيجري رفعها وإرسال الإعلان للمراجعة تلقائياً.");
+
+      const { processPendingAdUploads } = await import("./lib/adUploadQueue");
+      void processPendingAdUploads();
+
+      navigate("/");
+    } catch (err: any) {
+      console.error("خطأ تجهيز طلب الإعلان:", err);
+      stopWithError(
+        err?.message ||
+        err?.details ||
+        err?.hint ||
+        "تعذّر حفظ طلب الإعلان. لم يتم إرساله، يرجى المحاولة مجدداً."
+      );
     }
-
-        // يبقى القفل مفعلاً بعد النجاح حتى يتم التحويل.
   }
-
   const inputClass =
     "w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10";
 

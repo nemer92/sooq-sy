@@ -48,6 +48,7 @@ import MySales from "./MySales";
 import DeliveryDriver from "./DeliveryDriver";
 import DeviceKeyTest from "./DeviceKeyTest";
 import Support from "./Support.tsx";
+import { processPendingAdUploads } from "./lib/adUploadQueue";
 
 
 
@@ -597,6 +598,27 @@ function MaintenanceGuard({
 }
 
 // ==========================================
+function AdUploadQueueRunner() {
+  useEffect(() => {
+    const processQueue = () => {
+      void processPendingAdUploads();
+    };
+
+    processQueue();
+    window.addEventListener("online", processQueue);
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      processQueue();
+    });
+
+    return () => {
+      window.removeEventListener("online", processQueue);
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  return null;
+}
 // تشغيل التطبيق
 // ==========================================
 
@@ -605,6 +627,7 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter
       basename="/"
     >
+      <AdUploadQueueRunner />
       <AppUrlListener />
       <MobileScrollRestoration />
       <MobileBackButtonHandler />

@@ -883,7 +883,7 @@ export default function Profile() {
                 </p>
 
                 <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <h1 className="truncate text-lg font-black text-slate-900">
+                  <h1 className={`truncate text-lg font-black text-slate-900 ${isGeneralAdmin ? "[-webkit-text-stroke:0.3px_#d4a017] [text-shadow:0_0_1px_#d4a017]" : ""}`}>
                     {name || "الملف الشخصي"}
                   </h1>
 

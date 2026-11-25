@@ -558,7 +558,7 @@ function formatLastSeen(value: string | null | undefined) {
 
               <div className="flex flex-col items-start gap-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="break-words text-xl font-black text-slate-900">
+                  <h1 className={`break-words text-xl font-black ${isGeneralAdmin ? "rounded-lg border border-amber-400/70 bg-black/70 px-3 py-1.5 text-amber-100 shadow-[0_0_18px_rgba(245,158,11,0.3)] [text-shadow:0_0_8px_rgba(255,215,80,0.8)] [-webkit-text-stroke:0.3px_#f59e0b]" : "text-slate-900"}`}>
                     {profile.display_name || "مستخدم Sooq.sy"}
                   </h1>
 

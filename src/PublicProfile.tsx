@@ -657,14 +657,12 @@ function formatLastSeen(value: string | null | undefined) {
 
             {/* أعداد المتابعة */}
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
+                                          <button
                 type="button"
                 onClick={() => openFollowList("followers")}
                 disabled={isGeneralAdmin && !isOwnProfile}
                 className={`flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition ${isGeneralAdmin && !isOwnProfile ? "cursor-default" : "hover:border-emerald-300 hover:bg-emerald-50"}`}
-                className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition hover:border-emerald-300 hover:bg-emerald-50"
-              >
-                <Users size={17} className="text-emerald-600" />
+              ><Users size={17} className="text-emerald-600" />
                 <span className="text-sm font-black text-slate-800">
                   {followersCount.toLocaleString("en-US")}
                 </span>

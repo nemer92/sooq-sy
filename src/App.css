@@ -2432,7 +2432,7 @@ html.dark body .admin-app-scroll-layout .content textarea:focus {
 .admin-gold-cover {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(115deg, #09090b 0%, #3b2a12 28%, #111018 52%, #38204d 76%, #09090b 100%);
+  background: linear-gradient(115deg, #64748b 0%, #535b80 25%, #707b9c 50%, #5b527c 75%, #64748b 100%);
   background-size: 240% 100%;
   animation: adminGoldFlow 9s ease-in-out infinite alternate;
 }
@@ -2440,7 +2440,7 @@ html.dark body .admin-app-scroll-layout .content textarea:focus {
   content: "";
   position: absolute;
   inset: -60% -30%;
-  background: linear-gradient(110deg, transparent 38%, rgba(255,220,130,.08) 44%, rgba(255,236,180,.65) 49%, rgba(190,145,255,.22) 53%, transparent 60%);
+  background: linear-gradient(110deg, transparent 38%, rgba(210,220,255,.08) 44%, rgba(235,240,255,.38) 49%, rgba(180,190,230,.14) 53%, transparent 60%);
   transform: translateX(-65%);
   animation: adminGoldShine 5s ease-in-out infinite;
 }

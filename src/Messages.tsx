@@ -630,7 +630,7 @@ export default function Messages() {
         {/* بطاقة معلومات الطرف الآخر */}
         <div className="mb-3 shrink-0 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:mb-4 sm:p-4">
           <div className="flex items-center gap-3">
-            <div className="relative shrink-0">
+            <button type="button" onClick={() => otherUser?.id && navigate(`/user/${otherUser.id}`)} className="relative shrink-0 cursor-pointer rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
               {otherUser?.avatar_url ? (
                 <img
                   src={otherUser.avatar_url}
@@ -642,12 +642,12 @@ export default function Messages() {
                   <UserRound size={25} />
                 </div>
               )}
-            </div>
+            </button>
 
             <div className="min-w-0 flex-1">
-              <h1 className="truncate text-base font-black text-slate-900 sm:text-lg">
+              <button type="button" onClick={() => otherUser?.id && navigate(`/user/${otherUser.id}`)} className="truncate text-base font-black text-slate-900 sm:text-lg text-right">
                 {otherUser?.display_name || "المستخدم"}
-              </h1>
+              </button>
 
               <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 sm:text-sm">
                 <ShieldAlert size={13} className="text-emerald-600" />

@@ -2367,3 +2367,64 @@ html.dark body .admin-app-scroll-layout .content textarea:focus {
     padding: 14px;
   }
 }
+
+/* Mobile admin layout fixes: resolve table overflow cascade conflicts */
+@media (max-width: 768px) {
+  html body .admin-app-scroll-layout .content table {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html body .admin-app-scroll-layout > .sidebar {
+    max-height: 150px !important;
+    flex-shrink: 0 !important;
+  }
+
+  html body .admin-app-scroll-layout > .sidebar > .brand {
+    padding: 7px 12px !important;
+  }
+
+  html body .admin-app-scroll-layout > .sidebar > nav {
+    max-height: 58px !important;
+    padding: 5px 8px 8px !important;
+  }
+
+  html body .admin-app-scroll-layout > .sidebar > nav .menu-item {
+    min-height: 40px !important;
+  }
+
+  html body .admin-app-scroll-layout > .main > .topbar {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  html body .admin-app-scroll-layout > .main > .topbar .top-actions {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
+  html body .admin-app-scroll-layout > .main > .content,
+  html body .admin-app-scroll-layout > .main > .content > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  html body .admin-app-scroll-layout > .sidebar {
+    max-height: 138px !important;
+  }
+
+  html body .admin-app-scroll-layout > .sidebar > .brand {
+    padding: 5px 10px !important;
+  }
+
+  html body .admin-app-scroll-layout > .sidebar > nav {
+    padding-inline: 6px !important;
+  }
+}

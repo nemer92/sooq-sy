@@ -451,6 +451,7 @@ type PointPackage = {
 };
 
 type PointTopupRequest = {
+  user_name?: string;
   id: string;
   user_id: string;
   package_id: string;
@@ -704,7 +705,17 @@ const loadPointTopupRequests = async () => {
 
     if (error) throw error;
 
-    setPointTopupRequests(data || []);
+    const requests = data ?? [];
+    const userIds = [...new Set(requests.map((request) => request.user_id))];
+    const { data: profiles, error: profilesError } = userIds.length
+      ? await supabase.from("profiles").select("id, display_name").in("id", userIds)
+      : { data: [], error: null };
+    if (profilesError) throw profilesError;
+    const enrichedRequests = requests.map((request) => ({
+      ...request,
+      user_name: profiles?.find((profile) => profile.id === request.user_id)?.display_name ?? "مستخدم غير معروف",
+    }));
+    setPointTopupRequests(enrichedRequests);
   } catch (err) {
     setPointTopupRequestsError(
       err instanceof Error ? err.message : "تعذر تحميل طلبات الشحن."
@@ -5183,8 +5194,8 @@ function getSubCategories(categoryId: number) {
 {/* طلبات حملات التمييز المدفوعة والنقاط */}
 {activeMenu === "طلبات حملات التمييز" && (
   <>
-<div className="mt-2 space-y-5" dir="rtl">
-  <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-5">
+<div className="mt-2 space-y-4" dir="rtl">
+  <div className="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-4">
     <div>
       <h2 className="text-lg font-black text-slate-800">
         طلبات حملات التمييز المدفوعة
@@ -5226,13 +5237,13 @@ function getSubCategories(categoryId: number) {
       </p>
     </div>
   ) : (
-    <div className="grid grid-cols-1 gap-4">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {campaignRequests.map((request) => (
         <div
           key={request.id}
-          className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+          className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-shadow hover:shadow-md"
         >
-          <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/80 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-xs font-semibold text-slate-500">
                 رقم الطلب
@@ -5266,7 +5277,7 @@ function getSubCategories(categoryId: number) {
             </div>
           </div>
 
-          <div className="space-y-4 p-4 sm:p-5">
+          <div className="space-y-3 p-3 sm:p-4">
             <div>
               <p className="text-xs font-semibold text-slate-500">
                 بيانات المستخدم
@@ -5282,7 +5293,7 @@ function getSubCategories(categoryId: number) {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
                 <p className="text-xs font-medium text-emerald-700">
                   المبلغ بالدولار
@@ -5345,8 +5356,8 @@ function getSubCategories(categoryId: number) {
 </div>
 {/* طلبات حملات التمييز بالنقاط */}
 
-<div className="mt-5 space-y-5" dir="rtl">
-  <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm">
+<div className="mt-4 space-y-4" dir="rtl">
+  <div className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
     <h2 className="text-lg font-black text-slate-800">
       طلبات حملات التمييز بالنقاط
     </h2>
@@ -5367,13 +5378,13 @@ function getSubCategories(categoryId: number) {
         </p>
       </div>
     ) : (
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {pointsCampaignRequests.map((request) => (
           <div
             key={request.id}
-            className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm"
+            className="overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-sm transition-shadow hover:shadow-md"
           >
-            <div className="flex flex-col gap-2 border-b bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 border-b border-emerald-100 bg-emerald-50/70 p-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs text-slate-500">رقم الطلب</p>
                 <p className="mt-1 break-all text-sm font-bold text-slate-700" dir="ltr">
@@ -5404,7 +5415,7 @@ function getSubCategories(categoryId: number) {
               )}
             </div>
 
-            <div className="space-y-4 p-4 sm:p-5">
+            <div className="space-y-3 p-3 sm:p-4">
               <div>
                 <p className="text-xs text-slate-500">المستخدم</p>
                 <p className="mt-1 font-bold text-slate-800">
@@ -5424,7 +5435,7 @@ function getSubCategories(categoryId: number) {
                 )}
               </div>
 
-              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 p-3">
                 <p className="text-sm text-emerald-700">
                   النقاط المخصومة للحملة
                 </p>
@@ -5607,7 +5618,7 @@ function getSubCategories(categoryId: number) {
         <h3 className="font-bold text-slate-700">لا يوجد عمال توصيل معتمدون</h3>
       </div>
     ) : (
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="admin-delivery-drivers-grid grid grid-cols-1 gap-4 xl:grid-cols-2">
         {adminDeliveryDrivers.map((driver) => (
           <div key={driver.user_id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-start gap-3">
@@ -5700,7 +5711,7 @@ function getSubCategories(categoryId: number) {
       </div>
     ) : (
 
-<div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+<div className="admin-store-requests-grid grid grid-cols-1 gap-5 xl:grid-cols-2">
   {storeRequests.map((request) => {
     const ordinaryLimit = Number(request.ordinary_ads_limit) || 100;
     const featuredLimit = Number(request.featured_ads_limit) || 20;
@@ -6028,7 +6039,7 @@ function getSubCategories(categoryId: number) {
         </p>
       </div>
     ) : (
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      <div className="admin-stores-management-grid grid grid-cols-1 gap-5 xl:grid-cols-2">
         {adminStores.map((store) => {
           const disabled =
             store.owner_disabled || store.admin_disabled;
@@ -6580,7 +6591,7 @@ function getSubCategories(categoryId: number) {
         </p>
       </div>
     ) : (
-      <div className="users-list">
+      <div className="users-list admin-users-premium-list">
         {filteredUsers.map((user) => (
           <article
             className="user-card"
@@ -6677,7 +6688,7 @@ function getSubCategories(categoryId: number) {
         <p>جارٍ تحميل التصنيفات...</p>
       </div>
     ) : (
-<div className="categories-list">
+<div className="categories-list admin-categories-premium-list">
   {mainCategories.map((category) => (
     <div className="category-card" key={category.id}>
       <div className="category-card-info">
@@ -7202,7 +7213,7 @@ function getSubCategories(categoryId: number) {
         <p>لا توجد بلاغات تطابق البحث أو الحالة المحددة.</p>
       </div>
     ) : (
-      <div className="users-list">
+      <div className="users-list admin-users-premium-list">
   {filteredReports.map((report) => (
     <article className="user-card report-card" key={report.id}>
       <div className="user-info">
@@ -7829,13 +7840,13 @@ onClick={() => {
 )}
 {/* قسم شحن النقاط */}
 {activeMenu === "شحن النقاط" && (
-  <div className="space-y-6">
+  <div className="grid gap-3 md:grid-cols-2">
 
     {/* إدارة الباقات */}
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <div className="mb-5 flex items-center justify-between">
+    <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-gray-800">
             <Coins className="text-amber-500" />
             إدارة باقات النقاط
           </h2>
@@ -7857,7 +7868,7 @@ onClick={() => {
         </div>
       )}
 
-      <div className="mb-6 grid gap-3 rounded-xl bg-gray-50 p-4 md:grid-cols-4">
+      <div className="mb-4 grid gap-2 rounded-xl bg-gray-50/80 p-3 sm:grid-cols-2 xl:grid-cols-4">
         <input
           value={pointPackageName}
           onChange={(e) => setPointPackageName(e.target.value)}
@@ -7921,7 +7932,7 @@ onClick={() => {
           لا توجد باقات حتى الآن.
         </p>
       ) : (
-        <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {pointPackages.map((pkg) => (
             <div
               key={pkg.id}
@@ -7988,9 +7999,9 @@ onClick={() => {
 
 
 {/* طلبات شحن النقاط */}
-<div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+<div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
   <div className="mb-5">
-    <h2 className="flex items-center gap-2 text-xl font-bold text-gray-800">
+    <h2 className="flex items-center gap-2 text-lg font-bold text-gray-800">
       <Wallet className="text-green-600" />
       طلبات شحن النقاط
     </h2>
@@ -8022,16 +8033,19 @@ onClick={() => {
       لا توجد طلبات شحن حتى الآن.
     </p>
   ) : (
-    <div className="space-y-4">
+    <div className="grid gap-3 md:grid-cols-2">
       {pointTopupRequests.map((request) => (
         <div
           key={request.id}
-          className="rounded-xl border border-gray-100 p-4"
+          className="rounded-xl border border-gray-100 bg-white p-3 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="font-bold text-gray-800">
                 طلب شحن نقاط جديد
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
+                الاسم: {request.user_name || "مستخدم غير معروف"}
               </p>
               <p className="mt-1 text-sm text-gray-500">
                 المستخدم: {request.user_id}

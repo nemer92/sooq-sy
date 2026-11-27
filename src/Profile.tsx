@@ -951,37 +951,16 @@ export default function Profile() {
             </label>
 
             {/* المتابعون ومن أتابع */}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => openFollowList("followers")}
-                className="flex min-h-16 items-center justify-center gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 transition hover:border-emerald-300 hover:bg-emerald-100 active:scale-[0.98]"
-              >
-                <Users size={19} className="shrink-0 text-emerald-700" />
-                <span className="text-right">
-                  <strong className="block text-base font-black text-emerald-900">
-                    {followersCount.toLocaleString("en-US")}
-                  </strong>
-                  <span className="block text-[10px] font-bold text-emerald-700">
-                    المتابعون
-                  </span>
-                </span>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => openFollowList("followers")} className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-100 bg-white px-2 py-2 shadow-sm transition-all duration-200 hover:border-emerald-200 hover:bg-emerald-50/60 active:scale-[0.99]">
+                <Users size={16} className="shrink-0 text-emerald-600" />
+                <span className="text-[11px] font-bold text-emerald-700">المتابعون</span>
+                <strong className="text-sm font-bold text-slate-800">{followersCount.toLocaleString("en-US")}</strong>
               </button>
-
-              <button
-                type="button"
-                onClick={() => openFollowList("following")}
-                className="flex min-h-16 items-center justify-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 transition hover:border-blue-300 hover:bg-blue-100 active:scale-[0.98]"
-              >
-                <UserCheck size={19} className="shrink-0 text-blue-700" />
-                <span className="text-right">
-                  <strong className="block text-base font-black text-blue-900">
-                    {followingCount.toLocaleString("en-US")}
-                  </strong>
-                  <span className="block text-[10px] font-bold text-blue-700">
-                    أتابع
-                  </span>
-                </span>
+              <button type="button" onClick={() => openFollowList("following")} className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-100 bg-white px-2 py-2 shadow-sm transition-all duration-200 hover:border-blue-200 hover:bg-blue-50/60 active:scale-[0.99]">
+                <UserCheck size={16} className="shrink-0 text-blue-600" />
+                <span className="text-[11px] font-bold text-blue-700">أتابع</span>
+                <strong className="text-sm font-bold text-slate-800">{followingCount.toLocaleString("en-US")}</strong>
               </button>
             </div>
           </div>
@@ -1246,7 +1225,7 @@ export default function Profile() {
                 </div>
               </div>
 
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-1 grid grid-cols-2 gap-2">
                 <div className="flex items-center gap-2 rounded-lg bg-slate-50 p-2.5">
                   <CalendarDays className="shrink-0 text-blue-600" size={16} />
                   <div className="min-w-0">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
+import { loadAdsCached, subscribeToAdsUpdates, invalidateAdsCache } from "./lib/adCache";
 import { useNavigate } from "react-router-dom";
 import { Share } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
@@ -460,6 +461,7 @@ async function toggleFavorite(adId: string) {
 
       setFavoriteAdIds((prev) => [...prev, adId]);
     }
+  invalidateAdsCache(`favorites:${user.id}`);
   } catch (error) {
     console.error("خطأ في المفضلة:", error);
     alert("تعذر تحديث المفضلة");
@@ -747,7 +749,9 @@ useEffect(() => {
   }
 
   loadSiteSettings();
-}, []);useEffect(() => {
+}, []);
+
+useEffect(() => {
   let channel: ReturnType<typeof supabase.channel> | null = null;
 
   async function loadUnreadMessagesCount() {
@@ -875,98 +879,119 @@ setUnreadMessagesCount(count ?? 0);
 }, []);
 
 useEffect(() => {
-  async function loadAds() {
-    const { data, error } = await supabase
-      .from("ads")
-      .select(`
-        id,
-        title,
-        description,
-        price,
-        currency,
-        listing_type,
-        category_id,
-        city_id,
-        condition,
-        created_at,
-        is_featured,
-        categories(name_ar),
-        cities(name_ar),
-        ad_images(image_path, sort_order)
-      `)
-      .eq("status", "approved")
-      .eq("listing_type", "sale")
-      .order("created_at", { ascending: false });
+  let active = true;
 
-    if (error) {
+  const refreshAds = () => {
+    void loadAdsCached<Ad[]>(
+      "home:approved:sale",
+      async () => {
+        const { data, error } = await supabase
+          .from("ads")
+          .select(`
+            id,
+            title,
+            description,
+            price,
+            currency,
+            listing_type,
+            category_id,
+            city_id,
+            condition,
+            created_at,
+            is_featured,
+            categories(name_ar),
+            cities(name_ar),
+            ad_images(image_path, sort_order)
+          `)
+          .eq("status", "approved")
+          .eq("listing_type", "sale")
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        return Promise.all(
+          (data ?? []).map(async (ad: any) => {
+            const sortedImages = (ad.ad_images ?? []).sort(
+              (a: any, b: any) => a.sort_order - b.sort_order
+            );
+
+            const signedImages = await Promise.all(
+              sortedImages.map(async (image: any) => {
+                const { data: imageData, error: imageError } =
+                  await supabase.storage
+                    .from("ad-images")
+                    .createSignedUrl(image.image_path, 3600);
+
+                if (imageError) {
+                  console.error("خطأ تحميل الصورة:", imageError);
+                  return "";
+                }
+
+                return imageData.signedUrl;
+              })
+            );
+
+            return {
+              id: ad.id,
+              city_id: ad.city_id,
+              title: ad.title,
+              category_id: ad.category_id,
+              description: ad.description,
+              price: ad.price,
+              currency: ad.currency,
+              listing_type: ad.listing_type,
+              condition: ad.condition,
+              created_at: ad.created_at,
+              is_featured: ad.is_featured ?? false,
+              category_name: ad.categories?.name_ar ?? "",
+              city_name: ad.cities?.name_ar ?? "",
+              images: signedImages.filter(Boolean),
+            } as Ad;
+          })
+        );
+      },
+      (cachedAds) => {
+        if (active) {
+          setAds(cachedAds);
+          setAdsLoading(false);
+        }
+      }
+    ).catch((error) => {
       console.error("خطأ تحميل الإعلانات:", error);
+      if (active) setAdsLoading(false);
+    });
+  };
+
+  const unsubscribe = subscribeToAdsUpdates(refreshAds);
+  refreshAds();
+
+  void (async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!active) return;
+
+    if (user) {
+      const { data: favorites, error: favoritesError } = await supabase
+        .from("favorites")
+        .select("ad_id")
+        .eq("user_id", user.id);
+
+      if (favoritesError) {
+        console.error("خطأ تحميل المفضلة:", favoritesError);
+      } else if (active) {
+        setFavoriteAdIds((favorites ?? []).map((item) => item.ad_id));
+      }
     } else {
-      const formattedAds: Ad[] = await Promise.all(
-        (data ?? []).map(async (ad: any) => {
-          const sortedImages = (ad.ad_images ?? []).sort(
-            (a: any, b: any) => a.sort_order - b.sort_order
-          );
-
-          const signedImages = await Promise.all(
-            sortedImages.map(async (image: any) => {
-              const { data: imageData, error: imageError } =
-                await supabase.storage
-                  .from("ad-images")
-                  .createSignedUrl(image.image_path, 3600);
-
-              if (imageError) {
-                console.error("خطأ تحميل الصورة:", imageError);
-                return "";
-              }
-
-              return imageData.signedUrl;
-            })
-          );
-
-          return {
-            id: ad.id,
-            city_id: ad.city_id,
-            title: ad.title,
-            category_id: ad.category_id,
-            description: ad.description,
-            price: ad.price,
-            currency: ad.currency,
-            listing_type: ad.listing_type,
-            condition: ad.condition,
-            created_at: ad.created_at,
-            is_featured: ad.is_featured ?? false,
-            category_name: ad.categories?.name_ar ?? "",
-            city_name: ad.cities?.name_ar ?? "",
-            images: signedImages.filter(Boolean),
-          };
-        })
-      );
-
-      setAds(formattedAds);
-      const { data: { user } } = await supabase.auth.getUser();
-
-if (user) {
-  const { data: favorites, error: favoritesError } = await supabase
-    .from("favorites")
-    .select("ad_id")
-    .eq("user_id", user.id);
-
-  if (favoritesError) {
-    console.error("خطأ تحميل المفضلة:", favoritesError);
-  } else {
-    setFavoriteAdIds((favorites ?? []).map((item) => item.ad_id));
-  }
-} else {
-  setFavoriteAdIds([]);
-}
-
+      setFavoriteAdIds([]);
     }
+  })();
 
-    setAdsLoading(false);
-  }
-
-  loadAds();
+  return () => {
+    active = false;
+    unsubscribe();
+  };
 }, []);
+
 useEffect(() => {
   let active = true;
   async function loadFeaturedStores() {
@@ -987,158 +1012,187 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  async function loadFeaturedAds() {
-    const { data, error } = await supabase
-      .from("ads")
-      .select(`
-        id,
-        title,
-        description,
-        price,
-        currency,
-        listing_type,
-        category_id,
-        city_id,
-        condition,
-        created_at,
-        is_featured,
-        categories(name_ar),
-        cities(name_ar),
-        ad_images(image_path, sort_order)
-      `)
-      .eq("status", "approved")
-      .eq("listing_type", "sale")
-      .eq("is_featured", true)
-      .order("created_at", { ascending: false })
-      .limit(6);
+  let active = true;
 
-if (error) {
-  console.error("خطأ تحميل الإعلانات المميزة:", error);
-  setFeaturedAdsLoading(false);
-  return;
-}
+  const refreshFeaturedAds = () => {
+    void loadAdsCached<Ad[]>(
+      "home:featured:sale",
+      async () => {
+        const { data, error } = await supabase
+          .from("ads")
+          .select(`
+            id,
+            title,
+            description,
+            price,
+            currency,
+            listing_type,
+            category_id,
+            city_id,
+            condition,
+            created_at,
+            is_featured,
+            categories(name_ar),
+            cities(name_ar),
+            ad_images(image_path, sort_order)
+          `)
+          .eq("status", "approved")
+          .eq("listing_type", "sale")
+          .eq("is_featured", true)
+          .order("created_at", { ascending: false })
+          .limit(6);
 
-    const formattedAds: Ad[] = await Promise.all(
-      (data ?? []).map(async (ad: any) => {
-        const sortedImages = (ad.ad_images ?? []).sort(
-          (a: any, b: any) => a.sort_order - b.sort_order
-        );
+        if (error) throw error;
 
-        const signedImages = await Promise.all(
-          sortedImages.map(async (image: any) => {
-            const { data: imageData, error: imageError } =
-              await supabase.storage
-                .from("ad-images")
-                .createSignedUrl(image.image_path, 3600);
+        return Promise.all(
+          (data ?? []).map(async (ad: any) => {
+            const sortedImages = (ad.ad_images ?? []).sort(
+              (a: any, b: any) => a.sort_order - b.sort_order
+            );
 
-            if (imageError) {
-              console.error("خطأ تحميل صورة الإعلان المميز:", imageError);
-              return "";
-            }
+            const signedImages = await Promise.all(
+              sortedImages.map(async (image: any) => {
+                const { data: imageData, error: imageError } =
+                  await supabase.storage
+                    .from("ad-images")
+                    .createSignedUrl(image.image_path, 3600);
 
-            return imageData.signedUrl;
+                if (imageError) {
+                  console.error("خطأ تحميل صورة الإعلان المميز:", imageError);
+                  return "";
+                }
+
+                return imageData.signedUrl;
+              })
+            );
+
+            return {
+              id: ad.id,
+              city_id: ad.city_id,
+              title: ad.title,
+              category_id: ad.category_id,
+              description: ad.description,
+              price: ad.price,
+              currency: ad.currency,
+              listing_type: ad.listing_type,
+              condition: ad.condition,
+              created_at: ad.created_at,
+              is_featured: true,
+              category_name: ad.categories?.name_ar ?? "",
+              city_name: ad.cities?.name_ar ?? "",
+              images: signedImages.filter(Boolean),
+            } as Ad;
           })
         );
+      },
+      (cachedAds) => {
+        if (active) {
+          setFeaturedAds(cachedAds);
+          setFeaturedAdsLoading(false);
+        }
+      }
+    ).catch((error) => {
+      console.error("خطأ تحميل الإعلانات المميزة:", error);
+      if (active) setFeaturedAdsLoading(false);
+    });
+  };
 
-        return {
-          id: ad.id,
-          city_id: ad.city_id,
-          title: ad.title,
-          category_id: ad.category_id,
-          description: ad.description,
-          price: ad.price,
-          currency: ad.currency,
-          listing_type: ad.listing_type,
-          condition: ad.condition,
-          created_at: ad.created_at,
-          is_featured: true,
-          category_name: ad.categories?.name_ar ?? "",
-          city_name: ad.cities?.name_ar ?? "",
-          images: signedImages.filter(Boolean),
-        };
-      })
-    );
+  const unsubscribe = subscribeToAdsUpdates(refreshFeaturedAds);
+  refreshFeaturedAds();
 
-    setFeaturedAds(formattedAds);
-    setFeaturedAdsLoading(false);
-  }
+  return () => {
+    active = false;
+    unsubscribe();
+  };
+}, []);useEffect(() => {
+  let active = true;
 
-  loadFeaturedAds();
-}, []);
-useEffect(() => {
-  async function loadDonations() {
-    const { data, error } = await supabase
-      .from("ads")
-      .select(`
-        id,
-        title,
-        description,
-        price,
-        currency,
-        listing_type,
-        category_id,
-        city_id,
-        condition,
-        created_at,
-        categories(name_ar),
-        cities(name_ar),
-        ad_images(image_path, sort_order)
-      `)
-      .eq("status", "approved")
-      .eq("listing_type", "donation")
-      .order("created_at", { ascending: false });
+  const refreshDonations = () => {
+    void loadAdsCached<Ad[]>(
+      "home:donations",
+      async () => {
+        const { data, error } = await supabase
+          .from("ads")
+          .select(`
+            id,
+            title,
+            description,
+            price,
+            currency,
+            listing_type,
+            category_id,
+            city_id,
+            condition,
+            created_at,
+            categories(name_ar),
+            cities(name_ar),
+            ad_images(image_path, sort_order)
+          `)
+          .eq("status", "approved")
+          .eq("listing_type", "donation")
+          .order("created_at", { ascending: false });
 
-    if (error) {
+        if (error) throw error;
+
+        return await Promise.all(
+          (data ?? []).map(async (ad: any) => {
+            const sortedImages = (ad.ad_images ?? []).sort(
+              (a: any, b: any) => a.sort_order - b.sort_order
+            );
+
+            const signedImages = await Promise.all(
+              sortedImages.map(async (image: any) => {
+                const { data: imageData, error: imageError } =
+                  await supabase.storage
+                    .from("ad-images")
+                    .createSignedUrl(image.image_path, 3600);
+
+                if (imageError) {
+                  console.error("خطأ تحميل صورة التبرع:", imageError);
+                  return "";
+                }
+
+                return imageData.signedUrl;
+              })
+            );
+
+            return {
+              id: ad.id,
+              city_id: ad.city_id,
+              title: ad.title,
+              category_id: ad.category_id,
+              description: ad.description,
+              price: ad.price,
+              currency: ad.currency,
+              listing_type: ad.listing_type,
+              condition: ad.condition,
+              created_at: ad.created_at,
+              category_name: ad.categories?.name_ar ?? "",
+              city_name: ad.cities?.name_ar ?? "",
+              images: signedImages.filter(Boolean),
+            } as Ad;
+          })
+        );
+      },
+      (cachedDonations) => {
+        if (active) {
+          setDonations(cachedDonations);
+          setDonationsLoading(false);
+        }
+      }
+    ).catch((error) => {
       console.error("خطأ تحميل التبرعات:", error);
-      setDonationsLoading(false);
-      return;
-    }
+      if (active) setDonationsLoading(false);
+    });
+  };
 
-    const formattedDonations: Ad[] = await Promise.all(
-      (data ?? []).map(async (ad: any) => {
-        const sortedImages = (ad.ad_images ?? []).sort(
-          (a: any, b: any) => a.sort_order - b.sort_order
-        );
+  const unsubscribe = subscribeToAdsUpdates(refreshDonations);
+  refreshDonations();
 
-        const signedImages = await Promise.all(
-          sortedImages.map(async (image: any) => {
-            const { data: imageData, error: imageError } =
-              await supabase.storage
-                .from("ad-images")
-                .createSignedUrl(image.image_path, 3600);
-
-            if (imageError) {
-              console.error("خطأ تحميل صورة التبرع:", imageError);
-              return "";
-            }
-
-            return imageData.signedUrl;
-          })
-        );
-
-        return {
-          id: ad.id,
-          city_id: ad.city_id,
-          title: ad.title,
-          category_id: ad.category_id,
-          description: ad.description,
-          price: ad.price,
-          currency: ad.currency,
-          listing_type: ad.listing_type,
-          condition: ad.condition,
-          created_at: ad.created_at,
-          category_name: ad.categories?.name_ar ?? "",
-          city_name: ad.cities?.name_ar ?? "",
-          images: signedImages.filter(Boolean),
-        };
-      })
-    );
-
-    setDonations(formattedDonations);
-    setDonationsLoading(false);
-  }
-
-  loadDonations();
+  return () => {
+    active = false;
+    unsubscribe();
+  };
 }, []);
 
 useEffect(() => {

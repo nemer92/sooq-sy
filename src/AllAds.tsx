@@ -63,55 +63,8 @@ export default function MyAds() {
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [featuringAdId, setFeaturingAdId] = useState<string | null>(null);
 
-  async function featureAd(ad: Ad) {
-    const isStoreAd = Boolean(ad.store_id);
 
-    const confirmed = await window.sooqConfirm(
-      isStoreAd
-        ? "هل تريد تمييز هذا الإعلان باستخدام حصة الإعلانات المميزة في اشتراك المتجر؟"
-        : "هل تريد تمييز هذا الإعلان مقابل 2 نقطة؟"
-    );
-
-    if (!confirmed) return;
-
-    setFeaturingAdId(ad.id);
-
-    try {
-      const { error } = isStoreAd
-        ? await supabase.rpc("feature_ad_with_subscription", {
-            p_ad_id: ad.id,
-          })
-        : await supabase.rpc("feature_ad_with_points", {
-            p_ad_id: ad.id,
-          });
-
-      if (error) throw error;
-
-      setAds((currentAds) =>
-        currentAds.map((item) =>
-          item.id === ad.id ? { ...item, is_featured: true } : item
-        )
-      );
-
-      window.alert(
-        isStoreAd
-          ? "تم تمييز الإعلان باستخدام حصة المتجر بنجاح."
-          : "تم تمييز إعلانك بنجاح مقابل 2 نقطة."
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-
-      if (message.includes("لا توجد نقاط كافية")) {
-        window.alert("لا توجد نقاط كافية.");
-      } else {
-        window.alert(message || "تعذر تمييز الإعلان.");
-      }
-    } finally {
-      setFeaturingAdId(null);
-    }
-  }
 
   useEffect(() => {
     let active = true;
@@ -556,21 +509,7 @@ export default function MyAds() {
                             أرشفة
                           </button>
 
-                          {ad.listing_type === "sale" && !ad.is_featured && (
-                            <button
-                              type="button"
-                              onClick={() => featureAd(ad)}
-                              disabled={featuringAdId === ad.id}
-                              className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 sm:text-xs"
-                            >
-                              <Star size={13} fill="currentColor" />
-                              {featuringAdId === ad.id
-                                ? "جارٍ التمييز..."
-                                : ad.store_id
-                                  ? "تمييز من حصة المتجر"
-                                  : "تمييز مقابل 5 نقاط"}
-                            </button>
-                          )}
+                       
 
                           {ad.published_at &&
                             !ad.is_featured &&

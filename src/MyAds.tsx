@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import { loadAdsCached, subscribeToAdsUpdates, invalidateAdsCache } from "./lib/adCache";
 import {
   ArrowRight,
   Eye,
@@ -64,62 +65,17 @@ export default function MyAds() {
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [featuringAdId, setFeaturingAdId] = useState<string | null>(null);
 
-  async function featureAd(ad: Ad) {
-    const isStoreAd = Boolean(ad.store_id);
-
-    const confirmed = await window.sooqConfirm(
-      isStoreAd
-        ? "هل تريد تمييز هذا الإعلان باستخدام حصة الإعلانات المميزة في اشتراك المتجر؟"
-        : "هل تريد تمييز هذا الإعلان مقابل 2 نقطة؟"
-    );
-
-    if (!confirmed) return;
-
-    setFeaturingAdId(ad.id);
-
-    try {
-      const { error } = isStoreAd
-        ? await supabase.rpc("feature_ad_with_subscription", {
-            p_ad_id: ad.id,
-          })
-        : await supabase.rpc("feature_ad_with_points", {
-            p_ad_id: ad.id,
-          });
-
-      if (error) throw error;
-
-      setAds((currentAds) =>
-        currentAds.map((item) =>
-          item.id === ad.id ? { ...item, is_featured: true } : item
-        )
-      );
-
-      window.alert(
-        isStoreAd
-          ? "تم تمييز الإعلان باستخدام حصة المتجر بنجاح."
-          : "تم تمييز إعلانك بنجاح مقابل 2 نقطة."
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-
-      if (message.includes("لا توجد نقاط كافية")) {
-        window.alert("لا توجد نقاط كافية.");
-      } else {
-        window.alert(message || "تعذر تمييز الإعلان.");
-      }
-    } finally {
-      setFeaturingAdId(null);
-    }
-  }
 
   useEffect(() => {
     let active = true;
+    let unsubscribe = () => {};
 
     async function loadMyAds() {
       try {
         const { data: sessionData } = await supabase.auth.getSession();
+
+        if (!active) return;
 
         if (!sessionData.session) {
           navigate("/auth", {
@@ -129,59 +85,92 @@ export default function MyAds() {
         }
 
         const userId = sessionData.session.user.id;
+        const cacheKey = `my-ads:${userId}`;
 
-        const { data, error } = await supabase
-          .from("ads")
-          .select(`
-            id,
-            title,
-            price,
-            currency,
-            status,
-            created_at,
-            published_at,
-            rejection_reason,
-            categories(name_ar),
-            cities(name_ar),
-            listing_type,
-            is_featured,
-            store_id,
-            ad_images(
-              image_path,
-              sort_order
-            )
-          `)
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false });
+        const fetchMyAds = async () => {
+          const { data, error } = await supabase
+            .from("ads")
+            .select(`
+              id,
+              title,
+              price,
+              currency,
+              status,
+              created_at,
+              published_at,
+              rejection_reason,
+              categories(name_ar),
+              cities(name_ar),
+              listing_type,
+              is_featured,
+              store_id,
+              ad_images(
+                image_path,
+                sort_order
+              )
+            `)
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false });
 
-        if (error) throw error;
+          if (error) throw error;
+          return { ads: data ?? [] };
+        };
 
-        const adsWithImages = await Promise.all(
-          (data ?? []).map(async (ad: any) => {
-            const sortedImages = [...(ad.ad_images ?? [])].sort(
-              (a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+        const applyAds = async (result: { ads: any[] }) => {
+          if (!active) return;
+
+          const adsWithImages = await Promise.all(
+            result.ads.map(async (ad: any) => {
+              const sortedImages = [...(ad.ad_images ?? [])].sort(
+                (a: any, b: any) =>
+                  (a.sort_order ?? 0) - (b.sort_order ?? 0)
+              );
+
+              const imageResults = await Promise.all(
+                sortedImages.map(async (image: any) => {
+                  const { data: signedData } = await supabase.storage
+                    .from("ad-images")
+                    .createSignedUrl(image.image_path, 3600);
+
+                  return signedData?.signedUrl ?? "";
+                })
+              );
+
+              return {
+                ...ad,
+                images: imageResults.filter(Boolean),
+              };
+            })
+          );
+
+          if (active) setAds(adsWithImages as Ad[]);
+        };
+
+        const refreshMyAds = () => {
+          void loadAdsCached<{ ads: any[] }>(
+            cacheKey,
+            fetchMyAds,
+            (result) => {
+              void applyAds(result).catch((error) =>
+                console.error("خطأ تحديث إعلانات المستخدم:", error)
+              );
+            }
+          ).catch((error) =>
+            console.error("خطأ تحديث كاش إعلانات المستخدم:", error)
+          );
+        };
+
+        unsubscribe = subscribeToAdsUpdates(refreshMyAds);
+
+        await loadAdsCached<{ ads: any[] }>(
+          cacheKey,
+          fetchMyAds,
+          (result) => {
+            void applyAds(result).catch((error) =>
+              console.error("خطأ عرض إعلانات المستخدم:", error)
             );
-
-            const imageResults = await Promise.all(
-              sortedImages.map(async (image: any) => {
-                const { data: signedData } = await supabase.storage
-                  .from("ad-images")
-                  .createSignedUrl(image.image_path, 3600);
-
-                return signedData?.signedUrl ?? "";
-              })
-            );
-
-            return {
-              ...ad,
-              images: imageResults.filter(Boolean),
-            };
-          })
+          }
         );
-
-        if (active) {
-          setAds(adsWithImages as Ad[]);
-        }
       } catch (err) {
         console.error("خطأ تحميل إعلانات المستخدم:", err);
 
@@ -199,9 +188,15 @@ export default function MyAds() {
 
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [navigate]);
 
+  async function invalidateCurrentUserAdsCache() {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user.id;
+    if (userId) invalidateAdsCache(`my-ads:${userId}`);
+  }
   async function deleteAd(adId: string) {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -240,6 +235,7 @@ export default function MyAds() {
 
       if (deleteError) throw deleteError;
 
+      await invalidateCurrentUserAdsCache();
       setAds((previousAds) =>
         previousAds.filter((ad) => ad.id !== adId)
       );
@@ -263,6 +259,7 @@ export default function MyAds() {
 
       if (error) throw error;
 
+      await invalidateCurrentUserAdsCache();
       setAds((previousAds) =>
         previousAds.map((ad) =>
           ad.id === adId ? { ...ad, status: newStatus } : ad
@@ -288,6 +285,7 @@ export default function MyAds() {
 
       if (error) throw error;
 
+      await invalidateCurrentUserAdsCache();
       setAds((previousAds) =>
         previousAds.map((ad) =>
           ad.id === adId ? { ...ad, status: "pending" } : ad
@@ -527,21 +525,7 @@ export default function MyAds() {
                             إغلاق الإعلان
                           </button>
 
-                          {ad.listing_type === "sale" && !ad.is_featured && (
-                            <button
-                              type="button"
-                              onClick={() => featureAd(ad)}
-                              disabled={featuringAdId === ad.id}
-                              className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 sm:text-xs"
-                            >
-                              <Star size={13} fill="currentColor" />
-                              {featuringAdId === ad.id
-                                ? "جارٍ التمييز..."
-                                : ad.store_id
-                                  ? "تمييز من حصة المتجر"
-                                  : "تمييز مقابل 5 نقاط"}
-                            </button>
-                          )}
+            
 
                           {ad.published_at &&
                             !ad.is_featured &&

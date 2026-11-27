@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import { loadAdsCached, subscribeToAdsUpdates, invalidateAdsCache } from "./lib/adCache";
 import AdPickupLocationMap from "./AdPickupLocationMap";
 import { Device } from "@capacitor/device";
 import { Capacitor } from "@capacitor/core";
@@ -57,12 +58,17 @@ export default function AdDetails() {
   const [pickupMessage, setPickupMessage] = useState("");
 
   useEffect(() => {
-    async function loadAd() {
-      if (!id) {
-        setLoading(false);
-        return;
-      }
+    let active = true;
+    let unsubscribe = () => {};
 
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+
+    const cacheKey = `ad:details:${id}`;
+
+    const fetchAdRecord = async () => {
       const adQuery = supabase
         .from("ads")
         .select(`
@@ -88,13 +94,76 @@ export default function AdDetails() {
         ? await adQuery.eq("public_code", Number(id)).maybeSingle()
         : await adQuery.eq("id", id).maybeSingle();
 
-      if (error) {
+      if (error) throw error;
+      return { ad: data };
+    };
+
+    const applyAdRecord = async (result: { ad: any | null }) => {
+      if (!active) return;
+
+      const nextAd = result.ad;
+      setAd(nextAd);
+
+      if (!nextAd) {
+        setImages([]);
+        return;
+      }
+
+      const sortedImages = [...(nextAd.ad_images ?? [])].sort(
+        (a: any, b: any) => a.sort_order - b.sort_order
+      );
+
+      const signedImages = await Promise.all(
+        sortedImages.map(async (image: any) => {
+          const { data: imageData, error: imageError } =
+            await supabase.storage
+              .from("ad-images")
+              .createSignedUrl(image.image_path, 3600);
+
+          if (imageError) {
+            console.error("خطأ تحميل الصورة:", imageError);
+            return "";
+          }
+
+          return imageData.signedUrl;
+        })
+      );
+
+      if (active) setImages(signedImages.filter(Boolean));
+    };
+
+    unsubscribe = subscribeToAdsUpdates(() => {
+      void loadAdsCached<{ ad: any | null }>(
+        cacheKey,
+        fetchAdRecord,
+        (result) => {
+          void applyAdRecord(result).catch((error) =>
+            console.error("خطأ تحديث الإعلان:", error)
+          );
+        }
+      ).catch((error) => console.error("خطأ تحديث كاش الإعلان:", error));
+    });
+
+    async function loadAd() {
+      const cachedResult: { current: { ad: any | null } | null } = { current: null };
+
+      try {
+        await loadAdsCached<{ ad: any | null }>(
+          cacheKey,
+          fetchAdRecord,
+          (result) => {
+            cachedResult.current = result;
+          }
+        );
+      } catch (error) {
         console.error("خطأ تحميل الإعلان:", error);
       }
 
-      if (data) {
-        setAd(data);
+      if (!active) return;
 
+      const data = cachedResult.current?.ad ?? null;
+
+      if (data) {
         if (!recordedViewIds.current.has(data.id)) {
           recordedViewIds.current.add(data.id);
           const { error: viewMetricError } = await supabase.rpc("record_ad_view", {
@@ -174,6 +243,7 @@ export default function AdDetails() {
           data: { user },
         } = await supabase.auth.getUser();
 
+        if (!active) return;
         setCurrentUserId(user?.id ?? null);
 
         if (user?.id === data.user_id) {
@@ -182,6 +252,7 @@ export default function AdDetails() {
             .select("views_count, contact_clicks_count, favorites_count")
             .eq("ad_id", data.id)
             .maybeSingle();
+
           if (metricsError) {
             console.error("تعذر تحميل إحصائيات الإعلان:", metricsError);
           } else if (metricsData) {
@@ -240,7 +311,7 @@ export default function AdDetails() {
 
         if (sellerError) {
           console.error("خطأ تحميل بيانات البائع:", sellerError);
-        } else {
+        } else if (active) {
           setSeller(sellerData);
         }
 
@@ -251,38 +322,29 @@ export default function AdDetails() {
 
         if (verificationError) {
           console.error("خطأ التحقق من حالة توثيق البائع:", verificationError);
-          setIsVerified(false);
-        } else {
+          if (active) setIsVerified(false);
+        } else if (active) {
           setIsVerified(Boolean(verificationResult));
         }
-
-        const sortedImages = [...(data.ad_images ?? [])].sort(
-          (a: any, b: any) => a.sort_order - b.sort_order
-        );
-
-        const signedImages = await Promise.all(
-          sortedImages.map(async (image: any) => {
-            const { data: imageData, error: imageError } =
-              await supabase.storage
-                .from("ad-images")
-                .createSignedUrl(image.image_path, 3600);
-
-            if (imageError) {
-              console.error("خطأ تحميل الصورة:", imageError);
-              return "";
-            }
-
-            return imageData.signedUrl;
-          })
-        );
-
-        setImages(signedImages.filter(Boolean));
+      } else {
+        setCurrentUserId(null);
+        setIsFavorite(false);
+        setSeller(null);
+        setIsVerified(false);
       }
 
-      setLoading(false);
+      if (active) {
+        await applyAdRecord({ ad: data });
+        setLoading(false);
+      }
     }
 
-    loadAd();
+    void loadAd();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [id, location.search]);
 
   async function submitReport() {
@@ -542,6 +604,7 @@ export default function AdDetails() {
         if (error) throw error;
         setIsFavorite(true);
       }
+    invalidateAdsCache(`favorites:${user.id}`);
     } catch (error) {
       console.error("خطأ تحديث المفضلة:", error);
       alert("تعذر تحديث المفضلة. حاول مرة أخرى.");
@@ -611,11 +674,11 @@ export default function AdDetails() {
   if (loading) {
     return (
       <main dir="rtl" className="min-h-screen bg-[#f6f8f7] p-4">
-        <div className="mx-auto max-w-7xl animate-pulse space-y-5">
+        <div className="mx-auto max-w-6xl animate-pulse space-y-5">
           <div className="h-14 rounded-2xl bg-white" />
           <div className="grid gap-6 lg:grid-cols-2">
-            <div className="h-[420px] rounded-3xl bg-slate-200" />
-            <div className="space-y-5 rounded-3xl bg-white p-6">
+            <div className="h-[420px] rounded-2xl bg-slate-200" />
+            <div className="space-y-5 rounded-2xl bg-white p-6">
               <div className="h-5 w-1/3 rounded-lg bg-slate-200" />
               <div className="h-9 w-3/4 rounded-lg bg-slate-200" />
               <div className="h-14 w-1/2 rounded-xl bg-slate-200" />
@@ -634,7 +697,7 @@ export default function AdDetails() {
         dir="rtl"
         className="flex min-h-screen items-center justify-center bg-[#f6f8f7] p-5"
       >
-        <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white p-9 text-center shadow-sm">
+        <div className="w-full max-w-md rounded-2xl border border-slate-100 bg-white p-9 text-center shadow-sm">
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
             <ShoppingCart size={28} strokeWidth={1.6} />
           </div>
@@ -657,10 +720,10 @@ export default function AdDetails() {
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-[#f6f8f7] pb-10">
+    <main dir="rtl" className="min-h-screen bg-gradient-to-b from-[#edf4f0] via-[#f7f9f8] to-white pb-12">
       {/* Header */}
       <header className="sticky top-0 z-40 border-b border-slate-100/80 bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-[62px] max-w-7xl items-center gap-3 px-4 sm:px-6">
+        <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
           <button
             type="button"
             onClick={() => {
@@ -691,12 +754,12 @@ export default function AdDetails() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-7xl px-3 py-5 sm:px-6 sm:py-8">
-        <div className="grid items-start gap-5 lg:grid-cols-[1.08fr_0.92fr] lg:gap-7">
+      <div className="mx-auto max-w-7xl px-3 py-6 sm:px-6 sm:py-9">
+        <div className="grid items-start gap-5 lg:grid-cols-[1.12fr_0.88fr] lg:gap-8">
           {/* Gallery and seller */}
-          <section className="min-w-0 space-y-4">
-            <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white p-2.5 shadow-[0_8px_35px_rgba(15,23,42,0.045)] sm:p-3">
-              <div className="relative flex h-[300px] items-center justify-center overflow-hidden rounded-[20px] bg-[#f5f7f6] sm:h-[440px] lg:h-[520px]">
+          <section className="min-w-0 space-y-5">
+            <div className="overflow-hidden rounded-[26px] border border-white bg-white p-2.5 shadow-[0_18px_55px_rgba(15,45,35,0.09)] sm:p-3">
+              <div className="relative flex h-[310px] items-center justify-center overflow-hidden rounded-[21px] bg-gradient-to-br from-[#eef3f0] to-[#f8faf9] sm:h-[440px] lg:h-[510px]">
                 {images.length > 0 ? (
                   <img
                     src={images[activeImage]}
@@ -756,7 +819,7 @@ export default function AdDetails() {
                       key={index}
                       type="button"
                       onClick={() => setActiveImage(index)}
-                      className={`h-[68px] w-[68px] shrink-0 overflow-hidden rounded-xl border-2 transition sm:h-[78px] sm:w-[78px] ${
+                      className={`h-[58px] w-[58px] shrink-0 overflow-hidden rounded-xl border-2 transition sm:h-[66px] sm:w-[66px] ${
                         activeImage === index
                           ? "border-emerald-600 shadow-sm"
                           : "border-transparent opacity-65 hover:opacity-100"
@@ -776,7 +839,7 @@ export default function AdDetails() {
             {/* Seller card */}
             <Link
               to={`/user/${ad.user_id}`}
-              className="group flex items-center gap-3.5 rounded-3xl border border-slate-100 bg-white p-4 shadow-[0_5px_25px_rgba(15,23,42,0.025)] transition hover:border-emerald-200 hover:shadow-md sm:p-5"
+              className="group flex items-center gap-3.5 rounded-[22px] border border-white bg-white p-4 shadow-[0_12px_35px_rgba(15,45,35,0.06)] transition hover:border-emerald-200 hover:shadow-lg sm:p-5"
             >
               {seller?.avatar_url ? (
                 <img
@@ -824,8 +887,8 @@ export default function AdDetails() {
           </section>
 
           {/* Ad details */}
-          <section className="min-w-0 space-y-4">
-            <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-[0_8px_35px_rgba(15,23,42,0.04)] sm:p-6">
+          <section className="min-w-0 space-y-5">
+            <div className="overflow-hidden rounded-[26px] border border-white bg-white p-4 shadow-[0_18px_55px_rgba(15,45,35,0.075)] sm:p-6">
               {/* Category and city */}
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 {ad.categories?.name_ar && (
@@ -843,16 +906,16 @@ export default function AdDetails() {
                 )}
               </div>
 
-              <h1 className="text-xl font-extrabold leading-[1.8] text-slate-900 sm:text-2xl">
+              <h1 className="text-lg font-extrabold leading-[1.7] text-slate-900 sm:text-xl">
                 {ad.title}
               </h1>
 
               {/* Price */}
-              <div className="mt-5 rounded-2xl border border-emerald-100 bg-gradient-to-l from-emerald-50/80 to-white p-4 sm:p-5">
+              <div className="mt-6 rounded-2xl border border-emerald-100 bg-gradient-to-l from-[#e5f6ed] via-[#f2faf5] to-white p-4 shadow-inner sm:p-5">
                 <p className="mb-2 text-xs font-semibold text-slate-500">
                   السعر المطلوب
                 </p>
-                <div className="text-2xl font-black tracking-tight text-emerald-700 sm:text-3xl">
+                <div className="text-2xl font-black tracking-tight text-emerald-800 sm:text-3xl">
                   {formatPrice()}
                 </div>
               </div>
@@ -877,34 +940,34 @@ export default function AdDetails() {
               </div>
 
               {currentUserId === ad.user_id && (
-                <div className="mt-6 grid grid-cols-3 gap-3">
-                  <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                <div className="mt-5 grid grid-cols-3 gap-2">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
                     <div className="flex items-center gap-2 text-slate-500">
                       <Eye size={18} />
                       <span className="text-xs font-semibold">المشاهدات</span>
                     </div>
-                    <p className="mt-2 text-2xl font-extrabold text-slate-800">{adMetrics.views_count}</p>
+                    <p className="mt-1.5 text-xl font-bold text-slate-800">{adMetrics.views_count}</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
                     <div className="flex items-center gap-2 text-slate-500">
                       <MessageCircle size={18} />
                       <span className="text-xs font-semibold">نقرات المراسلة</span>
                     </div>
-                    <p className="mt-2 text-2xl font-extrabold text-slate-800">{adMetrics.contact_clicks_count}</p>
+                    <p className="mt-1.5 text-xl font-bold text-slate-800">{adMetrics.contact_clicks_count}</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3">
                     <div className="flex items-center gap-2 text-slate-500">
                       <Heart size={18} />
                       <span className="text-xs font-semibold">المفضلة</span>
                     </div>
-                    <p className="mt-2 text-2xl font-extrabold text-slate-800">{adMetrics.favorites_count}</p>
+                    <p className="mt-1.5 text-xl font-bold text-slate-800">{adMetrics.favorites_count}</p>
                   </div>
                 </div>
               )}
 
               {/* Seller pickup location */}
               {currentUserId === ad.user_id && (
-                <div className="mt-6 rounded-2xl border border-slate-100 bg-[#fafcfb] p-4 sm:p-5">
+                <div className="mt-6 rounded-2xl border border-slate-100 bg-[#fafcfb] p-3.5 sm:p-4">
                   <div className="mb-4 flex items-start gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
                       <MapPin size={19} />
@@ -934,7 +997,7 @@ export default function AdDetails() {
                   </button>
 
                   {showPickupEditor && (
-                    <div className="mt-4 space-y-4 border-t border-slate-100 pt-4">
+                    <div className="mt-4 space-y-5 border-t border-slate-100 pt-4">
                       <p className="text-xs leading-6 text-slate-600">
                         اضغط على الخريطة لتحديد الموقع، ويمكنك سحب العلامة الحمراء لتعديلها.
                       </p>
@@ -982,7 +1045,7 @@ export default function AdDetails() {
                             pickupLatitude === null ||
                             pickupLongitude === null
                           }
-                          className="flex-1 rounded-xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex-1 rounded-xl bg-emerald-700 px-3 py-2.5 text-[13px] font-bold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {pickupSaving ? "جارٍ الحفظ..." : "حفظ موقع الاستلام"}
                         </button>
@@ -991,7 +1054,7 @@ export default function AdDetails() {
                           type="button"
                           onClick={() => setShowPickupEditor(false)}
                           disabled={pickupSaving}
-                          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50"
                         >
                           إلغاء
                         </button>
@@ -1008,14 +1071,14 @@ export default function AdDetails() {
               )}
 
               {/* Actions */}
-              <div className="mt-6 space-y-3">
+              <div className="mt-6 grid grid-cols-2 gap-2.5">
                 {ad.listing_type === "sale" && (
                   <>
                     <button
                       type="button"
                       onClick={requestPurchase}
                       disabled={purchaseLoading}
-                      className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-amber-500 px-4 py-3.5 text-sm font-extrabold text-white shadow-sm shadow-amber-500/10 transition hover:-translate-y-0.5 hover:bg-amber-600 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="flex w-full items-center justify-center gap-2.5 min-h-11 rounded-xl bg-amber-500 px-2.5 py-2 text-xs font-extrabold text-white shadow-sm shadow-amber-500/10 transition hover:-translate-y-0.5 hover:bg-amber-600 hover:shadow-md disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <ShoppingCart size={19} />
                       {purchaseLoading ? "جارٍ إرسال الطلب..." : "طلب شراء"}
@@ -1032,7 +1095,7 @@ export default function AdDetails() {
                 <button
                   type="button"
                   onClick={startConversation}
-                  className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-emerald-700 px-4 py-3.5 text-sm font-extrabold text-white shadow-sm shadow-emerald-700/10 transition hover:-translate-y-0.5 hover:bg-emerald-800 hover:shadow-md"
+                  className="flex w-full items-center justify-center gap-2.5 min-h-11 rounded-xl bg-emerald-700 px-2.5 py-2 text-xs font-extrabold text-white shadow-sm shadow-emerald-700/10 transition hover:-translate-y-0.5 hover:bg-emerald-800 hover:shadow-md"
                 >
                   <MessageCircle size={19} />
                   مراسلة البائع
@@ -1041,7 +1104,7 @@ export default function AdDetails() {
                 <button
                   type="button"
                   onClick={toggleFavorite}
-                  className={`flex w-full items-center justify-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-bold transition ${
+                  className={`flex w-full items-center justify-center gap-2.5 col-span-2 rounded-xl border px-3 py-2.5 text-xs font-bold transition ${
                     isFavorite
                       ? "border-rose-200 bg-rose-50 text-rose-600"
                       : "border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50/50 hover:text-rose-600"
@@ -1056,11 +1119,11 @@ export default function AdDetails() {
               </div>
 
               {/* Share */}
-              <div className="mt-4 grid grid-cols-2 gap-2.5">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={shareAdOnWhatsApp}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-green-100 bg-green-50 px-3 py-3 text-xs font-bold text-green-700 transition hover:bg-green-100"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-green-100 bg-green-50 px-3 py-2 text-[11px] font-bold text-green-700 transition hover:bg-green-100"
                 >
                   <Share2 size={16} />
                   مشاركة واتساب
@@ -1069,7 +1132,7 @@ export default function AdDetails() {
                 <button
                   type="button"
                   onClick={copyAdLink}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50"
+                  className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 transition hover:bg-slate-50"
                 >
                   <Copy size={16} />
                   نسخ الرابط
@@ -1077,7 +1140,7 @@ export default function AdDetails() {
               </div>
 
               {/* Description */}
-              <div className="mt-7 border-t border-slate-100 pt-6">
+              <div className="mt-7 rounded-2xl bg-[#f8faf9] p-4 sm:p-5">
                 <div className="mb-3 flex items-center gap-2">
                   <div className="h-6 w-1 rounded-full bg-emerald-600" />
                   <h2 className="text-base font-extrabold text-slate-800">
@@ -1085,7 +1148,7 @@ export default function AdDetails() {
                   </h2>
                 </div>
 
-                <p className="whitespace-pre-wrap text-sm leading-8 text-slate-600">
+                <p className="whitespace-pre-wrap text-sm leading-8 text-slate-700">
                   {ad.description || "لا يوجد وصف لهذا الإعلان."}
                 </p>
               </div>
@@ -1159,7 +1222,7 @@ export default function AdDetails() {
                       type="button"
                       onClick={submitReport}
                       disabled={reportLoading}
-                      className="w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full rounded-xl bg-red-600 px-3 py-2.5 text-[13px] font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {reportLoading ? "جارٍ إرسال البلاغ..." : "إرسال البلاغ"}
                     </button>

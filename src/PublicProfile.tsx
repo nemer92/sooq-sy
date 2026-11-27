@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import { loadAdsCached, subscribeToAdsUpdates } from "./lib/adCache";
 import {
   ArrowRight,
   UserRound,
@@ -133,7 +134,6 @@ export default function PublicProfile() {
         const [
           verificationResult,
           phoneResult,
-          adsResult,
           reviewsResult,
           salesResult,
           countsResult,
@@ -146,13 +146,6 @@ export default function PublicProfile() {
           supabase.rpc("get_public_profile_phone", {
             p_user_id: id,
           }),
-
-          supabase
-            .from("ads")
-            .select("id, public_code, title, price, currency, created_at, city_id")
-            .eq("user_id", id)
-            .eq("status", "approved")
-            .order("created_at", { ascending: false }),
 
           supabase
             .from("seller_reviews")
@@ -177,7 +170,6 @@ export default function PublicProfile() {
 
         if (verificationResult.error) throw verificationResult.error;
         if (phoneResult.error) throw phoneResult.error;
-        if (adsResult.error) throw adsResult.error;
         if (reviewsResult.error) throw reviewsResult.error;
         if (countsResult.error) throw countsResult.error;
 
@@ -189,11 +181,26 @@ export default function PublicProfile() {
             ? String(phoneResult.data)
             : null
         );
-
-        const loadedAds = adsResult.data || [];
         const loadedReviews = (reviewsResult.data || []) as Review[];
 
-        setAds(loadedAds);
+        let loadedAds: any[] = [];
+        await loadAdsCached<any[]>(
+          `profile:ads:${id}`,
+          async () => {
+            const { data, error } = await supabase
+              .from("ads")
+              .select("id, public_code, title, price, currency, created_at, city_id")
+              .eq("user_id", id)
+              .eq("status", "approved")
+              .order("created_at", { ascending: false });
+            if (error) throw error;
+            return data || [];
+          },
+          (data) => {
+            loadedAds = data;
+            if (!cancelled) setAds(data);
+          }
+        );
         setReviews(loadedReviews);
 
         if (driverReviewsResult.error) {
@@ -303,10 +310,31 @@ export default function PublicProfile() {
       }
     }
 
+    const unsubscribe = subscribeToAdsUpdates(() => {
+      if (!id || cancelled) return;
+      void loadAdsCached<any[]>(
+        `profile:ads:${id}`,
+        async () => {
+          const { data, error } = await supabase
+            .from("ads")
+            .select("id, public_code, title, price, currency, created_at, city_id")
+            .eq("user_id", id)
+            .eq("status", "approved")
+            .order("created_at", { ascending: false });
+          if (error) throw error;
+          return data || [];
+        },
+        (data) => {
+          if (!cancelled) setAds(data);
+        }
+      ).catch((err) => console.error("تعذر تحديث إعلانات الملف الشخصي:", err));
+    });
+
     loadProfile();
 
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [id]);
 
@@ -538,12 +566,13 @@ function formatLastSeen(value: string | null | undefined) {
       </header>
 
       <div className="mx-auto max-w-4xl px-3 py-6 sm:px-5">
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className={isGeneralAdmin ? "admin-gold-cover h-28 sm:h-36" : "h-28 bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500 sm:h-36"} />
+        <section className="relative isolate overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className={`absolute inset-x-0 top-0 z-0 h-32 sm:h-36 ${isGeneralAdmin ? "admin-gold-cover" : "bg-gradient-to-l from-emerald-900 via-emerald-700 to-teal-500"}`} />
+          <div className="h-32 sm:h-36" />
 
-          <div className="px-5 pb-5 sm:px-8">
-            <div className="-mt-12 flex flex-wrap items-end gap-4">
-              <div className={`flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 bg-emerald-50 text-emerald-700 shadow-md ${isGeneralAdmin ? "admin-gold-avatar" : "border-white"}`}>
+          <div className="relative z-10 -mt-4 px-3 pb-3 sm:px-4">
+            <div className="-mt-9 flex flex-wrap items-end gap-3">
+              <div className={`relative z-20 flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border-[3px] bg-emerald-50 text-emerald-700 shadow-md ${isGeneralAdmin ? "admin-gold-avatar" : "border-white"}`}>
                 {profile.avatar_url ? (
                   <img
                     src={profile.avatar_url}

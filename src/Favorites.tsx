@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
+import { loadAdsCached, subscribeToAdsUpdates, invalidateAdsCache } from "./lib/adCache";
 import { Heart, MapPin, Car, ArrowRight } from "lucide-react";
 
 type FavoriteAd = {
@@ -21,92 +22,113 @@ export default function Favorites() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+    let unsubscribe = () => {};
+
     async function loadFavorites() {
       try {
         const {
           data: { user },
         } = await supabase.auth.getUser();
 
+        if (!active) return;
+
         if (!user) {
           navigate("/auth");
           return;
         }
 
-        const { data: favorites, error: favoritesError } =
-          await supabase
-            .from("favorites")
-            .select("ad_id")
-            .eq("user_id", user.id);
+        const cacheKey = `favorites:${user.id}`;
 
-        if (favoritesError) throw favoritesError;
+        unsubscribe = subscribeToAdsUpdates(() => {
+          if (active) void loadFavorites();
+        });
 
-        const adIds = (favorites ?? []).map((item) => item.ad_id);
+        await loadAdsCached<FavoriteAd[]>(
+          cacheKey,
+          async () => {
+            const { data: favorites, error: favoritesError } =
+              await supabase
+                .from("favorites")
+                .select("ad_id")
+                .eq("user_id", user.id);
 
-        if (adIds.length === 0) {
-          setAds([]);
-          return;
-        }
+            if (favoritesError) throw favoritesError;
 
-        const { data, error } = await supabase
-          .from("ads")
-          .select(`
-            id,
-            title,
-            price,
-            currency,
-            condition,
-            created_at,
-            cities(name_ar),
-            ad_images(image_path, sort_order)
-          `)
-          .in("id", adIds)
-          .eq("status", "approved")
-          .eq("listing_type", "sale")
-          .order("created_at", { ascending: false });
+            const adIds = (favorites ?? []).map((item) => item.ad_id);
 
-        if (error) throw error;
+            if (adIds.length === 0) return [];
 
-        const formattedAds: FavoriteAd[] = await Promise.all(
-          (data ?? []).map(async (ad: any) => {
-            const sortedImages = (ad.ad_images ?? []).sort(
-              (a: any, b: any) => a.sort_order - b.sort_order
-            );
+            const { data, error } = await supabase
+              .from("ads")
+              .select(`
+                id,
+                title,
+                price,
+                currency,
+                condition,
+                created_at,
+                cities(name_ar),
+                ad_images(image_path, sort_order)
+              `)
+              .in("id", adIds)
+              .eq("status", "approved")
+              .eq("listing_type", "sale")
+              .order("created_at", { ascending: false });
 
-            const signedImages = await Promise.all(
-              sortedImages.map(async (image: any) => {
-                const { data: imageData, error: imageError } =
-                  await supabase.storage
-                    .from("ad-images")
-                    .createSignedUrl(image.image_path, 3600);
+            if (error) throw error;
 
-                if (imageError) return "";
+            return Promise.all(
+              (data ?? []).map(async (ad: any) => {
+                const sortedImages = (ad.ad_images ?? []).sort(
+                  (a: any, b: any) => a.sort_order - b.sort_order
+                );
 
-                return imageData.signedUrl;
+                const signedImages = await Promise.all(
+                  sortedImages.map(async (image: any) => {
+                    const { data: imageData, error: imageError } =
+                      await supabase.storage
+                        .from("ad-images")
+                        .createSignedUrl(image.image_path, 3600);
+
+                    if (imageError) return "";
+                    return imageData.signedUrl;
+                  })
+                );
+
+                return {
+                  id: ad.id,
+                  title: ad.title,
+                  price: ad.price,
+                  currency: ad.currency,
+                  condition: ad.condition,
+                  city_name: ad.cities?.name_ar ?? "",
+                  created_at: ad.created_at,
+                  images: signedImages.filter(Boolean),
+                } as FavoriteAd;
               })
             );
-
-            return {
-              id: ad.id,
-              title: ad.title,
-              price: ad.price,
-              currency: ad.currency,
-              condition: ad.condition,
-              city_name: ad.cities?.name_ar ?? "",
-              created_at: ad.created_at,
-              images: signedImages.filter(Boolean),
-            };
-          })
+          },
+          (cachedAds) => {
+            if (!active) return;
+            setAds(cachedAds);
+            setLoading(false);
+          }
         );
-
-        setAds(formattedAds);
       } catch (error) {
+        if (!active) return;
         console.error("خطأ تحميل المفضلة:", error);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
 
-    loadFavorites();
+    void loadFavorites();
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, [navigate]);
 
   async function removeFavorite(adId: string) {
@@ -125,6 +147,7 @@ export default function Favorites() {
 
       if (error) throw error;
 
+      invalidateAdsCache(`favorites:${user.id}`);
       setAds((prev) => prev.filter((ad) => ad.id !== adId));
     } catch (error) {
       console.error("خطأ إزالة الإعلان من المفضلة:", error);

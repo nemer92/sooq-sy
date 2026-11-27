@@ -12,6 +12,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import { loadAdsCached, subscribeToAdsUpdates, invalidateAdsCache } from "./lib/adCache";
 
 type Store = {
   id: string;
@@ -104,6 +105,7 @@ const confirmCloseAd = async () => {
       throw new Error("تعذر إغلاق الإعلان أو ليس لديك صلاحية عليه");
     }
 
+    invalidateAdsCache(`store:ads:${store.id}`);
     setAds((current) =>
       current.filter((ad) => ad.id !== closingAdId)
     );
@@ -119,6 +121,7 @@ const confirmCloseAd = async () => {
 
   useEffect(() => {
     let active = true;
+    let unsubscribe = () => {};
 
     async function load() {
       if (!id) {
@@ -128,92 +131,101 @@ const confirmCloseAd = async () => {
 
       setLoading(true);
 
-      const [
-        { data: storeData, error: storeError },
-        { data: adsData, error: adsError },
-      ] = await Promise.all([
-        supabase
-          .from("stores")
-          .select(
-            "id,owner_id,name,business_type,description,governorate,city,phone,whatsapp,logo_url,cover_url"
-          )
-          .eq("id", id)
-          .eq("status", "active")
-          .maybeSingle(),
+      const { data: storeData, error: storeError } = await supabase
+        .from("stores")
+        .select(
+          "id,owner_id,name,business_type,description,governorate,city,phone,whatsapp,logo_url,cover_url"
+        )
+        .eq("id", id)
+        .eq("status", "active")
+        .maybeSingle();
 
-        supabase
-          .from("ads")
-          .select(
-            "id,title,description,price,currency,condition,created_at,is_featured,categories(name_ar),cities(name_ar),ad_images(image_path,sort_order)"
-          )
-          .eq("store_id", id)
-          .eq("status", "approved")
-          .order("created_at", { ascending: false }),
-      ]);
+      if (storeError) console.error("تعذر تحميل المتجر:", storeError);
+      if (!active) return;
 
-      if (storeError) {
-        console.error("تعذر تحميل المتجر:", storeError);
-      }
+      setStore(storeData as Store | null);
 
-      if (adsError) {
-        console.error("تعذر تحميل إعلانات المتجر:", adsError);
-      }
+      const cacheKey = `store:ads:${id}`;
 
-      let formatted: Ad[] = [];
+      async function loadStoreAds() {
+        await loadAdsCached<Ad[]>(
+          cacheKey,
+          async () => {
+            const { data: adsData, error: adsError } = await supabase
+              .from("ads")
+              .select(
+                "id,title,description,price,currency,condition,created_at,is_featured,categories(name_ar),cities(name_ar),ad_images(image_path,sort_order)"
+              )
+              .eq("store_id", id)
+              .eq("status", "approved")
+              .order("created_at", { ascending: false });
 
-      if (adsData) {
-        formatted = await Promise.all(
-          (adsData as any[]).map(async (ad) => {
-            const sorted = [...(ad.ad_images ?? [])].sort(
-              (a, b) => a.sort_order - b.sort_order
-            );
+            if (adsError) throw adsError;
 
-            const images = await Promise.all(
-              sorted.map(async (image) => {
-                const { data } = await supabase.storage
-                  .from("ad-images")
-                  .createSignedUrl(image.image_path, 3600);
+            return Promise.all(
+              (adsData ?? []).map(async (ad: any) => {
+                const sorted = [...(ad.ad_images ?? [])].sort(
+                  (a, b) => a.sort_order - b.sort_order
+                );
 
-                return data?.signedUrl ?? "";
+                const images = await Promise.all(
+                  sorted.map(async (image: any) => {
+                    const { data } = await supabase.storage
+                      .from("ad-images")
+                      .createSignedUrl(image.image_path, 3600);
+
+                    return data?.signedUrl ?? "";
+                  })
+                );
+
+                const cat = Array.isArray(ad.categories)
+                  ? ad.categories[0]
+                  : ad.categories;
+                const cityValue = Array.isArray(ad.cities)
+                  ? ad.cities[0]
+                  : ad.cities;
+
+                return {
+                  id: ad.id,
+                  title: ad.title,
+                  description: ad.description,
+                  price: ad.price,
+                  currency: ad.currency,
+                  condition: ad.condition,
+                  created_at: ad.created_at,
+                  is_featured: ad.is_featured,
+                  category_name: cat?.name_ar ?? "",
+                  city_name: cityValue?.name_ar ?? "",
+                  images: images.filter(Boolean),
+                } as Ad;
               })
             );
-
-            const cat = Array.isArray(ad.categories)
-              ? ad.categories[0]
-              : ad.categories;
-
-            const cityValue = Array.isArray(ad.cities)
-              ? ad.cities[0]
-              : ad.cities;
-
-            return {
-              id: ad.id,
-              title: ad.title,
-              description: ad.description,
-              price: ad.price,
-              currency: ad.currency,
-              condition: ad.condition,
-              created_at: ad.created_at,
-              is_featured: ad.is_featured,
-              category_name: cat?.name_ar ?? "",
-              city_name: cityValue?.name_ar ?? "",
-              images: images.filter(Boolean),
-            };
-          })
+          },
+          (cachedAds) => {
+            if (!active) return;
+            setAds(cachedAds);
+            setLoading(false);
+          }
         );
       }
 
-      if (active) {
-        setStore(storeData as Store | null);
-        setAds(formatted);
-        setLoading(false);
+      unsubscribe = subscribeToAdsUpdates(() => {
+        if (active) void loadStoreAds();
+      });
+
+      try {
+        await loadStoreAds();
+      } catch (error) {
+        console.error("تعذر تحميل إعلانات المتجر:", error);
+        if (active) setLoading(false);
       }
     }
 
-    load();
+    void load();
 
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [id]);
 

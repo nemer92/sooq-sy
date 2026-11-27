@@ -2439,7 +2439,7 @@ html.dark body .admin-app-scroll-layout .content textarea:focus {
 .admin-gold-cover::after {
   content: "";
   position: absolute;
-  inset: -60% -30%;
+  inset: -60% -30% -15%;
   background: linear-gradient(110deg, transparent 38%, rgba(210,220,255,.08) 44%, rgba(235,240,255,.38) 49%, rgba(180,190,230,.14) 53%, transparent 60%);
   transform: translateX(-65%);
   animation: adminGoldShine 5s ease-in-out infinite;

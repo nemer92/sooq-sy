@@ -1,7 +1,8 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, MapPin, Car } from "lucide-react";
 import { supabase } from "./lib/supabase";
+import { loadAdsCached, subscribeToAdsUpdates } from "./lib/adCache";
 
 type Ad = {
   id: string;
@@ -26,71 +27,86 @@ export default function PublicAds() {
 
   useEffect(() => {
     let active = true;
+    const cacheKey = `public:sale:featured:${featuredOnly}`;
 
     async function loadAds() {
-      setLoading(true);
-      setError("");
+      try {
+        await loadAdsCached<Ad[]>(
+          cacheKey,
+          async () => {
+            const { data, error: queryError } = await supabase
+              .from("ads")
+              .select(`
+                id, title, description, price, currency, created_at, is_featured,
+                categories(name_ar), cities(name_ar),
+                ad_images(image_path, sort_order)
+              `)
+              .eq("status", "approved")
+              .eq("listing_type", "sale")
+              .eq("is_featured", featuredOnly)
+              .order("created_at", { ascending: false });
 
-      const { data, error: queryError } = await supabase
-        .from("ads")
-        .select(`
-          id, title, description, price, currency, created_at, is_featured,
-          categories(name_ar), cities(name_ar),
-          ad_images(image_path, sort_order)
-        `)
-        .eq("status", "approved")
-        .eq("listing_type", "sale")
-        .eq("is_featured", featuredOnly)
-        .order("created_at", { ascending: false });
+            if (queryError) throw queryError;
 
-      if (!active) return;
+            return Promise.all(
+              (data ?? []).map(async (ad: any) => {
+                const sortedImages = (ad.ad_images ?? []).sort(
+                  (a: any, b: any) => a.sort_order - b.sort_order
+                );
 
-      if (queryError) {
+                const images = await Promise.all(
+                  sortedImages.map(async (image: any) => {
+                    const { data: imageData, error: imageError } =
+                      await supabase.storage
+                        .from("ad-images")
+                        .createSignedUrl(image.image_path, 3600);
+
+                    if (imageError) return "";
+                    return imageData.signedUrl;
+                  })
+                );
+
+                return {
+                  id: ad.id,
+                  title: ad.title,
+                  description: ad.description ?? "",
+                  price: ad.price,
+                  currency: ad.currency ?? "",
+                  created_at: ad.created_at,
+                  category_name: ad.categories?.name_ar ?? "",
+                  city_name: ad.cities?.name_ar ?? "",
+                  images: images.filter(Boolean),
+                  is_featured: ad.is_featured ?? false,
+                } as Ad;
+              })
+            );
+          },
+          (cachedAds) => {
+            if (!active) return;
+            setAds(cachedAds);
+            setLoading(false);
+            setError("");
+          }
+        );
+      } catch (queryError) {
+        if (!active) return;
         console.error("خطأ تحميل الإعلانات:", queryError);
-        setError("تعذر تحميل الإعلانات. حاول مرة أخرى.");
-        setLoading(false);
-        return;
-      }
-
-      const formatted: Ad[] = await Promise.all(
-        (data ?? []).map(async (ad: any) => {
-          const sortedImages = (ad.ad_images ?? []).sort(
-            (a: any, b: any) => a.sort_order - b.sort_order
-          );
-          const images = await Promise.all(
-            sortedImages.map(async (image: any) => {
-              const { data: imageData, error: imageError } = await supabase.storage
-                .from("ad-images")
-                .createSignedUrl(image.image_path, 3600);
-              if (imageError) return "";
-              return imageData.signedUrl;
-            })
-          );
-
-          return {
-            id: ad.id,
-            title: ad.title,
-            description: ad.description ?? "",
-            price: ad.price,
-            currency: ad.currency ?? "",
-            created_at: ad.created_at,
-            category_name: ad.categories?.name_ar ?? "",
-            city_name: ad.cities?.name_ar ?? "",
-            images: images.filter(Boolean),
-            is_featured: ad.is_featured ?? false,
-          };
-        })
-      );
-
-      if (active) {
-        setAds(formatted);
+        if (ads.length === 0) {
+          setError("تعذر تحميل الإعلانات. حاول مرة أخرى.");
+        }
         setLoading(false);
       }
     }
 
-    loadAds();
+    const unsubscribe = subscribeToAdsUpdates(() => {
+      if (active) void loadAds();
+    });
+
+    void loadAds();
+
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [featuredOnly]);
 

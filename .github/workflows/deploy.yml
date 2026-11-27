@@ -88,6 +88,9 @@ jobs:
           echo "Android update version: ${VERSION}"
           echo "Bundle ID: ${BUNDLE_ID}"
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Build Signed Android APK
         shell: bash
         env:

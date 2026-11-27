@@ -535,6 +535,7 @@ function MaintenanceGuard({
   const location = useLocation();
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [introFinished, setIntroFinished] = useState(false);
 
   useEffect(() => {
     const loadMaintenanceMode = async () => {
@@ -558,16 +559,30 @@ function MaintenanceGuard({
     return <>{children}</>;
   }
 
-  if (loading) {
+  if (!introFinished) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="font-bold text-slate-500">
-          جاري فتح التطبيق...
-        </p>
+      <div className="fixed inset-0 z-[99999] flex min-h-screen items-center justify-center overflow-hidden bg-white">
+        <video
+          src="/intro/intro.MP4"
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          onEnded={() => setIntroFinished(true)}
+          onError={() => setIntroFinished(true)}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
       </div>
     );
   }
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="font-bold text-slate-500">يرجى الانتظار...</p>
+      </div>
+    );
+  }
   if (maintenanceMode) {
     return (
       <main

@@ -559,7 +559,7 @@ function MaintenanceGuard({
     return <>{children}</>;
   }
 
-  if (!introFinished) {
+  if (!introFinished || loading) {
     return (
       <div className="fixed inset-0 z-[99999] flex min-h-screen items-center justify-center overflow-hidden bg-white">
         <video
@@ -567,6 +567,8 @@ function MaintenanceGuard({
           autoPlay
           muted
           playsInline
+          controls={false}
+          disablePictureInPicture
           preload="auto"
           onEnded={() => setIntroFinished(true)}
           onError={() => setIntroFinished(true)}

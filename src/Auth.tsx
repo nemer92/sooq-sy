@@ -416,7 +416,7 @@ export default function Auth() {
           >
             <div className="h-16 w-16 overflow-hidden rounded-2xl bg-white shadow-lg shadow-emerald-600/20 ring-1 ring-emerald-100">
               <img
-                src="/logo.png?v=3"
+                src="/app-icon.png?v=1"
                 alt="شعار سوق سوريا"
                 className="h-full w-full object-cover"
               />

@@ -3917,7 +3917,7 @@ function getSubCategories(categoryId: number) {
       <div className="login-page" dir="rtl">
         <div className="login-card">
 <img
-  src="/logo.png?v=3"
+  src="/app-icon.png?v=1"
   alt="Sooq.Sy"
   className="login-logo"
 />

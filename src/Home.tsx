@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { Share } from "@capacitor/share";
@@ -8,7 +8,6 @@ import {
   getLiveUpdateState,
   subscribeLiveUpdate,
 } from "./lib/liveUpdate";
-import siteIcon from "../assets/icon.png";
 import {
   Search,
   MapPin,
@@ -523,8 +522,13 @@ const toggleCondition = (condition: "new" | "used") => {
   );
 };
 const [siteName, setSiteName] = useState("Sooq.Sy");
-const [logoUrl, setLogoUrl] = useState("");
-const [heroImageUrl, setHeroImageUrl] = useState("");
+const [heroImageUrl, setHeroImageUrl] = useState(() => {
+  try {
+    return localStorage.getItem("sooq_hero_image_url") || "";
+  } catch {
+    return "";
+  }
+});
 const [contactEmail, setContactEmail] = useState("");
 const [contactPhone, setContactPhone] = useState("");
 const [allowNewAds, setAllowNewAds] = useState(true);
@@ -725,8 +729,17 @@ useEffect(() => {
     }
 
     setSiteName(data.site_name || "Sooq.Sy");
-    setLogoUrl(data.logo_url || "");
-    setHeroImageUrl(data.hero_image_url || "");
+    const latestHeroImage = data.hero_image_url || "";
+    setHeroImageUrl(latestHeroImage);
+    try {
+      if (latestHeroImage) {
+        localStorage.setItem("sooq_hero_image_url", latestHeroImage);
+      } else {
+        localStorage.removeItem("sooq_hero_image_url");
+      }
+    } catch {
+      console.warn("تعذر حفظ صورة الواجهة محلياً");
+    }
     setContactEmail(data.contact_email || "");
     setContactPhone(data.contact_phone || "");
     setAllowNewAds(data.allow_new_ads ?? true);
@@ -1287,7 +1300,7 @@ const matchesCondition = selectedConditions.includes(
   {/* اللوغو على اليسار */}
   <div className="order-1 shrink-0 rounded-2xl bg-emerald-50 p-1 shadow-sm ring-1 ring-emerald-100/80 transition duration-300 group-hover:scale-[1.03] group-hover:shadow-md">
 <img
-  src={logoUrl || siteIcon}
+  src="/app-icon.png?v=1"
   alt="Sooq.Sy"
   className="h-10 w-10 rounded-xl object-contain sm:h-11 sm:w-11"
 />

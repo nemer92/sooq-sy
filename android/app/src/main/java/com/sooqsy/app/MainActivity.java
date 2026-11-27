@@ -1,4 +1,3 @@
-
 package com.sooqsy.app;
 
 import android.os.Bundle;
@@ -10,5 +9,11 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(DeviceKeyPlugin.class);
         super.onCreate(savedInstanceState);
+
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView()
+                .getSettings()
+                .setMediaPlaybackRequiresUserGesture(false);
+        }
     }
 }

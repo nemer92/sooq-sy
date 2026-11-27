@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import AdPickupLocationMap from "./AdPickupLocationMap";
@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Tag,
   MessageCircle,
+  Eye,
   Image as ImageIcon,
   Clock3,
 } from "lucide-react";
@@ -46,6 +47,8 @@ export default function AdDetails() {
   const [isVerified, setIsVerified] = useState(false);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [adMetrics, setAdMetrics] = useState({ views_count: 0, contact_clicks_count: 0, favorites_count: 0 });
+  const recordedViewIds = useRef(new Set<string>());
   const [pickupLatitude, setPickupLatitude] = useState<number | null>(null);
   const [pickupLongitude, setPickupLongitude] = useState<number | null>(null);
   const [pickupAddressLabel, setPickupAddressLabel] = useState("");
@@ -91,6 +94,15 @@ export default function AdDetails() {
 
       if (data) {
         setAd(data);
+
+        if (!recordedViewIds.current.has(data.id)) {
+          recordedViewIds.current.add(data.id);
+          const { error: viewMetricError } = await supabase.rpc("record_ad_view", {
+            p_ad_id: data.id,
+            p_event_id: crypto.randomUUID(),
+          });
+          if (viewMetricError) console.error("تعذر تسجيل مشاهدة الإعلان:", viewMetricError);
+        }
 
         const shareToken = new URLSearchParams(
           window.location.search
@@ -163,6 +175,19 @@ export default function AdDetails() {
         } = await supabase.auth.getUser();
 
         setCurrentUserId(user?.id ?? null);
+
+        if (user?.id === data.user_id) {
+          const { data: metricsData, error: metricsError } = await supabase
+            .from("ad_metrics")
+            .select("views_count, contact_clicks_count, favorites_count")
+            .eq("ad_id", data.id)
+            .maybeSingle();
+          if (metricsError) {
+            console.error("تعذر تحميل إحصائيات الإعلان:", metricsError);
+          } else if (metricsData) {
+            setAdMetrics(metricsData);
+          }
+        }
 
         if (user && user.id === data.user_id) {
           const { data: pickupData, error: pickupError } = await supabase
@@ -470,6 +495,13 @@ export default function AdDetails() {
         if (insertError) throw insertError;
         conversationId = newConversation.id;
       }
+
+      const { data: contactMetricResult, error: contactMetricError } = await supabase.rpc("record_ad_contact_click", {
+        p_ad_id: ad.id,
+        p_event_id: crypto.randomUUID(),
+        p_conversation_id: conversationId,
+      });
+      if (contactMetricError) console.error("تعذر تسجيل نقرة المراسلة:", contactMetricError); else console.log("نتيجة تسجيل نقرة المراسلة:", contactMetricResult);
 
       navigate(`/messages/${conversationId}`);
     } catch (error) {
@@ -843,6 +875,32 @@ export default function AdDetails() {
                   </span>
                 )}
               </div>
+
+              {currentUserId === ad.user_id && (
+                <div className="mt-6 grid grid-cols-3 gap-3">
+                  <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Eye size={18} />
+                      <span className="text-xs font-semibold">المشاهدات</span>
+                    </div>
+                    <p className="mt-2 text-2xl font-extrabold text-slate-800">{adMetrics.views_count}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <MessageCircle size={18} />
+                      <span className="text-xs font-semibold">نقرات المراسلة</span>
+                    </div>
+                    <p className="mt-2 text-2xl font-extrabold text-slate-800">{adMetrics.contact_clicks_count}</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-100 bg-white p-4">
+                    <div className="flex items-center gap-2 text-slate-500">
+                      <Heart size={18} />
+                      <span className="text-xs font-semibold">المفضلة</span>
+                    </div>
+                    <p className="mt-2 text-2xl font-extrabold text-slate-800">{adMetrics.favorites_count}</p>
+                  </div>
+                </div>
+              )}
 
               {/* Seller pickup location */}
               {currentUserId === ad.user_id && (

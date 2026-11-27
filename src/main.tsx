@@ -53,7 +53,7 @@ import { processPendingAdUploads } from "./lib/adUploadQueue";
 
 
 // ==========================================
-// أنواع نوافذ Sooq.sy المخصصة
+// ط·آ£ط¸â€ ط¸ث†ط·آ§ط·آ¹ ط¸â€ ط¸ث†ط·آ§ط¸ظ¾ط·آ° Sooq.sy ط·آ§ط¸â€‍ط¸â€¦ط·آ®ط·آµط·آµط·آ©
 // ==========================================
 
 declare global {
@@ -97,7 +97,7 @@ function queueCustomDialog(dialog: DialogRequest) {
   }
 }
 
-// استبدال alert الافتراضي
+// ط·آ§ط·آ³ط·ع¾ط·آ¨ط·آ¯ط·آ§ط¸â€‍ alert ط·آ§ط¸â€‍ط·آ§ط¸ظ¾ط·ع¾ط·آ±ط·آ§ط·آ¶ط¸ظ¹
 window.alert = (message?: any): void => {
   queueCustomDialog({
     id: ++nextDialogId,
@@ -106,7 +106,7 @@ window.alert = (message?: any): void => {
   });
 };
 
-// نافذة تأكيد مخصصة
+// ط¸â€ ط·آ§ط¸ظ¾ط·آ°ط·آ© ط·ع¾ط·آ£ط¸ئ’ط¸ظ¹ط·آ¯ ط¸â€¦ط·آ®ط·آµط·آµط·آ©
 window.sooqConfirm = (message: string): Promise<boolean> => {
   return new Promise((resolve) => {
     queueCustomDialog({
@@ -118,7 +118,7 @@ window.sooqConfirm = (message: string): Promise<boolean> => {
   });
 };
 
-// نافذة إدخال نص مخصصة
+// ط¸â€ ط·آ§ط¸ظ¾ط·آ°ط·آ© ط·آ¥ط·آ¯ط·آ®ط·آ§ط¸â€‍ ط¸â€ ط·آµ ط¸â€¦ط·آ®ط·آµط·آµط·آ©
 window.sooqPrompt = (message: string): Promise<string | null> => {
   return new Promise((resolve) => {
     queueCustomDialog({
@@ -131,7 +131,7 @@ window.sooqPrompt = (message: string): Promise<string | null> => {
 };
 
 // ==========================================
-// عرض نوافذ التنبيه والتأكيد والإدخال
+// ط·آ¹ط·آ±ط·آ¶ ط¸â€ ط¸ث†ط·آ§ط¸ظ¾ط·آ° ط·آ§ط¸â€‍ط·ع¾ط¸â€ ط·آ¨ط¸ظ¹ط¸â€، ط¸ث†ط·آ§ط¸â€‍ط·ع¾ط·آ£ط¸ئ’ط¸ظ¹ط·آ¯ ط¸ث†ط·آ§ط¸â€‍ط·آ¥ط·آ¯ط·آ®ط·آ§ط¸â€‍
 // ==========================================
 
 function CustomAlertHost() {
@@ -254,7 +254,7 @@ function CustomAlertHost() {
               }}
               autoFocus
               className="mt-5 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-right text-base text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              placeholder="اكتب هنا..."
+              placeholder="ط·آ§ط¸ئ’ط·ع¾ط·آ¨ ط¸â€،ط¸â€ ط·آ§..."
             />
           )}
         </div>
@@ -267,7 +267,7 @@ function CustomAlertHost() {
               autoFocus
               className="w-full rounded-2xl bg-emerald-600 px-5 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
             >
-              حسناً
+              ط·آ­ط·آ³ط¸â€ ط·آ§ط¸â€¹
             </button>
           )}
 
@@ -279,7 +279,7 @@ function CustomAlertHost() {
                 autoFocus
                 className="w-1/2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3.5 text-base font-bold text-slate-700 transition-colors hover:bg-slate-200 active:scale-[0.98]"
               >
-                إلغاء
+                ط·آ¥ط¸â€‍ط·ط›ط·آ§ط·طŒ
               </button>
 
               <button
@@ -287,7 +287,7 @@ function CustomAlertHost() {
                 onClick={() => finishDialog(true)}
                 className="w-1/2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
               >
-                تأكيد
+                ط·ع¾ط·آ£ط¸ئ’ط¸ظ¹ط·آ¯
               </button>
             </>
           )}
@@ -299,7 +299,7 @@ function CustomAlertHost() {
                 onClick={() => finishDialog(null)}
                 className="w-1/2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3.5 text-base font-bold text-slate-700 transition-colors hover:bg-slate-200 active:scale-[0.98]"
               >
-                إلغاء
+                ط·آ¥ط¸â€‍ط·ط›ط·آ§ط·طŒ
               </button>
 
               <button
@@ -307,7 +307,7 @@ function CustomAlertHost() {
                 onClick={() => finishDialog(promptValue)}
                 className="w-1/2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
               >
-                متابعة
+                ط¸â€¦ط·ع¾ط·آ§ط·آ¨ط·آ¹ط·آ©
               </button>
             </>
           )}
@@ -369,7 +369,7 @@ function AppUrlListener() {
 }
 
 // ==========================================
-// حفظ واستعادة موضع التمرير على أندرويد فقط
+// ط·آ­ط¸ظ¾ط·آ¸ ط¸ث†ط·آ§ط·آ³ط·ع¾ط·آ¹ط·آ§ط·آ¯ط·آ© ط¸â€¦ط¸ث†ط·آ¶ط·آ¹ ط·آ§ط¸â€‍ط·ع¾ط¸â€¦ط·آ±ط¸ظ¹ط·آ± ط·آ¹ط¸â€‍ط¸â€° ط·آ£ط¸â€ ط·آ¯ط·آ±ط¸ث†ط¸ظ¹ط·آ¯ ط¸ظ¾ط¸â€ڑط·آ·
 // ==========================================
 
 function MobileScrollRestoration() {
@@ -455,7 +455,7 @@ function MobileScrollRestoration() {
 }
 
 // ==========================================
-// معالجة زر الرجوع في تطبيق أندرويد فقط
+// ط¸â€¦ط·آ¹ط·آ§ط¸â€‍ط·آ¬ط·آ© ط·آ²ط·آ± ط·آ§ط¸â€‍ط·آ±ط·آ¬ط¸ث†ط·آ¹ ط¸ظ¾ط¸ظ¹ ط·ع¾ط·آ·ط·آ¨ط¸ظ¹ط¸â€ڑ ط·آ£ط¸â€ ط·آ¯ط·آ±ط¸ث†ط¸ظ¹ط·آ¯ ط¸ظ¾ط¸â€ڑط·آ·
 // ==========================================
 
 function MobileBackButtonHandler() {
@@ -524,7 +524,7 @@ function MobileBackButtonHandler() {
 }
 
 // ==========================================
-// التحقق من وضع الصيانة
+// ط·آ§ط¸â€‍ط·ع¾ط·آ­ط¸â€ڑط¸â€ڑ ط¸â€¦ط¸â€  ط¸ث†ط·آ¶ط·آ¹ ط·آ§ط¸â€‍ط·آµط¸ظ¹ط·آ§ط¸â€ ط·آ©
 // ==========================================
 
 function MaintenanceGuard({
@@ -536,6 +536,7 @@ function MaintenanceGuard({
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [introFinished, setIntroFinished] = useState(false);
+  const [introStarted, setIntroStarted] = useState(false);
 
   useEffect(() => {
     const loadMaintenanceMode = async () => {
@@ -570,9 +571,10 @@ function MaintenanceGuard({
           controls={false}
           disablePictureInPicture
           preload="auto"
+          onPlaying={() => setIntroStarted(true)}
           onEnded={() => setIntroFinished(true)}
           onError={() => setIntroFinished(true)}
-          className="absolute inset-0 h-full w-full object-cover"
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-150 ${introStarted ? "opacity-100" : "opacity-0"}`}
         />
       </div>
     );
@@ -581,7 +583,7 @@ function MaintenanceGuard({
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <p className="font-bold text-slate-500">يرجى الانتظار...</p>
+        <p className="font-bold text-slate-500">ط¸ظ¹ط·آ±ط·آ¬ط¸â€° ط·آ§ط¸â€‍ط·آ§ط¸â€ ط·ع¾ط·آ¸ط·آ§ط·آ±...</p>
       </div>
     );
   }
@@ -592,19 +594,19 @@ function MaintenanceGuard({
         className="flex min-h-screen items-center justify-center bg-slate-50 px-4"
       >
         <div className="w-full max-w-lg rounded-3xl border bg-white p-10 text-center shadow-sm">
-          <div className="mb-5 text-5xl">🛠️</div>
+          <div className="mb-5 text-5xl">ظ‹ع؛â€؛آ أ¯آ¸عˆ</div>
 
           <h1 className="text-2xl font-black text-slate-800">
-            الموقع قيد الصيانة
+            ط·آ§ط¸â€‍ط¸â€¦ط¸ث†ط¸â€ڑط·آ¹ ط¸â€ڑط¸ظ¹ط·آ¯ ط·آ§ط¸â€‍ط·آµط¸ظ¹ط·آ§ط¸â€ ط·آ©
           </h1>
 
           <p className="mt-4 leading-8 text-slate-500">
-            نعمل حالياً على إجراء بعض التحسينات والتحديثات.
-            نعتذر عن توقف الخدمة مؤقتاً، وسنعود إليكم قريباً.
+            ط¸â€ ط·آ¹ط¸â€¦ط¸â€‍ ط·آ­ط·آ§ط¸â€‍ط¸ظ¹ط·آ§ط¸â€¹ ط·آ¹ط¸â€‍ط¸â€° ط·آ¥ط·آ¬ط·آ±ط·آ§ط·طŒ ط·آ¨ط·آ¹ط·آ¶ ط·آ§ط¸â€‍ط·ع¾ط·آ­ط·آ³ط¸ظ¹ط¸â€ ط·آ§ط·ع¾ ط¸ث†ط·آ§ط¸â€‍ط·ع¾ط·آ­ط·آ¯ط¸ظ¹ط·آ«ط·آ§ط·ع¾.
+            ط¸â€ ط·آ¹ط·ع¾ط·آ°ط·آ± ط·آ¹ط¸â€  ط·ع¾ط¸ث†ط¸â€ڑط¸ظ¾ ط·آ§ط¸â€‍ط·آ®ط·آ¯ط¸â€¦ط·آ© ط¸â€¦ط·آ¤ط¸â€ڑط·ع¾ط·آ§ط¸â€¹ط·إ’ ط¸ث†ط·آ³ط¸â€ ط·آ¹ط¸ث†ط·آ¯ ط·آ¥ط¸â€‍ط¸ظ¹ط¸ئ’ط¸â€¦ ط¸â€ڑط·آ±ط¸ظ¹ط·آ¨ط·آ§ط¸â€¹.
           </p>
 
           <p className="mt-6 text-sm font-bold text-emerald-600">
-            شكراً لتفهمكم ❤️
+            ط·آ´ط¸ئ’ط·آ±ط·آ§ط¸â€¹ ط¸â€‍ط·ع¾ط¸ظ¾ط¸â€،ط¸â€¦ط¸ئ’ط¸â€¦ أ¢â€Œآ¤أ¯آ¸عˆ
           </p>
         </div>
       </main>
@@ -636,7 +638,7 @@ function AdUploadQueueRunner() {
 
   return null;
 }
-// تشغيل التطبيق
+// ط·ع¾ط·آ´ط·ط›ط¸ظ¹ط¸â€‍ ط·آ§ط¸â€‍ط·ع¾ط·آ·ط·آ¨ط¸ظ¹ط¸â€ڑ
 // ==========================================
 
 createRoot(document.getElementById("root")!).render(

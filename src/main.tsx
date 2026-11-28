@@ -254,7 +254,7 @@ function CustomAlertHost() {
               }}
               autoFocus
               className="mt-5 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-right text-base text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-              placeholder="ط·آ§ط¸ئ’ط·ع¾ط·آ¨ ط¸â€،ط¸â€ ط·آ§..."
+              placeholder="اكتب هنا..."
             />
           )}
         </div>
@@ -267,7 +267,7 @@ function CustomAlertHost() {
               autoFocus
               className="w-full rounded-2xl bg-emerald-600 px-5 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
             >
-              ط·آ­ط·آ³ط¸â€ ط·آ§ط¸â€¹
+              حسناً
             </button>
           )}
 
@@ -279,7 +279,7 @@ function CustomAlertHost() {
                 autoFocus
                 className="w-1/2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3.5 text-base font-bold text-slate-700 transition-colors hover:bg-slate-200 active:scale-[0.98]"
               >
-                ط·آ¥ط¸â€‍ط·ط›ط·آ§ط·طŒ
+                إلغاء
               </button>
 
               <button
@@ -287,7 +287,7 @@ function CustomAlertHost() {
                 onClick={() => finishDialog(true)}
                 className="w-1/2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
               >
-                ط·ع¾ط·آ£ط¸ئ’ط¸ظ¹ط·آ¯
+                تأكيد
               </button>
             </>
           )}
@@ -299,7 +299,7 @@ function CustomAlertHost() {
                 onClick={() => finishDialog(null)}
                 className="w-1/2 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3.5 text-base font-bold text-slate-700 transition-colors hover:bg-slate-200 active:scale-[0.98]"
               >
-                ط·آ¥ط¸â€‍ط·ط›ط·آ§ط·طŒ
+                إلغاء
               </button>
 
               <button
@@ -307,7 +307,7 @@ function CustomAlertHost() {
                 onClick={() => finishDialog(promptValue)}
                 className="w-1/2 rounded-2xl bg-emerald-600 px-4 py-3.5 text-base font-bold text-white shadow-lg shadow-emerald-600/20 transition-colors hover:bg-emerald-700 active:scale-[0.98]"
               >
-                ط¸â€¦ط·ع¾ط·آ§ط·آ¨ط·آ¹ط·آ©
+                متابعة
               </button>
             </>
           )}

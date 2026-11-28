@@ -81,6 +81,10 @@ export default function AddAd() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [parentCategoryId, setParentCategoryId] = useState("");
+  const subcategories = categories.filter(
+    (category) => category.parent_id === Number(parentCategoryId)
+  );
   const [governorateId, setGovernorateId] = useState("");
   const [cityId, setCityId] = useState("");
   const [price, setPrice] = useState("");
@@ -1005,25 +1009,59 @@ export default function AddAd() {
 
                 <select
                   required
-                  value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className={inputClass}
-                >
-                  <option value="">اختر التصنيف</option>
-                  {categories.map((category) => {
-                    const parent = categories.find(
-                      (item) => item.id === category.parent_id
+                  value={parentCategoryId}
+                  onChange={(e) => {
+                    const selectedParentId = e.target.value;
+                    setParentCategoryId(selectedParentId);
+
+                    const hasSubcategories = categories.some(
+                      (category) =>
+                        category.parent_id === Number(selectedParentId)
                     );
 
-                    return (
-                      <option key={category.id} value={category.id}>
-                        {parent
-                          ? `${parent.name_ar} - ${category.name_ar}`
-                          : category.name_ar}
-                      </option>
+                    setCategoryId(
+                      selectedParentId && !hasSubcategories
+                        ? selectedParentId
+                        : ""
                     );
-                  })}
+                  }}
+                  className={inputClass}
+                >
+                  <option value="">
+                    {"\u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0635\u0646\u064A\u0641"}
+                  </option>
+                  {categories
+                    .filter((category) => category.parent_id === null)
+                    .map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name_ar}
+                      </option>
+                    ))}
                 </select>
+
+                {parentCategoryId && subcategories.length > 0 && (
+                  <div className="mt-3">
+                    <label className={labelClass}>
+                      {"\u0627\u0644\u062A\u0635\u0646\u064A\u0641 \u0627\u0644\u0641\u0631\u0639\u064A"}
+                      <span className="mr-1 text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={categoryId}
+                      onChange={(e) => setCategoryId(e.target.value)}
+                      className={inputClass}
+                    >
+                      <option value="">
+                        {"\u0627\u062E\u062A\u0631 \u0627\u0644\u062A\u0635\u0646\u064A\u0641 \u0627\u0644\u0641\u0631\u0639\u064A"}
+                      </option>
+                      {subcategories.map((category) => (
+                        <option key={category.id} value={category.id}>
+                          {category.name_ar}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div>

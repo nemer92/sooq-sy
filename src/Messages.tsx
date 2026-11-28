@@ -20,6 +20,8 @@ type Message = {
   sender_id: string;
   body: string;
   created_at: string;
+  is_read: boolean;
+  delivered_at: string | null;
 };
 
 export default function Messages() {
@@ -222,16 +224,6 @@ export default function Messages() {
 
         setMessages(messagesData || []);
 
-        const { error: readError } = await supabase.rpc(
-          "mark_conversation_messages_read",
-          {
-            p_conversation_id: id,
-          }
-        );
-
-        if (readError) {
-          console.error("خطأ تحديث حالة القراءة:", readError);
-        }
       } catch (err) {
         console.error("خطأ تحميل المحادثة:", err);
         setError("تعذر تحميل المحادثة.");
@@ -244,7 +236,7 @@ export default function Messages() {
   }, [id, navigate]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !userId) return;
 
     const channel = supabase
       .channel(`conversation-${id}`)
@@ -256,34 +248,74 @@ export default function Messages() {
           table: "messages",
           filter: `conversation_id=eq.${id}`,
         },
-        (payload) => {
+        async (payload) => {
           const incomingMessage = payload.new as Message;
 
           setMessages((previous) => {
-            if (
-              previous.some(
-                (message) => message.id === incomingMessage.id
-              )
-            ) {
+            if (previous.some((message) => message.id === incomingMessage.id)) {
               return previous;
             }
 
             return [...previous, incomingMessage];
           });
+
+          if (incomingMessage.sender_id !== userId) {
+            const { error: readError } = await supabase.rpc(
+              "mark_conversation_messages_read",
+              { p_conversation_id: id }
+            );
+
+            if (readError) {
+              console.error("خطأ تحديث قراءة الرسالة:", readError);
+            }
+          }
         }
       )
-      .subscribe((status, err) => {
-        console.log("حالة اتصال الرسائل:", status);
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${id}`,
+        },
+        (payload) => {
+          const updatedMessage = payload.new as Message;
 
-        if (err) {
-          console.error("خطأ اتصال الرسائل:", err);
+          setMessages((previous) =>
+            previous.map((message) =>
+              message.id === updatedMessage.id
+                ? { ...message, ...updatedMessage }
+                : message
+            )
+          );
         }
-      });
+      )
+      .subscribe(async (status, err) => {
+      console.log("Messages realtime status:", status);
+
+      if (status === "SUBSCRIBED") {
+        const { error: readError } = await supabase.rpc(
+          "mark_conversation_messages_read",
+          { p_conversation_id: id }
+        );
+
+        if (readError) {
+          console.error("Read status update failed:", readError);
+        } else {
+          console.log("Conversation messages marked as read.");
+        }
+      }
+
+      if (err) {
+        console.error("Messages realtime error:", err);
+      }
+    });
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [id]);
+  }, [id, userId]);
 
   async function toggleBlock() {
     if (!otherUser || !userId || blocking) return;
@@ -804,6 +836,28 @@ export default function Messages() {
                                 : "text-slate-400"
                             }`}
                           >
+                            {isMine && (
+                              <span
+                                className={`text-[13px] font-bold leading-none ${
+                                  message.is_read
+                                    ? "text-sky-500"
+                                    : "text-slate-400"
+                                }`}
+                                title={
+                                  message.is_read
+                                    ? "مقروءة"
+                                    : message.delivered_at
+                                      ? "تم التسليم"
+                                      : "تم الإرسال"
+                                }
+                              >
+                                {message.is_read
+                                  ? "✓✓"
+                                  : message.delivered_at
+                                    ? "✓✓"
+                                    : "✓"}
+                              </span>
+                            )}
                             <Clock3 size={10} />
                             {formatMessageDate(message.created_at)}
                           </span>

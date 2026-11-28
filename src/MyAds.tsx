@@ -65,6 +65,23 @@ export default function MyAds() {
   const [ads, setAds] = useState<Ad[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeFilter, setActiveFilter] = useState<
+    "all" | "approved" | "pending" | "archived" | "rejected" | "sold"
+  >("all");
+
+  const counts = {
+    all: ads.length,
+    approved: ads.filter((ad) => ad.status === "approved").length,
+    pending: ads.filter((ad) => ad.status === "pending").length,
+    archived: ads.filter((ad) => ad.status === "archived").length,
+    rejected: ads.filter((ad) => ad.status === "rejected").length,
+    sold: ads.filter((ad) => ad.status === "sold").length,
+  };
+
+  const filteredAds =
+    activeFilter === "all"
+      ? ads
+      : ads.filter((ad) => ad.status === activeFilter);
 
 
   useEffect(() => {
@@ -198,14 +215,22 @@ export default function MyAds() {
     if (userId) invalidateAdsCache(`my-ads:${userId}`);
   }
   async function deleteAd(adId: string) {
+    let stage = "التحقق من الحساب";
+
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError) throw sessionError;
+
       const user = sessionData.session?.user;
 
       if (!user) {
         navigate("/auth");
         return;
       }
+
+      stage = "جلب صور الإعلان";
 
       const { data: imagesData, error: imagesError } = await supabase
         .from("ad_images")
@@ -218,35 +243,66 @@ export default function MyAds() {
         (image) => image.image_path
       );
 
-      if (imagePaths.length > 0) {
-        const { error: storageError } = await supabase.storage
-          .from("ad-images")
-          .remove(imagePaths);
+      stage = "التحقق من صلاحية حذف الإعلان";
 
-        if (storageError) throw storageError;
+      const { data: adData, error: adCheckError } = await supabase
+        .from("ads")
+        .select("id")
+        .eq("id", adId)
+        .eq("user_id", user.id)
+        .in("status", ["pending", "rejected"])
+        .maybeSingle();
+
+      if (adCheckError) throw adCheckError;
+
+      if (!adData) {
+        alert("لم يتم العثور على الإعلان أو أنه لم يعد قابلاً للحذف.");
+        return;
       }
 
-      const { error: deleteError } = await supabase
+      stage = "حذف الإعلان من قاعدة البيانات";
+
+      const { data: deletedAds, error: deleteError } = await supabase
         .from("ads")
         .delete()
         .eq("id", adId)
         .eq("user_id", user.id)
-        .in("status", ["pending", "rejected"]);
+        .in("status", ["pending", "rejected"])
+        .select("id");
 
       if (deleteError) throw deleteError;
 
+      if (!deletedAds || deletedAds.length === 0) {
+        throw new Error("لم تحذف قاعدة البيانات أي سجل للإعلان.");
+      }
+
       await invalidateCurrentUserAdsCache();
+
       setAds((previousAds) =>
         previousAds.filter((ad) => ad.id !== adId)
       );
 
+      if (imagePaths.length > 0) {
+        stage = "تنظيف صور الإعلان";
+
+        const { error: storageError } = await supabase.storage
+          .from("ad-images")
+          .remove(imagePaths);
+
+        if (storageError) {
+          console.error("فشل حذف صور الإعلان:", storageError);
+          alert("تم حذف الإعلان بنجاح، لكن تعذر حذف بعض الصور من التخزين.");
+          return;
+        }
+      }
+
       alert("تم حذف الإعلان بنجاح.");
     } catch (error) {
-      console.error("خطأ حذف الإعلان:", error);
-      alert("تعذر حذف الإعلان. حاول مرة أخرى.");
+      console.error("مرحلة فشل الحذف:", stage);
+      console.error("تفاصيل الخطأ:", error);
+      alert(`تعذر حذف الإعلان أثناء: ${stage}. راجع Console لمعرفة السبب.`);
     }
   }
-
   async function updateAdStatus(
     adId: string,
     newStatus: "sold" | "archived"
@@ -305,7 +361,7 @@ export default function MyAds() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link
             to="/"
-            className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-bold text-emerald-700 transition hover:bg-emerald-50"
+            className="inline-flex min-h-[34px] items-center gap-1.5 rounded-xl px-2 py-1.5 text-[11px] font-semibold leading-none text-emerald-700 transition hover:bg-emerald-50"
           >
             <ArrowRight size={19} />
             العودة للرئيسية
@@ -341,7 +397,7 @@ export default function MyAds() {
 
             <Link
               to="/add-ad"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 sm:px-5 sm:py-3 sm:text-sm"
+              className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-semibold leading-none text-white shadow-sm transition hover:bg-emerald-700 sm:px-5 sm:py-3 sm:text-sm"
             >
               <Plus size={17} />
               أضف إعلاناً جديداً
@@ -356,6 +412,51 @@ export default function MyAds() {
           )}
         </section>
 
+        {!loading && !error && ads.length > 0 && (
+          <section className="mb-5">
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 bg-white p-2 shadow-sm">
+              <span className="ml-1 text-[11px] font-bold text-slate-500">
+                تصفية حسب الحالة:
+              </span>
+              {[
+                { key: "all", label: "الكل" },
+                { key: "approved", label: "منشورة" },
+                { key: "pending", label: "قيد المراجعة" },
+                { key: "rejected", label: "مرفوضة" },
+                { key: "archived", label: "مؤرشفة" },
+                { key: "sold", label: "مباعة" },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setActiveFilter(item.key as typeof activeFilter)}
+                  className={`inline-flex min-h-[32px] items-center justify-center rounded-lg border border-transparent px-2.5 py-1.5 text-[11px] font-medium leading-none transition ${
+                    activeFilter === item.key
+                      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
+                      : "bg-slate-50 text-slate-600 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700"
+                  }`}
+                >
+                  {item.label}
+                  <span className="mr-1 opacity-75">
+                    ({counts[item.key as keyof typeof counts]})
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!loading && !error && ads.length > 0 && filteredAds.length === 0 && (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-12 text-center">
+            <Tag size={30} className="mx-auto mb-3 text-slate-300" />
+            <h2 className="font-bold text-slate-700">
+              لا توجد إعلانات بهذه الحالة
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              جرّب اختيار حالة أخرى لعرض إعلاناتك.
+            </p>
+          </div>
+        )}
         {loading && (
           <div className="rounded-2xl border border-slate-100 bg-white p-12 text-center shadow-sm">
             <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-emerald-100 border-t-emerald-600" />
@@ -396,8 +497,8 @@ export default function MyAds() {
         )}
 
         {!loading && !error && ads.length > 0 && (
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
-            {ads.map((ad) => {
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            {filteredAds.map((ad) => {
               const status = statusInfo[ad.status] ?? {
                 label: ad.status,
                 color: "bg-slate-100 text-slate-600 border-slate-200",
@@ -421,7 +522,7 @@ export default function MyAds() {
 
                   <Link
                     to={`/ad/${ad.id}`}
-                    className="group relative block aspect-square w-full overflow-hidden bg-slate-100"
+                    className="group relative block aspect-[16/10] w-full overflow-hidden bg-slate-100"
                   >
                     {ad.images.length > 0 ? (
                       <img
@@ -450,7 +551,7 @@ export default function MyAds() {
                     )}
                   </Link>
 
-                  <div className="flex flex-1 flex-col p-2 sm:p-3">
+                  <div className="flex flex-1 flex-col p-2 sm:p-2.5">
                     <div className="mb-1.5 flex min-w-0 items-center gap-1 text-[10px] text-slate-400 sm:text-xs">
                       <Tag size={11} className="shrink-0" />
                       <span className="truncate">
@@ -459,7 +560,7 @@ export default function MyAds() {
                     </div>
 
                     <Link to={`/ad/${ad.id}`}>
-                      <h2 className="line-clamp-2 min-h-[2.5rem] text-xs font-black leading-5 text-slate-800 transition hover:text-emerald-700 sm:min-h-[3rem] sm:text-sm sm:leading-6">
+                      <h2 className="line-clamp-2 min-h-[2.25rem] text-xs font-black leading-[1.35rem] text-slate-800 transition hover:text-emerald-700 sm:min-h-[2.5rem] sm:text-sm sm:leading-5">
                         {ad.title}
                       </h2>
                     </Link>
@@ -476,7 +577,7 @@ export default function MyAds() {
                         : "السعر عند التواصل"}
                     </div>
 
-                    <div className="mt-2 flex flex-col gap-1.5 border-t border-slate-100 pt-2 text-[10px] text-slate-500 sm:text-xs">
+                    <div className="mt-1.5 flex flex-row flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-1.5 text-[10px] text-slate-500 sm:text-xs">
                       <span className="flex min-w-0 items-center gap-1">
                         <MapPin size={12} className="shrink-0" />
                         <span className="truncate">
@@ -491,38 +592,38 @@ export default function MyAds() {
                     </div>
 
                     {ad.status === "rejected" && ad.rejection_reason && (
-                      <div className="mt-2 rounded-lg border border-red-100 bg-red-50/70 p-2 text-[10px] leading-5 text-red-700 sm:text-xs">
+                      <div className="mt-1.5 line-clamp-2 max-h-12 overflow-hidden rounded-lg border border-red-100 bg-red-50/70 p-1.5 text-[10px] leading-4 text-red-700 sm:text-xs">
                         <span className="font-bold">سبب الرفض:</span>{" "}
                         {ad.rejection_reason}
                       </div>
                     )}
 
-                    <div className="mt-auto flex flex-col gap-1.5 pt-3">
+                    <div className="mt-auto grid grid-cols-2 gap-1.5 pt-2">
                       {ad.status === "approved" && (
                         <>
                           <Link
                             to={`/ad/${ad.id}`}
-                            className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-2 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-50 sm:text-xs"
+                            className="inline-flex min-h-[34px] w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-white px-2 py-1.5 text-[11px] font-medium leading-none text-emerald-700 transition hover:bg-emerald-50  min-h-[36px] whitespace-nowrap !text-[11px] !font-medium !leading-none"
                           >
-                            <Eye size={13} />
-                            عرض الإعلان
+                            <Eye size={12} />
+                            عرض
                           </Link>
 
                           <button
                             type="button"
                             onClick={async () => {
                               const confirmed = await window.sooqConfirm(
-                                "هل تريد إغلاق الإعلان وأرشفته؟"
+                                "هل تريد إغلاق وأرشفته؟"
                               );
 
                               if (confirmed) {
                                 updateAdStatus(ad.id, "archived");
                               }
                             }}
-                            className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-2 text-[10px] font-bold text-slate-600 transition hover:bg-slate-50 sm:text-xs"
+                            className="inline-flex min-h-[34px] w-full items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-1.5 text-[11px] font-medium leading-none text-slate-600 transition hover:bg-slate-50  min-h-[36px] whitespace-nowrap !text-[11px] !font-medium !leading-none"
                           >
-                            <Archive size={13} />
-                            إغلاق الإعلان
+                            <Archive size={12} />
+                            إغلاق
                           </button>
 
             
@@ -532,16 +633,16 @@ export default function MyAds() {
                             !ad.store_id && (
                               <Link
                                 to={`/featured-campaign/${ad.id}`}
-                                className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 transition hover:bg-amber-100 sm:text-xs"
+                                className="col-span-2 inline-flex min-h-[34px] w-full items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-medium leading-none text-amber-700 transition hover:bg-amber-100  min-h-[36px] whitespace-nowrap !text-[11px] !font-medium !leading-none"
                               >
-                                <Star size={13} fill="currentColor" />
+                                <Star size={12} fill="currentColor" />
                                 تمييز الإعلان
                               </Link>
                             )}
 
                           {ad.is_featured && (
-                            <span className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[10px] font-bold text-amber-700 sm:text-xs">
-                              <Star size={13} fill="currentColor" />
+                            <span className="inline-flex min-h-[34px] w-full items-center justify-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] font-medium leading-none text-amber-700  min-h-[36px] whitespace-nowrap !text-[11px] !font-medium !leading-none">
+                              <Star size={12} fill="currentColor" />
                               إعلان مميز
                             </span>
                           )}
@@ -560,10 +661,10 @@ export default function MyAds() {
                               republishAd(ad.id);
                             }
                           }}
-                          className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2 text-[10px] font-bold text-emerald-700 transition hover:bg-emerald-100 sm:text-xs"
+                          className="col-span-2 inline-flex min-h-[34px] w-full items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[11px] font-medium leading-none text-emerald-700 transition hover:bg-emerald-100  min-h-[36px] whitespace-nowrap !text-[11px] !font-medium !leading-none"
                         >
-                          <RotateCcw size={13} />
-                          إعادة نشر الإعلان
+                          <RotateCcw size={12} />
+                          إعادة النشر
                         </button>
                       )}
 
@@ -572,10 +673,10 @@ export default function MyAds() {
                         ad.status === "approved") && (
                         <Link
                           to={`/edit-ad/${ad.id}`}
-                          className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-blue-100 bg-blue-50/50 px-2 py-2 text-[10px] font-bold text-blue-700 transition hover:bg-blue-50 sm:text-xs"
+                          className="inline-flex min-h-[34px] w-full items-center justify-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50/50 px-2 py-1.5 text-[11px] font-medium leading-none text-blue-700 transition hover:bg-blue-50  min-h-[36px] whitespace-nowrap !text-[11px] !font-medium !leading-none"
                         >
-                          <Pencil size={13} />
-                          تعديل الإعلان
+                          <Pencil size={12} />
+                          تعديل
                         </Link>
                       )}
 
@@ -591,10 +692,10 @@ export default function MyAds() {
                               deleteAd(ad.id);
                             }
                           }}
-                          className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-red-100 bg-red-50/50 px-2 py-2 text-[10px] font-bold text-red-600 transition hover:bg-red-50 sm:text-xs"
+                          className="inline-flex min-h-[34px] w-full items-center justify-center gap-1.5 rounded-xl border border-red-100 bg-red-50/50 px-2 py-1.5 text-[11px] font-medium leading-none text-red-600 transition hover:bg-red-50  min-h-[36px] whitespace-nowrap !text-[11px] !font-medium !leading-none"
                         >
-                          <Trash2 size={13} />
-                          حذف الإعلان
+                          <Trash2 size={12} />
+                          حذف
                         </button>
                       )}
                     </div>

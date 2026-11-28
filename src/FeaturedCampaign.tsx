@@ -242,45 +242,63 @@ export default function FeaturedCampaign() {
   }
 
   return (
-    <main dir="rtl" className="min-h-screen bg-slate-50">
-      <header className="border-b bg-white px-5 py-4">
-        <div className="mx-auto flex max-w-3xl items-center gap-3">
+    <main dir="rtl" className="min-h-screen bg-[#f6f8f7]">
+      <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-xl sm:px-5">
+        <div className="mx-auto flex max-w-4xl items-center gap-3">
           <button
             type="button"
             onClick={() => navigate("/my-ads")}
-            className="text-emerald-700"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
           >
             <ArrowRight size={22} />
           </button>
 
-          <h1 className="text-xl font-black text-slate-800">
+          <h1 className="text-lg font-extrabold tracking-tight text-slate-800 sm:text-xl">
             تمييز الإعلان
           </h1>
         </div>
       </header>
 
-      <div className="mx-auto max-w-3xl space-y-5 px-4 py-7">
+      <div className="mx-auto max-w-4xl space-y-5 px-3 py-5 sm:space-y-6 sm:px-5 sm:py-8">
 
+        <section className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                <Megaphone size={21} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-slate-500">الإعلان الذي تريد تمييزه</p>
+                <h2 className="mt-1 truncate text-sm font-bold text-slate-800 sm:text-base">
+                  {ad.title}
+                </h2>
+              </div>
+            </div>
+            <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700">
+              منشور
+            </span>
+          </div>
+        </section>
         {/* Campaign explanation */}
-        <section className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
-          <div className="bg-gradient-to-l from-amber-500 to-yellow-400 p-5 text-white">
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-amber-100 bg-gradient-to-l from-amber-50 via-orange-50/60 to-white p-5 text-slate-800 sm:p-7">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-amber-200 bg-white text-amber-600 shadow-sm sm:h-14 sm:w-14">
                 <Crown size={28} />
               </div>
 
               <div>
-                <h2 className="text-xl font-black">
+                <h2 className="text-lg font-extrabold tracking-tight text-slate-800 sm:text-xl">
                   خلّي إعلانك مميز!
                 </h2>
-                <p className="mt-1 text-sm text-white/90">
+                <p className="mt-1 text-xs leading-6 text-slate-500 sm:text-xs">
                   أبرز إعلانك وامنحه فرصة أكبر للوصول إلى المهتمين
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-4 p-5">
+          <div className="space-y-5 p-4 sm:p-6">
             <div className="flex items-center justify-between rounded-xl bg-amber-50 p-3">
               <div className="flex items-center gap-2 font-bold text-amber-800">
                 <CalendarDays size={20} />
@@ -292,8 +310,8 @@ export default function FeaturedCampaign() {
               </span>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 transition hover:border-emerald-100 hover:bg-emerald-50/30 sm:p-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
                   <Crown size={21} />
                 </div>
@@ -302,13 +320,13 @@ export default function FeaturedCampaign() {
                   <h3 className="font-bold text-slate-800">
                     الظهور ضمن الإعلانات المميزة
                   </h3>
-                  <p className="mt-1 text-sm leading-7 text-slate-600">
+                  <p className="mt-1 text-xs leading-7 text-slate-600">
                     ينتقل إعلانك إلى قسم الإعلانات المميزة ليظهر بشكل بارز أمام زوار الموقع.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 transition hover:border-emerald-100 hover:bg-emerald-50/30 sm:p-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
                   <BellRing size={21} />
                 </div>
@@ -317,13 +335,13 @@ export default function FeaturedCampaign() {
                   <h3 className="font-bold text-slate-800">
                     إشعار يومي عن إعلانك
                   </h3>
-                  <p className="mt-1 text-sm leading-7 text-slate-600">
+                  <p className="mt-1 text-xs leading-7 text-slate-600">
                     يتم إرسال إشعار يومي داخل التطبيق للتعريف بإعلانك المميز، لمدة 10 أيام متتالية.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 transition hover:border-emerald-100 hover:bg-emerald-50/30 sm:p-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                   <Megaphone size={21} />
                 </div>
@@ -332,13 +350,13 @@ export default function FeaturedCampaign() {
                   <h3 className="font-bold text-slate-800">
                     استهداف المحافظات التي تختارها
                   </h3>
-                  <p className="mt-1 text-sm leading-7 text-slate-600">
+                  <p className="mt-1 text-xs leading-7 text-slate-600">
                     يمكنك تحديد المحافظات التي تريد توجيه حملة التمييز إليها، حسب حاجتك وميزانيتك.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-3 transition hover:border-emerald-100 hover:bg-emerald-50/30 sm:p-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
                   <Eye size={21} />
                 </div>
@@ -347,7 +365,7 @@ export default function FeaturedCampaign() {
                   <h3 className="font-bold text-slate-800">
                     فرصة أكبر للمشاهدة والتواصل
                   </h3>
-                  <p className="mt-1 text-sm leading-7 text-slate-600">
+                  <p className="mt-1 text-xs leading-7 text-slate-600">
                     يساعد إبراز الإعلان والإشعارات اليومية على لفت انتباه المهتمين وزيادة فرص مشاهدة إعلانك والتواصل معك.
                   </p>
                 </div>
@@ -357,7 +375,7 @@ export default function FeaturedCampaign() {
             <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
               <div className="flex items-start gap-2">
                 <CheckCircle2 size={20} className="mt-0.5 shrink-0 text-emerald-600" />
-                <p className="text-sm leading-7 text-emerald-800">
+                <p className="text-xs leading-7 text-emerald-800">
                   يتم خصم النقاط عند إرسال الطلب، وتبدأ الحملة بعد موافقة الإدارة لمدة 10 أيام.
                   في حال رفض الطلب، تُعاد النقاط إلى رصيدك.
                 </p>
@@ -371,7 +389,7 @@ export default function FeaturedCampaign() {
         </section>
 
         {/* Points balance */}
-        <section className="rounded-2xl border border-emerald-200 bg-white p-5">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="flex items-center gap-2 font-bold text-slate-800">
@@ -404,7 +422,7 @@ export default function FeaturedCampaign() {
         </section>
 
         {/* Governorates */}
-        <section className="rounded-2xl border bg-white p-5">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="flex items-center gap-2 font-bold text-slate-800">
             <MapPin size={19} />
             اختر المحافظات المستهدفة
@@ -423,7 +441,7 @@ export default function FeaturedCampaign() {
                 setSelectedGovernorates(governorates.map((item) => item.id));
               }
             }}
-            className={`mb-3 w-full rounded-xl border p-3 text-sm font-bold ${
+            className={`mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border p-3 text-xs font-semibold transition-colors sm:text-sm ${
               selectedGovernorates.length === 14
                 ? "border-emerald-500 bg-emerald-50 text-emerald-800"
                 : "border-slate-200 bg-slate-50 text-slate-700"
@@ -434,14 +452,14 @@ export default function FeaturedCampaign() {
               : "تحديد جميع المحافظات الـ14 — 150 نقطة"}
           </button>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
             {governorates.map((governorate) => {
               const checked = selectedGovernorates.includes(governorate.id);
 
               return (
                 <label
                   key={governorate.id}
-                  className={`flex cursor-pointer items-center gap-2 rounded-xl border p-3 text-sm font-medium ${
+                  className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border p-3 text-xs font-medium transition-all duration-200 sm:text-sm ${
                     checked
                       ? "border-emerald-500 bg-emerald-50 text-emerald-800"
                       : "border-slate-200 bg-white text-slate-700"
@@ -466,7 +484,7 @@ export default function FeaturedCampaign() {
         </section>
 
         {/* Campaign cost */}
-        <section className="rounded-2xl border bg-white p-5">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="font-bold text-slate-800">
             ملخص تكلفة الحملة
           </h2>
@@ -484,7 +502,7 @@ export default function FeaturedCampaign() {
 
             <div className="flex justify-between">
               <span className="text-slate-500">تكلفة الحملة</span>
-              <strong className="text-emerald-700">
+              <strong className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700">
                 {campaignPoints
                   ? `${campaignPoints.toLocaleString("en-US")} نقطة`
                   : "—"}
@@ -513,7 +531,7 @@ export default function FeaturedCampaign() {
         </section>
 
         {/* Request submission */}
-        <section className="rounded-2xl border bg-white p-5">
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="font-bold text-slate-800">
             تأكيد طلب الحملة
           </h2>
@@ -553,7 +571,7 @@ export default function FeaturedCampaign() {
                 selectedCount === 0 ||
                 !hasEnoughPoints
               }
-              className="mt-5 w-full rounded-xl bg-emerald-600 px-5 py-4 font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-gradient-to-l from-emerald-700 to-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md hover:from-emerald-800 hover:to-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
             >
               {submitting
                 ? "جارٍ إرسال الطلب..."
